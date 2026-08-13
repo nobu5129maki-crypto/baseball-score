@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #070a08;
+  --elevated: #121a14;
+  --sunken: #050705;
+  --line: #2c3c30;
+  --ink: #f4f7f0;
+  --muted: #9aa894;
+  --ball: #3ddc84;
+  --strike: #f5c518;
+  --out: #ff5a5a;
+  --accent: #f5c518;
+  --accent-ink: #14180c;
+}
+
+@theme inline {
+  --font-sans: var(--font-noto);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100%;
+  font-family: var(--font-noto), "Hiragino Sans", sans-serif;
+}
+
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+
+.tap {
+  min-height: 56px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  border: 1px solid var(--line);
+  background: var(--elevated);
+  color: var(--ink);
+}
+
+.tap:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.tap-accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.tap-danger {
+  background: #2a1212;
+  color: #ffd0d0;
+  border-color: #5a2020;
+}
+
+.tap-ghost {
+  background: transparent;
+}
+
+.tap-result {
+  min-height: 64px;
+  font-size: 1.05rem;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  display: inline-block;
+}
+
+.dot.on {
+  background: currentColor;
+}
