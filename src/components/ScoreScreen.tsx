@@ -8,6 +8,7 @@ import {
   commitEnd,
   commitPb,
   commitPickoff,
+  commitPinchHitter,
   commitPinchRunner,
   commitPitch,
   commitPlay,
@@ -33,7 +34,7 @@ import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
 import { batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
-import type { Base, Dest, Game, PlayResult, Position, RunnerMove, RunnerOnBase, Side } from "@/lib/types";
+import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase, Side } from "@/lib/types";
 import { BsopBar } from "./BsopBar";
 import { DiamondMap } from "./DiamondMap";
 import { GlossarySheet } from "./GlossarySheet";
@@ -60,6 +61,7 @@ type SheetKind =
   | "cs"
   | "pickoff"
   | "pr"
+  | "ph"
   | "field"
   | "hit_runner";
 
@@ -305,10 +307,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </div>
       ) : (
         <>
-          <div className="px-2 grid grid-cols-4 gap-1 pb-1">
+          <div className="px-2 grid grid-cols-5 gap-1 pb-1">
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("steal")} label="盗塁" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("cs")} label="盗塁死" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pickoff")} label="牽制" />
+            <Action onClick={() => setSheet("ph")} label="代打" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pr")} label="代走" />
           </div>
           <div className="px-2 grid grid-cols-3 gap-1 pb-2">
@@ -565,6 +568,19 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           onClose={() => setSheet(null)}
           onPick={(base, player, position) => {
             void patch((g) => commitPinchRunner(g, base, player.id, player.name, position));
+            setSheet(null);
+          }}
+        />
+      ) : null}
+      {sheet === "ph" ? (
+        <PinchHitterSheet
+          batter={batter}
+          battingLineup={getLineup(state, battingSide(state.half))}
+          myTeamBatting={battingSide(state.half) === game.mySide}
+          players={players ?? []}
+          onClose={() => setSheet(null)}
+          onPick={(player) => {
+            void patch((g) => commitPinchHitter(g, player.id, player.name));
             setSheet(null);
           }}
         />
@@ -859,6 +875,64 @@ function PinchSheet({
           onClick={() =>
             onPick(base, { id: `pr-${Date.now()}`, name: name.trim() }, position)
           }
+        >
+          出す
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+function PinchHitterSheet({
+  batter,
+  battingLineup,
+  myTeamBatting,
+  players,
+  onClose,
+  onPick,
+}: {
+  batter: LineupSlot;
+  battingLineup: Game["firstLineup"];
+  myTeamBatting: boolean;
+  players: { id: string; name: string }[];
+  onClose: () => void;
+  onPick: (player: { id: string; name: string }) => void;
+}) {
+  const [name, setName] = useState("");
+  const activeIds = new Set(battingLineup.map((s) => s.playerId));
+  const bench = myTeamBatting ? players.filter((p) => !activeIds.has(p.id)) : [];
+
+  return (
+    <Sheet title="代打" onClose={onClose}>
+      <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+        今の打者 {batter.order}番 {batter.playerName} を代打にします。ボール・ストライクはそのままです。守備位置を変えたいときはメニューの「選手交代・守備変更」から直せます。
+      </p>
+      {bench.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          className="tap tap-result tap-accent w-full mb-2"
+          onClick={() => onPick(p)}
+        >
+          {p.name} を代打に
+        </button>
+      ))}
+      {myTeamBatting && bench.length === 0 ? (
+        <p className="text-sm text-[#9aa894] mb-2">控えがいません。名前を入力しても出せます。</p>
+      ) : null}
+      <div className="flex gap-2 mt-2">
+        <input
+          className="tap flex-1 px-3 bg-[#121a14]"
+          lang="ja"
+          placeholder="名前を入力して代打"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button
+          type="button"
+          className="tap tap-accent px-4"
+          disabled={!name.trim()}
+          onClick={() => onPick({ id: `ph-${Date.now()}`, name: name.trim() })}
         >
           出す
         </button>

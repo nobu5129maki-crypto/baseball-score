@@ -609,6 +609,16 @@ export function commitPinchRunner(
   return append(game, { t: "pr", base, playerId, playerName, position });
 }
 
+export function commitPinchHitter(
+  game: Game,
+  playerId: string,
+  playerName: string,
+): Game {
+  const state = reduceGame(game);
+  const batter = getBatter(state);
+  return commitSub(game, battingSide(state.half), batter.order, playerId, playerName, batter.position);
+}
+
 export function commitEnd(game: Game): Game {
   return { ...append(game, { t: "end_game" }), status: "ended" };
 }

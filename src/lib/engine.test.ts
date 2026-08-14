@@ -3,6 +3,7 @@ import {
   commitEnd,
   commitPb,
   commitPickoff,
+  commitPinchHitter,
   commitPinchRunner,
   commitPitch,
   commitPlay,
@@ -275,6 +276,20 @@ describe("らくスコア engine", () => {
     const state = reduceGame(game);
     expect(state.bases[0]?.playerName).toBe("代走太");
     expect(state.firstLineup[0].playerName).toBe("代走太");
+  });
+
+  it("代打すると今の打者が交代しカウントは残る", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    game = commitPinchHitter(game, "PH1", "代打太");
+    const state = reduceGame(game);
+    expect(getBatter(state).playerId).toBe("PH1");
+    expect(getBatter(state).playerName).toBe("代打太");
+    expect(getBatter(state).order).toBe(1);
+    expect(getBatter(state).position).toBe("P");
+    expect(state.strikes).toBe(1);
+    expect(state.balls).toBe(1);
   });
 
   it("打球方向付きのヒットを記録できる", () => {
