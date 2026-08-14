@@ -7,6 +7,7 @@ import {
   commitPinchRunner,
   commitPitch,
   commitPlay,
+  commitPositionSwap,
   commitSteal,
   commitSub,
   commitWp,
@@ -209,6 +210,21 @@ describe("らくスコア engine", () => {
     expect(state.hits.first).toBe(0);
     expect(state.errors.second).toBe(1);
     expect(state.bases[0]?.playerId).toBe("A1");
+  });
+
+  it("守備位置の入れ替えで打順は変わらない", () => {
+    let game = makeGame();
+    const before = reduceGame(game);
+    const first = before.firstLineup[0];
+    const second = before.firstLineup[1];
+    expect(first.position).toBe("P");
+    expect(second.position).toBe("C");
+    game = commitPositionSwap(game, "first", 1, 2);
+    const state = reduceGame(game);
+    expect(state.firstLineup[0].playerId).toBe(first.playerId);
+    expect(state.firstLineup[0].position).toBe("C");
+    expect(state.firstLineup[1].playerId).toBe(second.playerId);
+    expect(state.firstLineup[1].position).toBe("P");
   });
 
   it("交代すると次打者名が変わる", () => {

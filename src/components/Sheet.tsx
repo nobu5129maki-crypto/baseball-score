@@ -6,10 +6,12 @@ export function Sheet({
   title,
   children,
   onClose,
+  tall,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  tall?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -19,7 +21,11 @@ export function Sheet({
         aria-label="閉じる"
         onClick={onClose}
       />
-      <div className="rounded-t-2xl bg-[#121a14] border-t border-[#2c3c30] p-4 pb-8 max-h-[80vh] overflow-y-auto">
+      <div
+        className={`rounded-t-2xl bg-[#121a14] border-t border-[#2c3c30] p-4 pb-8 overflow-y-auto ${
+          tall ? "max-h-[92dvh]" : "max-h-[80vh]"
+        }`}
+      >
         <div className="flex items-center mb-3">
           <h2 className="flex-1 text-lg font-bold">{title}</h2>
           <button type="button" className="tap tap-ghost px-3 text-sm" onClick={onClose}>

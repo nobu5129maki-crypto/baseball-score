@@ -13,9 +13,9 @@ import {
   commitPitch,
   commitPlay,
   commitSteal,
-  commitSub,
   commitWp,
   battingSide,
+  fieldingSide,
   getBatter,
   getLineup,
   getPitcher,
@@ -34,8 +34,9 @@ import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
 import { batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
-import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase, Side } from "@/lib/types";
+import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { BsopBar } from "./BsopBar";
+import { DefenseSheet } from "./DefenseSheet";
 import { DiamondMap } from "./DiamondMap";
 import { GlossarySheet } from "./GlossarySheet";
 import { InningScoreTable } from "./InningScoreTable";
@@ -307,6 +308,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </div>
       ) : (
         <>
+          <div className="px-2 pb-1">
+            <button type="button" className="tap w-full text-sm" onClick={() => setSheet("sub")}>
+              守備位置・交代
+            </button>
+            {fieldingSide(state.half) === game.mySide ? (
+              <p className="text-xs text-[#f5c518] text-center mt-1">今は守備中。投手交代や守備位置の入れ替えはここから</p>
+            ) : null}
+          </div>
           <div className="px-2 grid grid-cols-5 gap-1 pb-1">
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("steal")} label="盗塁" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("cs")} label="盗塁死" />
@@ -480,7 +489,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           <div className="flex flex-col gap-3">
             <InningScoreTable state={state} firstName={firstName} secondName={secondName} />
             <button type="button" className="tap w-full" onClick={() => setSheet("sub")}>
-              選手交代・守備変更
+              守備位置・交代
             </button>
             <Link href={`/games/${gameId}/lineup`} className="tap w-full flex items-center justify-center">
               メンバーを修正
@@ -498,17 +507,16 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </Sheet>
       ) : null}
       {sheet === "sub" ? (
-        <SubSheet
-          game={game}
+        <DefenseSheet
           lineup={getLineup(state, game.mySide)}
           otherLineup={getLineup(state, game.mySide === "first" ? "second" : "first")}
           mySide={game.mySide}
+          fieldingSide={fieldingSide(state.half)}
+          myTeamName={game.myTeamName}
+          opponentName={game.opponentName}
           players={players ?? []}
+          onApply={(mut) => void patch(mut)}
           onClose={() => setSheet(null)}
-          onSub={(s, order, playerId, playerName, position) => {
-            void patch((g) => commitSub(g, s, order, playerId, playerName, position));
-            setSheet(null);
-          }}
         />
       ) : null}
       {sheet === "steal" ? (
@@ -676,99 +684,6 @@ function ResultSheet({
   );
 }
 
-function SubSheet({
-  lineup,
-  otherLineup,
-  mySide,
-  players,
-  onClose,
-  onSub,
-}: {
-  game: Game;
-  lineup: Game["firstLineup"];
-  otherLineup: Game["firstLineup"];
-  mySide: Side;
-  players: { id: string; name: string }[];
-  onClose: () => void;
-  onSub: (
-    side: Side,
-    order: number,
-    playerId: string,
-    playerName: string,
-    position: Game["firstLineup"][0]["position"],
-  ) => void;
-}) {
-  const [order, setOrder] = useState(1);
-  const [side, setSide] = useState<Side>(mySide);
-  const slots = side === mySide ? lineup : otherLineup;
-  const slot = slots.find((s) => s.order === order) ?? slots[0];
-  const activeIds = new Set(slots.map((s) => s.playerId));
-  const bench = side === mySide ? players.filter((p) => !activeIds.has(p.id)) : [];
-
-  return (
-    <Sheet title="選手交代・守備変更" onClose={onClose}>
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        <button type="button" className={`tap ${side === mySide ? "tap-accent" : ""}`} onClick={() => setSide(mySide)}>
-          自チーム
-        </button>
-        <button
-          type="button"
-          className={`tap ${side !== mySide ? "tap-accent" : ""}`}
-          onClick={() => setSide(mySide === "first" ? "second" : "first")}
-        >
-          相手
-        </button>
-      </div>
-      <p className="text-sm text-[#9aa894] mb-2">打順を選んで、控えと入れ替え / 守備位置を変更</p>
-      <div className="grid grid-cols-9 gap-1 mb-3">
-        {slots.map((s) => (
-          <button
-            key={s.order}
-            type="button"
-            className={`tap min-h-12 px-0 text-sm ${s.order === order ? "tap-accent" : ""}`}
-            onClick={() => setOrder(s.order)}
-          >
-            {s.order}
-          </button>
-        ))}
-      </div>
-      <p className="text-sm mb-2">
-        {slot.order}番 {slot.playerName}（{POSITION_LABELS[slot.position]}）
-      </p>
-      <div className="grid grid-cols-3 gap-1 mb-3">
-        {(Object.keys(POSITION_LABELS) as Array<keyof typeof POSITION_LABELS>).map((pos) => (
-          <button
-            key={pos}
-            type="button"
-            className={`tap min-h-12 text-xs ${slot.position === pos ? "tap-accent" : ""}`}
-            onClick={() => onSub(side, slot.order, slot.playerId, slot.playerName, pos)}
-          >
-            {POSITION_LABELS[pos]}
-          </button>
-        ))}
-      </div>
-      {bench.length === 0 ? (
-        <p className="text-sm text-[#9aa894]">
-          {side === mySide ? "控えがいません。打順画面からも交代できます。" : "相手は打順画面で名前を直せます。"}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {bench.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="tap w-full"
-              onClick={() => onSub(side, slot.order, p.id, p.name, slot.position)}
-            >
-              {p.name} と交代
-            </button>
-          ))}
-        </div>
-      )}
-    </Sheet>
-  );
-}
-
 function RunnerPickSheet({
   title,
   hint,
@@ -913,7 +828,7 @@ function PinchHitterSheet({
   return (
     <Sheet title="代打" onClose={onClose}>
       <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-        今の打者 {batter.order}番 {batter.playerName} を代打にします。ボール・ストライクはそのままです。守備位置を変えたいときはメニューの「選手交代・守備変更」から直せます。
+        今の打者 {batter.order}番 {batter.playerName} を代打にします。ボール・ストライクはそのままです。守備位置を変えたいときは「守備位置・交代」から直せます。
       </p>
       {bench.map((p) => (
         <button

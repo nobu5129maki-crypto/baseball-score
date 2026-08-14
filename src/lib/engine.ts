@@ -620,6 +620,18 @@ export function commitPinchHitter(
   return commitSub(game, battingSide(state.half), batter.order, playerId, playerName, batter.position);
 }
 
+export function commitPositionSwap(game: Game, side: Side, orderA: number, orderB: number): Game {
+  if (orderA === orderB) return game;
+  const state = reduceGame(game);
+  const lineup = getLineup(state, side);
+  const a = lineup.find((s) => s.order === orderA);
+  const b = lineup.find((s) => s.order === orderB);
+  if (!a || !b) return game;
+  let next = commitSub(game, side, a.order, a.playerId, a.playerName, b.position);
+  next = commitSub(next, side, b.order, b.playerId, b.playerName, a.position);
+  return next;
+}
+
 export function commitEnd(game: Game): Game {
   return { ...append(game, { t: "end_game" }), status: "ended" };
 }
