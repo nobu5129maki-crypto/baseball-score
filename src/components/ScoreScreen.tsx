@@ -348,13 +348,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           </div>
           <div className={`px-2 pb-2 ${leftHanded ? "flex flex-col-reverse" : ""}`}>
             <div className="grid grid-cols-3 gap-2 mb-2">
-              <button type="button" className="tap" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
+              <button type="button" className="tap tap-ball" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
                 ボール
               </button>
-              <button type="button" className="tap" onClick={() => void patch((g) => commitPitch(g, "strike"))}>
+              <button type="button" className="tap tap-strike" onClick={() => void patch((g) => commitPitch(g, "strike"))}>
                 ストライク
               </button>
-              <button type="button" className="tap" onClick={() => void patch((g) => commitPitch(g, "foul"))}>
+              <button type="button" className="tap tap-foul" onClick={() => void patch((g) => commitPitch(g, "foul"))}>
                 ファウル
               </button>
             </div>
