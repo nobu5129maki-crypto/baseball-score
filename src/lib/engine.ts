@@ -14,6 +14,7 @@ import type {
   RunnerOnBase,
   Side,
 } from "./types";
+import { SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
   return half === "top" ? "first" : "second";
@@ -30,7 +31,7 @@ export function otherSide(side: Side): Side {
 export function emptyState(
   game: Pick<Game, "scheduledInnings" | "firstLineup" | "secondLineup">,
 ): GameState {
-  const innings = Math.max(1, game.scheduledInnings);
+  const innings = Math.max(SCOREBOARD_INNINGS, game.scheduledInnings);
   return {
     inning: 1,
     half: "top",
@@ -84,23 +85,76 @@ export function totalRuns(scores: number[]): number {
   return scores.reduce((sum, n) => sum + n, 0);
 }
 
+export function getPitcher(state: GameState): LineupSlot | undefined {
+  const side = fieldingSide(state.half);
+  return getLineup(state, side).find((slot) => slot.position === "P");
+}
+
+export function needsFieldPosition(result: PlayResult): boolean {
+  return (
+    result === "single" ||
+    result === "double" ||
+    result === "triple" ||
+    result === "groundout" ||
+    result === "flyout" ||
+    result === "lineout" ||
+    result === "error" ||
+    result === "gidp" ||
+    result === "fielders_choice" ||
+    result === "sac_bunt" ||
+    result === "sac_fly"
+  );
+}
+
+export function previewAfterMoves(
+  state: GameState,
+  moves: RunnerMove[],
+  batter: LineupSlot,
+): { bases: GameState["bases"]; scored: string[]; outs: string[] } {
+  const names = runnerLookup(state, batter);
+  const locations = new Map<string, 0 | Dest>();
+  locations.set(batter.playerId, 0);
+  state.bases.forEach((runner, index) => {
+    if (runner) locations.set(runner.playerId, (index + 1) as Base);
+  });
+  for (const move of moves) locations.set(move.playerId, move.to);
+
+  const bases: GameState["bases"] = [null, null, null];
+  const scored: string[] = [];
+  const outs: string[] = [];
+  for (const [playerId, loc] of locations) {
+    const info = names.get(playerId);
+    const name = info?.playerName ?? "走者";
+    if (loc === "out") {
+      outs.push(name);
+      continue;
+    }
+    if (loc === 0) continue;
+    if (loc === 4) {
+      scored.push(name);
+      continue;
+    }
+    bases[loc - 1] = info ?? { playerId, playerName: name, battingOrder: 0 };
+  }
+  return { bases, scored, outs };
+}
+
 export function needsRunnerConfirm(result: PlayResult, state: GameState): boolean {
+  if (result === "strikeout") return false;
+  if (result === "homerun") return false;
+  const hasRunner = state.bases.some(Boolean);
+  if (hasRunner) return true;
   if (
-    result === "strikeout" ||
+    result === "groundout" ||
+    result === "flyout" ||
+    result === "lineout" ||
     result === "walk" ||
     result === "hbp" ||
-    result === "homerun"
+    result === "dropped_third"
   ) {
     return false;
   }
-  const hasRunner = state.bases.some(Boolean);
-  if (
-    !hasRunner &&
-    (result === "groundout" || result === "flyout" || result === "lineout")
-  ) {
-    return false;
-  }
-  return true;
+  return false;
 }
 
 export function proposeMoves(
@@ -129,6 +183,7 @@ export function proposeMoves(
       return [batterMove(4), ...plus(state.bases, 4)];
     case "walk":
     case "hbp":
+    case "dropped_third":
       return forceWalk(batter.playerId, state.bases);
     case "strikeout":
     case "groundout":
@@ -194,6 +249,8 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       });
     case "steal":
       return applySteal(game, state, event.from, event.to);
+    case "pickoff":
+      return applySteal(game, state, event.from, "out");
     case "wp":
     case "pb":
       return applyOccupancy(game, state, plus(state.bases, 1), {
@@ -208,6 +265,8 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
         event.playerName,
         event.position,
       );
+    case "pr":
+      return applyPinchRunner(state, event.base, event.playerId, event.playerName, event.position);
     case "end_game":
       return { ...state, ended: true };
   }
@@ -394,14 +453,40 @@ function applySub(
   playerName: string,
   position: Position,
 ): GameState {
-  const patch = (slots: LineupSlot[]) =>
-    slots.map((slot) =>
-      slot.order === order ? { ...slot, playerId, playerName, position } : slot,
-    );
+  const current = getLineup(state, side);
+  const nextLineup = current.map((slot) =>
+    slot.order === order ? { ...slot, playerId, playerName, position } : slot,
+  );
+  const oldPitcher = current.find((slot) => slot.position === "P")?.playerId;
+  const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId;
+  const pitchesThrown =
+    oldPitcher !== newPitcher
+      ? { ...state.pitchesThrown, [side]: 0 }
+      : state.pitchesThrown;
   if (side === "first") {
-    return { ...state, firstLineup: patch(state.firstLineup) };
+    return { ...state, firstLineup: nextLineup, pitchesThrown };
   }
-  return { ...state, secondLineup: patch(state.secondLineup) };
+  return { ...state, secondLineup: nextLineup, pitchesThrown };
+}
+
+function applyPinchRunner(
+  state: GameState,
+  base: Base,
+  playerId: string,
+  playerName: string,
+  position: Position,
+): GameState {
+  const runner = state.bases[base - 1];
+  if (!runner) return state;
+  const side = battingSide(state.half);
+  const next = applySub(state, side, runner.battingOrder, playerId, playerName, position);
+  const bases: GameState["bases"] = [...next.bases];
+  bases[base - 1] = {
+    playerId,
+    playerName,
+    battingOrder: runner.battingOrder,
+  };
+  return { ...next, bases };
 }
 
 export function undoLast(events: GameEvent[]): GameEvent[] {
@@ -452,15 +537,24 @@ export function commitPitch(game: Game, kind: PitchKind): Game {
   return next;
 }
 
-export function commitPlay(game: Game, result: PlayResult, moves?: RunnerMove[]): Game {
+export function commitPlay(
+  game: Game,
+  result: PlayResult,
+  moves?: RunnerMove[],
+  field?: Position,
+): Game {
   const state = reduceGame(game);
   const batter = getBatter(state);
   const resolved = moves ?? proposeMoves(result, state, batter);
-  return append(game, { t: "play", result, moves: resolved });
+  return append(game, { t: "play", result, moves: resolved, field });
 }
 
 export function commitSteal(game: Game, from: Base, to: Dest): Game {
   return append(game, { t: "steal", from, to });
+}
+
+export function commitPickoff(game: Game, from: Base): Game {
+  return append(game, { t: "pickoff", from });
 }
 
 export function commitWp(game: Game): Game {
@@ -480,6 +574,16 @@ export function commitSub(
   position: Position,
 ): Game {
   return append(game, { t: "sub", side, order, playerId, playerName, position });
+}
+
+export function commitPinchRunner(
+  game: Game,
+  base: Base,
+  playerId: string,
+  playerName: string,
+  position: Position,
+): Game {
+  return append(game, { t: "pr", base, playerId, playerName, position });
 }
 
 export function commitEnd(game: Game): Game {

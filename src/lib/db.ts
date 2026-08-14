@@ -1,11 +1,12 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Game, Player, Settings, Team } from "./types";
+import type { Game, Player, RosterPack, Settings, Team } from "./types";
 
 export class RakuScoreDB extends Dexie {
   teams!: EntityTable<Team, "id">;
   players!: EntityTable<Player, "id">;
   games!: EntityTable<Game, "id">;
   settings!: EntityTable<Settings, "id">;
+  rosters!: EntityTable<RosterPack, "id">;
 
   constructor() {
     super("raku-score");
@@ -14,6 +15,13 @@ export class RakuScoreDB extends Dexie {
       players: "id, teamId, name",
       games: "id, updatedAt, status",
       settings: "id",
+    });
+    this.version(2).stores({
+      teams: "id, name",
+      players: "id, teamId, name",
+      games: "id, updatedAt, status",
+      settings: "id",
+      rosters: "id, name",
     });
   }
 }

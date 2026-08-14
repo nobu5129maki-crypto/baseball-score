@@ -1,4 +1,5 @@
 import { totalRuns } from "@/lib/engine";
+import { SCOREBOARD_INNINGS } from "@/lib/types";
 import type { GameState } from "@/lib/types";
 
 export function InningScoreTable({
@@ -10,7 +11,11 @@ export function InningScoreTable({
   firstName: string;
   secondName: string;
 }) {
-  const cols = Math.max(state.scores.first.length, state.scores.second.length, 7);
+  const cols = Math.max(
+    SCOREBOARD_INNINGS,
+    state.scores.first.length,
+    state.scores.second.length,
+  );
   const headers = Array.from({ length: cols }, (_, i) => String(i + 1));
 
   return (
@@ -75,7 +80,10 @@ function ScoreRow({
 }) {
   return (
     <tr className={active ? "bg-[#1a281c]" : ""}>
-      <td className="p-1 text-left font-bold truncate max-w-20">{name}</td>
+      <td className={`p-1 text-left font-bold truncate max-w-24 ${active ? "text-[#f5c518]" : ""}`}>
+        {active ? "攻 " : ""}
+        {name}
+      </td>
       {innings.map((v, i) => (
         <td key={`${name}-${i}`} className="p-1">
           {v === null ? "·" : v}

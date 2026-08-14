@@ -1,4 +1,4 @@
-import type { PlayResult } from "./types";
+import { POSITION_SHORT, type PlayResult, type Position } from "./types";
 
 export const PLAY_LABELS: Record<PlayResult, string> = {
   single: "シングル",
@@ -6,6 +6,7 @@ export const PLAY_LABELS: Record<PlayResult, string> = {
   triple: "スリーベース",
   homerun: "ホームラン",
   strikeout: "三振",
+  dropped_third: "振り逃げ",
   walk: "四球",
   hbp: "死球",
   groundout: "ゴロ",
@@ -18,11 +19,48 @@ export const PLAY_LABELS: Record<PlayResult, string> = {
   sac_fly: "犠牲フライ",
 };
 
+export const PLAY_SHORT: Record<PlayResult, string> = {
+  single: "安",
+  double: "二",
+  triple: "三",
+  homerun: "本",
+  strikeout: "三振",
+  dropped_third: "振逃",
+  walk: "四",
+  hbp: "死",
+  groundout: "ゴロ",
+  flyout: "飛",
+  lineout: "直",
+  gidp: "併",
+  error: "失",
+  fielders_choice: "野選",
+  sac_bunt: "犠",
+  sac_fly: "犠飛",
+};
+
 export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun"];
 export const OUT_RESULTS: PlayResult[] = ["groundout", "flyout", "lineout", "gidp"];
-export const OTHER_RESULTS: PlayResult[] = [
+export const OTHER_RESULTS: PlayResult[] = ["fielders_choice", "sac_bunt", "sac_fly"];
+
+export const FIELD_RESULTS: PlayResult[] = [
+  "single",
+  "double",
+  "triple",
+  "groundout",
+  "flyout",
+  "lineout",
+  "gidp",
   "error",
   "fielders_choice",
   "sac_bunt",
   "sac_fly",
 ];
+
+export function needsField(result: PlayResult): boolean {
+  return FIELD_RESULTS.includes(result);
+}
+
+export function playLabel(result: PlayResult, field?: Position): string {
+  if (!field) return PLAY_LABELS[result];
+  return `${POSITION_SHORT[field]}${PLAY_SHORT[result]}`;
+}

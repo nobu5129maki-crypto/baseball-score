@@ -48,10 +48,13 @@ export default function HomePage() {
       </section>
 
       <nav className="sticky bottom-0 border-t border-[#2c3c30] bg-[#070a08] px-4 py-3 flex gap-2">
-        <Link href="/teams" className="tap flex-1 flex items-center justify-center">
+        <Link href="/teams" className="tap flex-1 flex items-center justify-center text-sm">
           チーム
         </Link>
-        <Link href="/settings" className="tap flex-1 flex items-center justify-center">
+        <Link href="/stats" className="tap flex-1 flex items-center justify-center text-sm">
+          成績
+        </Link>
+        <Link href="/settings" className="tap flex-1 flex items-center justify-center text-sm">
           設定
         </Link>
       </nav>

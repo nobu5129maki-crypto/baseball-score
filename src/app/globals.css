@@ -89,3 +89,34 @@ select {
 .dot.on {
   background: currentColor;
 }
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    padding: 0;
+  }
+  body * {
+    color: #111 !important;
+    border-color: #333 !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  header,
+  nav,
+  .tap,
+  button {
+    display: none !important;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    border: 1px solid #333;
+    padding: 4px;
+  }
+}

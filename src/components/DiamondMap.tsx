@@ -7,6 +7,7 @@ type Props = {
   batterName: string;
   selectedId: string | null;
   edit: boolean;
+  displayBases?: GameState["bases"];
   onSelectRunner: (runner: RunnerOnBase, from: 0 | 1 | 2 | 3) => void;
   onSelectDest: (to: Dest) => void;
 };
@@ -16,18 +17,20 @@ export function DiamondMap({
   batterName,
   selectedId,
   edit,
+  displayBases,
   onSelectRunner,
   onSelectDest,
 }: Props) {
+  const shown = displayBases ?? state.bases;
   const bases: Array<{
     loc: 1 | 2 | 3;
     x: number;
     y: number;
     runner: RunnerOnBase | null;
   }> = [
-    { loc: 2, x: 120, y: 28, runner: state.bases[1] },
-    { loc: 1, x: 200, y: 110, runner: state.bases[0] },
-    { loc: 3, x: 40, y: 110, runner: state.bases[2] },
+    { loc: 2, x: 120, y: 28, runner: shown[1] },
+    { loc: 1, x: 200, y: 110, runner: shown[0] },
+    { loc: 3, x: 40, y: 110, runner: shown[2] },
   ];
 
   return (

@@ -38,6 +38,20 @@ export const POSITION_LABELS: Record<Position, string> = {
   RF: "ライト",
 };
 
+export const POSITION_SHORT: Record<Position, string> = {
+  P: "投",
+  C: "捕",
+  "1B": "一",
+  "2B": "二",
+  "3B": "三",
+  SS: "遊",
+  LF: "左",
+  CF: "中",
+  RF: "右",
+};
+
+export const SCOREBOARD_INNINGS = 12;
+
 export type PitchKind = "ball" | "strike" | "foul";
 
 export type PlayResult =
@@ -46,6 +60,7 @@ export type PlayResult =
   | "triple"
   | "homerun"
   | "strikeout"
+  | "dropped_third"
   | "walk"
   | "hbp"
   | "groundout"
@@ -76,6 +91,7 @@ export type PlayEvent = {
   t: "play";
   result: PlayResult;
   moves: RunnerMove[];
+  field?: Position;
 };
 
 export type StealEvent = {
@@ -89,12 +105,29 @@ export type StealEvent = {
 export type WpEvent = { id: string; seq: number; t: "wp" };
 export type PbEvent = { id: string; seq: number; t: "pb" };
 
+export type PickoffEvent = {
+  id: string;
+  seq: number;
+  t: "pickoff";
+  from: Base;
+};
+
 export type SubEvent = {
   id: string;
   seq: number;
   t: "sub";
   side: Side;
   order: number;
+  playerId: string;
+  playerName: string;
+  position: Position;
+};
+
+export type PinchRunnerEvent = {
+  id: string;
+  seq: number;
+  t: "pr";
+  base: Base;
   playerId: string;
   playerName: string;
   position: Position;
@@ -108,7 +141,9 @@ export type GameEvent =
   | StealEvent
   | WpEvent
   | PbEvent
+  | PickoffEvent
   | SubEvent
+  | PinchRunnerEvent
   | EndEvent;
 
 export type LineupSlot = {
@@ -116,6 +151,7 @@ export type LineupSlot = {
   playerId: string;
   playerName: string;
   position: Position;
+  number?: string;
 };
 
 export type GameStatus = "lineup" | "in_progress" | "ended";
@@ -147,6 +183,14 @@ export type Player = {
   teamId: string;
   name: string;
   number: string;
+  kana?: string;
+  createdAt: number;
+};
+
+export type RosterPack = {
+  id: string;
+  name: string;
+  players: Array<{ name: string; number: string; kana?: string }>;
   createdAt: number;
 };
 

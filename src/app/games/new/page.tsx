@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
@@ -59,6 +60,9 @@ export default function NewGamePage() {
         }}
       >
         <Field label="自チーム">{team?.name ?? "…"}</Field>
+        <Link href="/teams" className="text-sm text-[#f5c518] -mt-2">
+          チーム名・選手を修正する
+        </Link>
         <label className="flex flex-col gap-1">
           <span className="text-sm text-[#9aa894]">相手チーム</span>
           <input
@@ -102,9 +106,9 @@ export default function NewGamePage() {
             value={innings}
             onChange={(e) => setInnings(Number(e.target.value))}
           >
-            {[5, 6, 7, 9].map((n) => (
+            {[5, 6, 7, 9, 12].map((n) => (
               <option key={n} value={n}>
-                {n}回
+                {n}回{n === 12 ? "（延長込み）" : ""}
               </option>
             ))}
           </select>

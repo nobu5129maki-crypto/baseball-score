@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   commitEnd,
   commitPb,
+  commitPickoff,
+  commitPinchRunner,
   commitPitch,
   commitPlay,
   commitSteal,
   commitSub,
   commitWp,
   getBatter,
+  previewAfterMoves,
   proposeMoves,
   reduceGame,
   undoAtBat,
@@ -54,7 +57,7 @@ describe("らくスコア engine", () => {
     expect(state.half).toBe("top");
     expect(state.outs).toBe(0);
     expect(getBatter(state).playerName).toBe("A1");
-    expect(state.scores.first).toHaveLength(7);
+    expect(state.scores.first).toHaveLength(12);
   });
 
   it("ボール4つで四球、打者が1塁", () => {
@@ -227,5 +230,66 @@ describe("らくスコア engine", () => {
     const state = reduceGame(game);
     const moves = proposeMoves("walk", state, getBatter(state));
     expect(moves.some((m) => m.to === 4)).toBe(true);
+  });
+
+  it("二塁走者はツーベースでも三塁で止められる", () => {
+    let game = commitPlay(makeGame(), "double");
+    const r2 = reduceGame(game).bases[1];
+    expect(r2?.playerId).toBe("A1");
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    const custom = [
+      { playerId: batter.playerId, from: 0 as const, to: 2 as const },
+      { playerId: r2!.playerId, from: 2 as const, to: 3 as const },
+    ];
+    const preview = previewAfterMoves(before, custom, batter);
+    expect(preview.bases[1]?.playerId).toBe(batter.playerId);
+    expect(preview.bases[2]?.playerId).toBe("A1");
+    expect(preview.scored).toHaveLength(0);
+    game = commitPlay(game, "double", custom);
+    const state = reduceGame(game);
+    expect(state.bases[1]?.playerId).toBe(batter.playerId);
+    expect(state.bases[2]?.playerId).toBe("A1");
+    expect(state.scores.first[0]).toBe(0);
+  });
+
+  it("振り逃げは打者が1塁に生きる", () => {
+    const state = reduceGame(commitPlay(makeGame(), "dropped_third"));
+    expect(state.outs).toBe(0);
+    expect(state.bases[0]?.playerId).toBe("A1");
+  });
+
+  it("牽制アウトで走者が消える", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPickoff(game, 1);
+    const state = reduceGame(game);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]).toBeNull();
+    expect(getBatter(state).playerId).toBe("A2");
+  });
+
+  it("一塁に代走を出せる", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPinchRunner(game, 1, "PR1", "代走太", "LF");
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerName).toBe("代走太");
+    expect(state.firstLineup[0].playerName).toBe("代走太");
+  });
+
+  it("打球方向付きのヒットを記録できる", () => {
+    const game = commitPlay(makeGame(), "single", undefined, "LF");
+    const play = game.events.find((e) => e.t === "play");
+    expect(play && play.t === "play" && play.field).toBe("LF");
+  });
+
+  it("投手交代で今の投手の投球数はリセットされる", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    expect(reduceGame(game).pitchesThrown.second).toBe(2);
+    game = commitSub(game, "second", 1, "PX", "新投手", "P");
+    expect(reduceGame(game).pitchesThrown.second).toBe(0);
+    game = commitPitch(game, "strike");
+    expect(reduceGame(game).pitchesThrown.second).toBe(1);
   });
 });
