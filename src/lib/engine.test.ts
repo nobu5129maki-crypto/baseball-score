@@ -12,6 +12,7 @@ import {
   getBatter,
   previewAfterMoves,
   proposeMoves,
+  proposeRunnerHit,
   reduceGame,
   undoAtBat,
   undoLast,
@@ -291,5 +292,17 @@ describe("らくスコア engine", () => {
     expect(reduceGame(game).pitchesThrown.second).toBe(0);
     game = commitPitch(game, "strike");
     expect(reduceGame(game).pitchesThrown.second).toBe(1);
+  });
+
+  it("打球が走者に当たるとその走者はアウト、打者は1塁", () => {
+    let game = commitPlay(makeGame(), "single");
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "runner_hit", proposeRunnerHit(before, batter, 1));
+    const state = reduceGame(game);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    expect(state.hits.first).toBe(1);
+    expect(getBatter(state).playerId).toBe("A3");
   });
 });

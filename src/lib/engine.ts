@@ -206,7 +206,30 @@ export function proposeMoves(
           ? [{ playerId: r3.playerId, from: 3 as const, to: 4 as const }]
           : []),
       ];
+    case "runner_hit": {
+      const hit = ([1, 2, 3] as const).find((base) => state.bases[base - 1]);
+      if (!hit) return [batterMove(1)];
+      return proposeRunnerHit(state, batter, hit);
+    }
   }
+}
+
+export function proposeRunnerHit(
+  state: GameState,
+  batter: LineupSlot,
+  hitBase: Base,
+): RunnerMove[] {
+  const hitRunner = state.bases[hitBase - 1];
+  if (!hitRunner) {
+    return [{ playerId: batter.playerId, from: 0, to: 1 }];
+  }
+  const remaining: GameState["bases"] = [...state.bases];
+  remaining[hitBase - 1] = null;
+  return [
+    { playerId: batter.playerId, from: 0, to: 1 },
+    { playerId: hitRunner.playerId, from: hitBase, to: "out" },
+    ...forceWalk(batter.playerId, remaining).filter((m) => m.playerId !== batter.playerId),
+  ];
 }
 
 function plus(bases: GameState["bases"], steps: number): RunnerMove[] {

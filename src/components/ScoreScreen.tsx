@@ -23,6 +23,7 @@ import {
   needsRunnerConfirm,
   previewAfterMoves,
   proposeMoves,
+  proposeRunnerHit,
   reduceGame,
   totalRuns,
   undoAtBat,
@@ -44,6 +45,7 @@ const OTHER_HELP: Partial<Record<PlayResult, string>> = {
   fielders_choice: "fc",
   sac_bunt: "sh",
   sac_fly: "sf",
+  runner_hit: "rh",
 };
 
 type SheetKind =
@@ -58,7 +60,8 @@ type SheetKind =
   | "cs"
   | "pickoff"
   | "pr"
-  | "field";
+  | "field"
+  | "hit_runner";
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -167,6 +170,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       setSheet(null);
       return;
     }
+    if (sheet === "hit_runner") {
+      if (!state) return;
+      const moves = proposeRunnerHit(state, batter, from);
+      setConfirm({ result: "runner_hit", moves, selectedId: null });
+      setSheet(null);
+      return;
+    }
     if (!confirm) return;
     setConfirm({ ...confirm, selectedId: runner.playerId });
   }
@@ -242,7 +252,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       <DiamondMap
         state={state}
         selectedId={confirm?.selectedId ?? null}
-        edit={Boolean(confirm) || sheet === "steal" || sheet === "cs" || sheet === "pickoff"}
+        edit={Boolean(confirm) || sheet === "steal" || sheet === "cs" || sheet === "pickoff" || sheet === "hit_runner"}
         onSelectRunner={onSelectRunner}
         onSelectDest={onSelectDest}
       />
@@ -300,7 +310,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pickoff")} label="牽制" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pr")} label="代走" />
           </div>
-          <div className="px-2 grid grid-cols-2 gap-1 pb-2">
+          <div className="px-2 grid grid-cols-3 gap-1 pb-2">
             <Action
               disabled={occupiedCount === 0}
               onClick={() => void patch(commitWp)}
@@ -321,14 +331,34 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                 setSheet("glossary");
               }}
             />
+            <Action
+              disabled={occupiedCount === 0}
+              onClick={() => {
+                if (occupiedCount === 1) {
+                  const from = ((state.bases.findIndex(Boolean) + 1) || 1) as Base;
+                  const moves = proposeRunnerHit(state, batter, from);
+                  setConfirm({ result: "runner_hit", moves, selectedId: null });
+                  return;
+                }
+                setSheet("hit_runner");
+              }}
+              label="走者当たり"
+              help={() => {
+                setGlossaryId("rh");
+                setGlossaryBack(null);
+                setSheet("glossary");
+              }}
+            />
           </div>
-          {sheet === "steal" || sheet === "cs" || sheet === "pickoff" ? (
+          {sheet === "steal" || sheet === "cs" || sheet === "pickoff" || sheet === "hit_runner" ? (
             <p className="px-3 pb-2 text-sm text-[#f5c518]">
               {sheet === "steal"
                 ? "進塁させる走者をタップ"
                 : sheet === "pickoff"
                   ? "牽制アウトにする走者をタップ"
-                  : "アウトにする走者をタップ"}
+                  : sheet === "hit_runner"
+                    ? "打球が当たった走者をタップ"
+                    : "アウトにする走者をタップ"}
               <button type="button" className="ml-2 underline" onClick={() => setSheet(null)}>
                 キャンセル
               </button>

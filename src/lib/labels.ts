@@ -17,6 +17,7 @@ export const PLAY_LABELS: Record<PlayResult, string> = {
   fielders_choice: "野選",
   sac_bunt: "送りバント",
   sac_fly: "犠牲フライ",
+  runner_hit: "走者当たり",
 };
 
 export const PLAY_SHORT: Record<PlayResult, string> = {
@@ -36,6 +37,7 @@ export const PLAY_SHORT: Record<PlayResult, string> = {
   fielders_choice: "野選",
   sac_bunt: "犠",
   sac_fly: "犠飛",
+  runner_hit: "走当",
 };
 
 export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun"];

@@ -106,7 +106,8 @@ function isAb(result: PlayResult): boolean {
     result === "lineout" ||
     result === "gidp" ||
     result === "error" ||
-    result === "fielders_choice"
+    result === "fielders_choice" ||
+    result === "runner_hit"
   );
 }
 

@@ -70,7 +70,8 @@ export type PlayResult =
   | "error"
   | "fielders_choice"
   | "sac_bunt"
-  | "sac_fly";
+  | "sac_fly"
+  | "runner_hit";
 
 export type RunnerMove = {
   playerId: string;
