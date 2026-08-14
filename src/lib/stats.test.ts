@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { commitPinchHitter, commitPlay } from "./engine";
-import { atBatsThisGame, batterLine } from "./stats";
+import { commitEnd, commitPinchHitter, commitPlay, commitSteal } from "./engine";
+import { atBatsThisGame, batterLine, formatOps, myTeamSlashes } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -89,5 +89,33 @@ describe("batterLine", () => {
         r: 0,
       }),
     ).toBe("4打数0安打 四球1");
+  });
+});
+
+describe("formatOps / myTeamSlashes", () => {
+  function mine(): Game {
+    return { ...makeGame(), mySide: "first" };
+  }
+
+  it("OPSは出塁率と長打率の合計", () => {
+    expect(formatOps({ ab: 3, h: 1, bb: 0, hbp: 0, sf: 0, tb: 1 })).toBe(".667");
+  });
+
+  it("自チームだけ累積し相手は入れない", () => {
+    const game = commitPlay(mine(), "single");
+    const rows = myTeamSlashes([game]);
+    expect(rows.every((p) => p.side === "first")).toBe(true);
+    const a1 = rows.find((p) => p.playerId === "A1");
+    expect(a1).toMatchObject({ ab: 1, h: 1 });
+    expect(rows.some((p) => p.playerId.startsWith("B"))).toBe(false);
+  });
+
+  it("複数試合の打数安打盗塁を足す", () => {
+    let g1 = commitPlay({ ...mine(), id: "g1" }, "single");
+    g1 = commitSteal(g1, 1, 2);
+    g1 = commitEnd(g1);
+    const g2 = commitEnd(commitPlay({ ...mine(), id: "g2" }, "single"));
+    const a1 = myTeamSlashes([g1, g2]).find((p) => p.playerId === "A1");
+    expect(a1).toMatchObject({ ab: 2, h: 2, sb: 1 });
   });
 });

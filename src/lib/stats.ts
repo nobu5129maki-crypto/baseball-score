@@ -33,6 +33,23 @@ export function formatObp(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf">
   return n.toFixed(3).replace(/^0/, "");
 }
 
+export function formatSlg(tb: number, ab: number): string {
+  if (ab === 0) return "-";
+  const n = tb / ab;
+  if (n >= 1) return n.toFixed(3);
+  return n.toFixed(3).replace(/^0/, "");
+}
+
+export function formatOps(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" | "tb">): string {
+  const den = p.ab + p.bb + p.hbp + p.sf;
+  if (den === 0) return "-";
+  const obp = (p.h + p.bb + p.hbp) / den;
+  const slg = p.ab === 0 ? 0 : p.tb / p.ab;
+  const n = obp + slg;
+  if (n >= 1) return n.toFixed(3);
+  return n.toFixed(3).replace(/^0/, "");
+}
+
 export function batterLine(p: PlayerSlash): string {
   const extra = [p.bb ? `四球${p.bb}` : "", p.sb ? `盗塁${p.sb}` : ""].filter(Boolean);
   const line = `${p.ab}打数${p.h}安打`;
@@ -169,10 +186,13 @@ function applyEventToStats(
   if (event.t === "steal") {
     const runner = before.bases[event.from - 1];
     if (!runner) return;
-    const row = map.get(runner.playerId);
-    if (!row) return;
+    const row =
+      map.get(runner.playerId) ??
+      emptySlash(runner.playerId, runner.playerName, runner.battingOrder, battingSide(before.half));
+    row.name = runner.playerName;
     if (event.to === "out") row.cs += 1;
     else row.sb += 1;
+    map.set(runner.playerId, row);
   }
 }
 
@@ -180,23 +200,42 @@ export function slashFor(game: Game, playerId: string): PlayerSlash | undefined 
   return gameSlashes(game).find((p) => p.playerId === playerId);
 }
 
+function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {
+  const prev = map.get(row.playerId) ?? emptySlash(row.playerId, row.name, row.order, row.side);
+  prev.name = row.name;
+  prev.ab += row.ab;
+  prev.h += row.h;
+  prev.bb += row.bb;
+  prev.hbp += row.hbp;
+  prev.sf += row.sf;
+  prev.tb += row.tb;
+  prev.sb += row.sb;
+  prev.cs += row.cs;
+  prev.r += row.r;
+  map.set(row.playerId, prev);
+}
+
 export function mergeSlashes(games: Game[]): PlayerSlash[] {
   const map = new Map<string, PlayerSlash>();
   for (const game of games) {
-    for (const row of gameSlashes(game)) {
-      const prev = map.get(row.playerId) ?? emptySlash(row.playerId, row.name, row.order, row.side);
-      prev.name = row.name;
-      prev.ab += row.ab;
-      prev.h += row.h;
-      prev.bb += row.bb;
-      prev.hbp += row.hbp;
-      prev.sf += row.sf;
-      prev.tb += row.tb;
-      prev.sb += row.sb;
-      prev.cs += row.cs;
-      prev.r += row.r;
-      map.set(row.playerId, prev);
-    }
+    for (const row of gameSlashes(game)) addSlash(map, row);
   }
   return [...map.values()].sort((a, b) => b.h - a.h || a.name.localeCompare(b.name, "ja"));
+}
+
+export function myTeamSlashes(games: Game[]): PlayerSlash[] {
+  const map = new Map<string, PlayerSlash>();
+  for (const game of games) {
+    for (const row of gameSlashes(game)) {
+      if (row.side !== game.mySide) continue;
+      addSlash(map, row);
+    }
+  }
+  return [...map.values()]
+    .filter((p) => p.ab + p.bb + p.hbp + p.sf + p.sb + p.cs > 0)
+    .sort((a, b) => {
+      const aAvg = a.ab === 0 ? -1 : a.h / a.ab;
+      const bAvg = b.ab === 0 ? -1 : b.h / b.ab;
+      return bAvg - aAvg || b.ab - a.ab || b.h - a.h || a.name.localeCompare(b.name, "ja");
+    });
 }
