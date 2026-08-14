@@ -30,7 +30,7 @@ import {
 } from "@/lib/engine";
 import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
-import { batterLine, slashFor } from "@/lib/stats";
+import { batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, PlayResult, Position, RunnerMove, RunnerOnBase, Side } from "@/lib/types";
 import { BsopBar } from "./BsopBar";
@@ -99,6 +99,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const secondName = game.mySide === "second" ? game.myTeamName : game.opponentName;
   const occupiedCount = state.bases.filter(Boolean).length;
   const slash = slashFor(game, batter.playerId);
+  const atBats = atBatsThisGame(game, batter, state.half);
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
   const preview = confirm
     ? previewAfterMoves(state, confirm.moves, batter)
@@ -212,7 +213,23 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           {batter.order}番 {batter.playerName}
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
-        <p className="text-sm text-[#f5c518] mt-1">{slash ? batterLine(slash) : "今試合 まだ打席なし"}</p>
+        {atBats.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {atBats.map((ab, i) => (
+              <span
+                key={`${ab.inning}-${ab.result}-${i}`}
+                className="rounded-lg bg-[#070a08] border border-[#2c3c30] px-2 py-1 text-sm font-bold"
+              >
+                {ab.inning}回 {ab.label}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[#9aa894] mt-1">今試合 まだ打席なし</p>
+        )}
+        {slash && atBats.length > 0 ? (
+          <p className="text-xs text-[#9aa894] mt-1">{batterLine(slash)}</p>
+        ) : null}
       </div>
 
       <DiamondMap

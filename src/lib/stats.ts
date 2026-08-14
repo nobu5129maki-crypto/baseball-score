@@ -1,5 +1,6 @@
+import { playLabel } from "./labels";
 import { battingSide, getBatter, reduceGame } from "./engine";
-import type { Game, GameEvent, PlayEvent, PlayResult, Side } from "./types";
+import type { Game, GameEvent, Half, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
   playerId: string;
@@ -34,6 +35,42 @@ export function batterLine(p: PlayerSlash): string {
   if (p.bb) parts.push(`四${p.bb}`);
   if (p.sb) parts.push(`盗${p.sb}`);
   return `${parts.join(" ")}  打率${avg}`;
+}
+
+export type AtBatNote = {
+  inning: number;
+  half: Half;
+  label: string;
+  result: PlayResult;
+};
+
+export function atBatsThisGame(
+  game: Game,
+  batter: { playerId: string; order: number },
+  half: Half,
+): AtBatNote[] {
+  const side = battingSide(half);
+  const notes: AtBatNote[] = [];
+  let cursor: Game = { ...game, events: [] };
+  for (const event of game.events) {
+    if (event.t !== "play") {
+      cursor = { ...cursor, events: [...cursor.events, event] };
+      continue;
+    }
+    const before = reduceGame(cursor);
+    const who = getBatter(before);
+    if (battingSide(before.half) === side && (who.playerId === batter.playerId || who.order === batter.order)) {
+      const play = event as PlayEvent;
+      notes.push({
+        inning: before.inning,
+        half: before.half,
+        label: playLabel(play.result, play.field),
+        result: play.result,
+      });
+    }
+    cursor = { ...cursor, events: [...cursor.events, event] };
+  }
+  return notes;
 }
 
 function emptySlash(playerId: string, name: string, order: number, side: Side): PlayerSlash {
