@@ -158,6 +158,11 @@ export function LineupScreen({ gameId }: { gameId: string }) {
           </button>
         </div>
         {dup ? <p className="text-sm text-[#ff5a5a]">同じ選手が重複しています</p> : null}
+        <p className="text-sm text-[#9aa894] leading-relaxed">
+          {isMine
+            ? "打順は各選手の右にある ▲▼ で入れ替えます。"
+            : "相手の名前を直して、打順は ▲▼ で入れ替えます。"}
+        </p>
 
         <LineupBoard
           lineup={slots}

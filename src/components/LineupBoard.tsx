@@ -1,13 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { POSITION_LABELS, POSITIONS } from "@/lib/types";
 import type { LineupSlot, Player, Position } from "@/lib/types";
-
-type Drag =
-  | { kind: "line"; order: number }
-  | { kind: "bench"; playerId: string }
-  | null;
+import { Sheet } from "./Sheet";
 
 const FIELD: Array<{ pos: Position; className: string }> = [
   { pos: "CF", className: "col-start-2 row-start-1" },
@@ -36,196 +32,196 @@ export function LineupBoard({
   onPosition: (order: number, position: Position) => void;
   onRename: (order: number, name: string) => void;
 }) {
-  const [drag, setDrag] = useState<Drag>(null);
-  const [overOrder, setOverOrder] = useState<number | null>(null);
-  const [overPos, setOverPos] = useState<Position | null>(null);
-  const [picked, setPicked] = useState<Drag>(null);
-  const live = useRef<Drag>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
+  const [swapFrom, setSwapFrom] = useState<number | null>(null);
+  const [benchId, setBenchId] = useState<string | null>(null);
+  const [posOrder, setPosOrder] = useState<number | null>(null);
+  const posSlot = lineup.find((s) => s.order === posOrder) ?? null;
 
   function slotAt(pos: Position) {
     return lineup.find((s) => s.position === pos);
   }
 
-  function applyDrop(order: number | null, pos: Position | null) {
-    const current = live.current ?? picked;
-    setDrag(null);
-    setOverOrder(null);
-    setOverPos(null);
-    setPicked(null);
-    live.current = null;
-    if (!current) return;
+  function clearPicks() {
+    setSwapFrom(null);
+    setBenchId(null);
+  }
 
-    if (pos) {
-      if (current.kind === "line") onPosition(current.order, pos);
-      if (current.kind === "bench") {
-        const target = slotAt(pos);
-        const player = bench.find((p) => p.id === current.playerId);
-        if (player && target) onReplace(target.order, player);
-      }
+  function tapRow(order: number) {
+    if (benchId) {
+      const player = bench.find((p) => p.id === benchId);
+      if (player) onReplace(order, player);
+      clearPicks();
       return;
     }
-
-    if (order != null) {
-      if (current.kind === "line" && current.order !== order) onMoveOrder(current.order, order);
-      if (current.kind === "bench") {
-        const player = bench.find((p) => p.id === current.playerId);
-        if (player) onReplace(order, player);
-      }
+    if (swapFrom == null) {
+      setSwapFrom(order);
+      return;
     }
-  }
-
-  function fromPoint(clientX: number, clientY: number) {
-    const el = document.elementFromPoint(clientX, clientY);
-    const orderEl = el?.closest("[data-drop-order]");
-    const posEl = el?.closest("[data-drop-pos]");
-    const order = orderEl ? Number(orderEl.getAttribute("data-drop-order")) : null;
-    const pos = (posEl?.getAttribute("data-drop-pos") as Position | null) ?? null;
-    return { order: Number.isFinite(order) ? order : null, pos };
-  }
-
-  function onPointerDown(e: React.PointerEvent, next: Drag) {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    live.current = next;
-    start.current = { x: e.clientX, y: e.clientY };
-    setDrag(next);
-    setPicked(next);
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!live.current) return;
-    const hit = fromPoint(e.clientX, e.clientY);
-    setOverOrder(hit.order);
-    setOverPos(hit.pos);
-  }
-
-  function onPointerUp(e: React.PointerEvent) {
-    const origin = start.current;
-    const moved =
-      origin != null && (Math.abs(e.clientX - origin.x) > 12 || Math.abs(e.clientY - origin.y) > 12);
-    start.current = null;
-    if (moved) {
-      const hit = fromPoint(e.clientX, e.clientY);
-      applyDrop(hit.order, hit.pos);
-    } else {
-      setDrag(null);
-      setOverOrder(null);
-      setOverPos(null);
+    if (swapFrom === order) {
+      setSwapFrom(null);
+      return;
     }
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
+    onMoveOrder(swapFrom, order);
+    clearPicks();
+  }
+
+  function hint() {
+    if (benchId) {
+      const p = bench.find((b) => b.id === benchId);
+      return `${p?.name ?? "控え"} を出す打順をタップしてください`;
     }
+    if (swapFrom != null) {
+      const s = lineup.find((x) => x.order === swapFrom);
+      return `${swapFrom}番 ${s?.playerName ?? ""} と入れ替える打順をタップ`;
+    }
+    return null;
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-[#9aa894]">
-        選手を指でドラッグして打順や守備位置へ。または一度タップしてから置き場をタップ。
-      </p>
+    <div className="flex flex-col gap-4">
+      <section>
+        <h3 className="font-bold text-lg">打順</h3>
+        <p className="text-sm text-[#9aa894] mt-1 leading-relaxed">
+          右の <span className="text-[#f5c518] font-bold">▲▼</span> で1つずつ入れ替え。選手のカードをタップしてから、入れ替えたい相手をタップしてもOKです。
+        </p>
+        {hint() ? (
+          <div className="mt-2 rounded-xl border border-[#f5c518] bg-[#1a281c] px-3 py-2 flex items-center gap-2">
+            <p className="flex-1 text-sm text-[#f5c518] font-bold">{hint()}</p>
+            <button type="button" className="text-sm underline" onClick={clearPicks}>
+              キャンセル
+            </button>
+          </div>
+        ) : null}
 
-      <div className="rounded-2xl border border-[#2c3c30] bg-[#0d140f] p-3">
-        <p className="text-xs text-[#9aa894] mb-2">守備位置（ここに落とすと交代 / 位置替え）</p>
-        <div className="grid grid-cols-3 grid-rows-5 gap-2">
-          {FIELD.map(({ pos, className }) => {
-            const slot = slotAt(pos);
-            const hot = overPos === pos;
+        <ol className="flex flex-col gap-2 mt-3">
+          {lineup.map((slot, index) => {
+            const selected = swapFrom === slot.order;
             return (
+              <li
+                key={slot.order}
+                className={`rounded-2xl border p-2 bg-[#121a14] ${selected ? "border-[#f5c518] bg-[#1a281c]" : "border-[#2c3c30]"}`}
+              >
+                <div className="flex items-stretch gap-2">
+                  <button
+                    type="button"
+                    className={`tap w-14 px-0 text-xl ${selected ? "tap-accent" : ""}`}
+                    onClick={() => tapRow(slot.order)}
+                    aria-label={`${slot.order}番を選ぶ`}
+                  >
+                    {slot.order}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <input
+                      className="tap w-full px-3 bg-[#070a08] min-h-12"
+                      lang="ja"
+                      value={slot.playerName}
+                      onChange={(e) => onRename(slot.order, e.target.value)}
+                      aria-label={`${slot.order}番の名前`}
+                    />
+                    <button
+                      type="button"
+                      className="mt-1 text-left text-sm text-[#9aa894] px-1"
+                      onClick={() => setPosOrder(slot.order)}
+                    >
+                      {POSITION_LABELS[slot.position]} · 守備を変更
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-1 w-12 shrink-0">
+                    <button
+                      type="button"
+                      className="h-11 rounded-xl border border-[#2c3c30] bg-[#070a08] text-lg font-bold disabled:opacity-30"
+                      disabled={index === 0}
+                      onClick={() => onMoveOrder(slot.order, slot.order - 1)}
+                      aria-label="打順を上げる"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      className="h-11 rounded-xl border border-[#2c3c30] bg-[#070a08] text-lg font-bold disabled:opacity-30"
+                      disabled={index === lineup.length - 1}
+                      onClick={() => onMoveOrder(slot.order, slot.order + 1)}
+                      aria-label="打順を下げる"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      <section>
+        <h3 className="font-bold text-lg">ベンチ</h3>
+        <p className="text-sm text-[#9aa894] mt-1">控えをタップしてから、出す打順をタップします。</p>
+        {bench.length === 0 ? (
+          <p className="text-sm text-[#9aa894] mt-2">控えはいません。相手側は下の名簿コードも使えます。</p>
+        ) : (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {bench.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`tap px-3 ${benchId === p.id ? "tap-accent" : ""}`}
+                onClick={() => {
+                  setSwapFrom(null);
+                  setBenchId((id) => (id === p.id ? null : p.id));
+                }}
+              >
+                {p.number ? `${p.number} ` : ""}
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-bold text-lg">守備位置</h3>
+        <p className="text-sm text-[#9aa894] mt-1">選手をタップすると守備位置を変えられます。</p>
+        <div className="rounded-2xl border border-[#2c3c30] bg-[#0d140f] p-3 mt-2">
+          <div className="grid grid-cols-3 grid-rows-5 gap-2">
+            {FIELD.map(({ pos, className }) => {
+              const slot = slotAt(pos);
+              return (
+                <button
+                  key={pos}
+                  type="button"
+                  className={`tap min-h-14 px-1 text-xs ${className}`}
+                  onClick={() => {
+                    if (slot) setPosOrder(slot.order);
+                  }}
+                >
+                  <span className="block text-[10px] opacity-70">{POSITION_LABELS[pos]}</span>
+                  <span className="font-bold">{slot?.playerName ?? "空き"}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {posSlot ? (
+        <Sheet title={`${posSlot.order}番 ${posSlot.playerName} の守備`} onClose={() => setPosOrder(null)}>
+          <p className="text-sm text-[#9aa894] mb-3">守備位置を選ぶと、その位置の選手と入れ替わります。</p>
+          <div className="grid grid-cols-3 gap-2">
+            {POSITIONS.map((pos) => (
               <button
                 key={pos}
                 type="button"
-                data-drop-pos={pos}
-                className={`tap min-h-14 px-1 text-xs ${className} ${hot ? "tap-accent" : ""}`}
+                className={`tap tap-result text-sm ${posSlot.position === pos ? "tap-accent" : ""}`}
                 onClick={() => {
-                  if (picked) applyDrop(slot?.order ?? null, pos);
+                  onPosition(posSlot.order, pos);
+                  setPosOrder(null);
                 }}
               >
-                <span className="block text-[10px] opacity-70">{POSITION_LABELS[pos]}</span>
-                <span className="font-bold">{slot?.playerName ?? "空き"}</span>
+                {POSITION_LABELS[pos]}
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <ol className="flex flex-col gap-2">
-        {lineup.map((slot) => (
-            <li
-              key={slot.order}
-              data-drop-order={slot.order}
-              className={`rounded-xl border p-3 bg-[#121a14] ${overOrder === slot.order ? "border-[#f5c518]" : "border-[#2c3c30]"}`}
-              onClick={() => {
-                if (picked) applyDrop(slot.order, null);
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className={`tap min-h-12 w-12 px-0 text-lg touch-none ${picked?.kind === "line" && picked.order === slot.order ? "tap-accent" : ""}`}
-                  onPointerDown={(e) => onPointerDown(e, { kind: "line", order: slot.order })}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                >
-                  {slot.order}
-                </button>
-                <input
-                  className="tap flex-1 px-2 bg-[#070a08] min-h-12"
-                  lang="ja"
-                  value={slot.playerName}
-                  onChange={(e) => onRename(slot.order, e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div className="grid grid-cols-5 gap-1 mt-2">
-                {POSITIONS.map((pos) => (
-                  <button
-                    key={pos}
-                    type="button"
-                    className={`tap min-h-10 px-0 text-[11px] ${slot.position === pos ? "tap-accent" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPosition(slot.order, pos);
-                    }}
-                  >
-                    {POSITION_LABELS[pos].slice(0, 3)}
-                  </button>
-                ))}
-              </div>
-            </li>
-        ))}
-      </ol>
-      <h3 className="font-bold mt-2">ベンチ</h3>
-      {bench.length === 0 ? (
-        <p className="text-sm text-[#9aa894]">控えはいません。相手側は下の名簿コードも使えます。</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {bench.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              data-bench={p.id}
-              className={`tap px-3 touch-none ${
-                (drag?.kind === "bench" && drag.playerId === p.id) ||
-                (picked?.kind === "bench" && picked.playerId === p.id)
-                  ? "tap-accent"
-                  : ""
-              }`}
-              onPointerDown={(e) => onPointerDown(e, { kind: "bench", playerId: p.id })}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onClick={() => setPicked({ kind: "bench", playerId: p.id })}
-            >
-              {p.number ? `${p.number} ` : ""}
-              {p.name}
-            </button>
-          ))}
-        </div>
-      )}
-      {picked ? (
-        <p className="text-sm text-[#f5c518]">
-          {picked.kind === "bench" ? "控えを選びました。打順または守備位置をタップ" : "打順を選びました。入れ替え先をタップ"}
-        </p>
+            ))}
+          </div>
+        </Sheet>
       ) : null}
     </div>
   );
