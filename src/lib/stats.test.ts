@@ -44,7 +44,7 @@ describe("atBatsThisGame", () => {
 });
 
 describe("batterLine", () => {
-  it("打数-安打.打率の順で出す", () => {
+  it("日本式の打数安打で出す", () => {
     expect(
       batterLine({
         playerId: "1",
@@ -61,7 +61,7 @@ describe("batterLine", () => {
         cs: 0,
         r: 0,
       }),
-    ).toBe("3-1.333");
+    ).toBe("3打数1安打");
     expect(
       batterLine({
         playerId: "1",
@@ -78,6 +78,6 @@ describe("batterLine", () => {
         cs: 0,
         r: 0,
       }),
-    ).toBe("4-0.000 四1");
+    ).toBe("4打数0安打 四球1");
   });
 });

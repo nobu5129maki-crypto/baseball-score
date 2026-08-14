@@ -34,10 +34,9 @@ export function formatObp(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf">
 }
 
 export function batterLine(p: PlayerSlash): string {
-  const avg = formatAvg(p.h, p.ab);
-  const slash = avg === "-" ? `${p.ab}-${p.h}.-` : avg.startsWith(".") ? `${p.ab}-${p.h}${avg}` : `${p.ab}-${p.h} ${avg}`;
-  const extra = [p.bb ? `四${p.bb}` : "", p.sb ? `盗${p.sb}` : ""].filter(Boolean);
-  return extra.length ? `${slash} ${extra.join(" ")}` : slash;
+  const extra = [p.bb ? `四球${p.bb}` : "", p.sb ? `盗塁${p.sb}` : ""].filter(Boolean);
+  const line = `${p.ab}打数${p.h}安打`;
+  return extra.length ? `${line} ${extra.join(" ")}` : line;
 }
 
 export type AtBatNote = {
