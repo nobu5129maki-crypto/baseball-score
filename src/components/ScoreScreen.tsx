@@ -40,6 +40,12 @@ import { InningScoreTable } from "./InningScoreTable";
 import { PositionPicker } from "./PositionPicker";
 import { Sheet } from "./Sheet";
 
+const OTHER_HELP: Partial<Record<PlayResult, string>> = {
+  fielders_choice: "fc",
+  sac_bunt: "sh",
+  sac_fly: "sf",
+};
+
 type SheetKind =
   | null
   | "hit"
@@ -64,6 +70,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   }, [gameId]);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [glossaryId, setGlossaryId] = useState<string | "index">("index");
+  const [glossaryBack, setGlossaryBack] = useState<SheetKind>(null);
   const [pendingResult, setPendingResult] = useState<PlayResult | null>(null);
   const [confirm, setConfirm] = useState<{
     result: PlayResult;
@@ -294,8 +301,26 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pr")} label="代走" />
           </div>
           <div className="px-2 grid grid-cols-2 gap-1 pb-2">
-            <Action disabled={occupiedCount === 0} onClick={() => void patch(commitWp)} label="暴投" help={() => { setGlossaryId("wp"); setSheet("glossary"); }} />
-            <Action disabled={occupiedCount === 0} onClick={() => void patch(commitPb)} label="捕逸" help={() => { setGlossaryId("pb"); setSheet("glossary"); }} />
+            <Action
+              disabled={occupiedCount === 0}
+              onClick={() => void patch(commitWp)}
+              label="暴投"
+              help={() => {
+                setGlossaryId("wp");
+                setGlossaryBack(null);
+                setSheet("glossary");
+              }}
+            />
+            <Action
+              disabled={occupiedCount === 0}
+              onClick={() => void patch(commitPb)}
+              label="捕逸"
+              help={() => {
+                setGlossaryId("pb");
+                setGlossaryBack(null);
+                setSheet("glossary");
+              }}
+            />
           </div>
           {sheet === "steal" || sheet === "cs" || sheet === "pickoff" ? (
             <p className="px-3 pb-2 text-sm text-[#f5c518]">
@@ -379,12 +404,31 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       ) : null}
       {sheet === "other" ? (
         <Sheet title="その他" onClose={() => setSheet(null)}>
-          <div className="grid grid-cols-2 gap-2">
-            {OTHER_RESULTS.map((r) => (
-              <button key={r} type="button" className="tap tap-result" onClick={() => startResult(r)}>
-                {PLAY_LABELS[r]}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2">
+            {OTHER_RESULTS.map((r) => {
+              const helpId = OTHER_HELP[r];
+              return (
+                <div key={r} className="relative">
+                  <button type="button" className="tap tap-result w-full" onClick={() => startResult(r)}>
+                    {PLAY_LABELS[r]}
+                  </button>
+                  {helpId ? (
+                    <button
+                      type="button"
+                      className="absolute -top-1 -right-1 w-9 h-9 rounded-full bg-[#070a08] border border-[#2c3c30] text-sm font-bold"
+                      aria-label={`${PLAY_LABELS[r]}の解説`}
+                      onClick={() => {
+                        setGlossaryId(helpId);
+                        setGlossaryBack("other");
+                        setSheet("glossary");
+                      }}
+                    >
+                      ?
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </Sheet>
       ) : null}
@@ -404,7 +448,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         />
       ) : null}
       {sheet === "glossary" ? (
-        <GlossarySheet termId={glossaryId} onClose={() => setSheet(null)} />
+        <GlossarySheet
+          termId={glossaryId}
+          onClose={() => {
+            setSheet(glossaryBack);
+            setGlossaryBack(null);
+          }}
+        />
       ) : null}
       {sheet === "menu" ? (
         <Sheet title="試合メニュー" onClose={() => setSheet(null)}>
