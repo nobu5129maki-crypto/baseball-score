@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { kanjiCandidates } from "@/lib/kanji-names";
 import { POSITION_LABELS, POSITIONS } from "@/lib/types";
 import type { LineupSlot, Player, Position } from "@/lib/types";
 
@@ -151,9 +150,7 @@ export function LineupBoard({
       </div>
 
       <ol className="flex flex-col gap-2">
-        {lineup.map((slot) => {
-          const kanji = kanjiCandidates(slot.playerName);
-          return (
+        {lineup.map((slot) => (
             <li
               key={slot.order}
               data-drop-order={slot.order}
@@ -180,23 +177,6 @@ export function LineupBoard({
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
-              {kanji.length > 0 ? (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {kanji.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className="tap tap-accent px-2 min-h-10 text-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRename(slot.order, c);
-                      }}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               <div className="grid grid-cols-5 gap-1 mt-2">
                 {POSITIONS.map((pos) => (
                   <button
@@ -213,8 +193,7 @@ export function LineupBoard({
                 ))}
               </div>
             </li>
-          );
-        })}
+        ))}
       </ol>
       <h3 className="font-bold mt-2">ベンチ</h3>
       {bench.length === 0 ? (

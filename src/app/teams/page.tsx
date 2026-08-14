@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
-import { KanjiNameField } from "@/components/KanjiNameField";
 import { db } from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { decodeRoster, encodeRoster } from "@/lib/roster-share";
@@ -68,9 +67,14 @@ export default function TeamsPage() {
                     onChange={(e) => setEditing({ ...editing, number: e.target.value })}
                     placeholder="背番号"
                   />
-                  <KanjiNameField
+                  <input
+                    className="tap px-3 bg-[#121a14]"
+                    lang="ja"
+                    autoCapitalize="off"
+                    autoComplete="off"
+                    placeholder="選手名"
                     value={editing.name}
-                    onChange={(name) => setEditing({ ...editing, name })}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   />
                   <div className="flex gap-2">
                     <button
@@ -117,7 +121,15 @@ export default function TeamsPage() {
             value={number}
             onChange={(e) => setNumber(e.target.value)}
           />
-          <KanjiNameField value={name} onChange={setName} />
+          <input
+            className="tap px-3 bg-[#121a14]"
+            lang="ja"
+            autoCapitalize="off"
+            autoComplete="off"
+            placeholder="選手名"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
           <button
             type="button"
             className="tap tap-accent"
