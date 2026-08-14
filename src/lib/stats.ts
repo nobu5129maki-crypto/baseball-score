@@ -20,21 +20,24 @@ export type PlayerSlash = {
 
 export function formatAvg(h: number, ab: number): string {
   if (ab === 0) return "-";
-  return (h / ab).toFixed(3).replace(/^0/, "");
+  const n = h / ab;
+  if (n >= 1) return n.toFixed(3);
+  return n.toFixed(3).replace(/^0/, "");
 }
 
 export function formatObp(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf">): string {
   const den = p.ab + p.bb + p.hbp + p.sf;
   if (den === 0) return "-";
-  return ((p.h + p.bb + p.hbp) / den).toFixed(3).replace(/^0/, "");
+  const n = (p.h + p.bb + p.hbp) / den;
+  if (n >= 1) return n.toFixed(3);
+  return n.toFixed(3).replace(/^0/, "");
 }
 
 export function batterLine(p: PlayerSlash): string {
   const avg = formatAvg(p.h, p.ab);
-  const parts = [`${p.h}-${p.ab}`];
-  if (p.bb) parts.push(`四${p.bb}`);
-  if (p.sb) parts.push(`盗${p.sb}`);
-  return `${parts.join(" ")}  打率${avg}`;
+  const slash = avg === "-" ? `${p.ab}-${p.h}.-` : avg.startsWith(".") ? `${p.ab}-${p.h}${avg}` : `${p.ab}-${p.h} ${avg}`;
+  const extra = [p.bb ? `四${p.bb}` : "", p.sb ? `盗${p.sb}` : ""].filter(Boolean);
+  return extra.length ? `${slash} ${extra.join(" ")}` : slash;
 }
 
 export type AtBatNote = {

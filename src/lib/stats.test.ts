@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitPlay } from "./engine";
-import { atBatsThisGame } from "./stats";
+import { atBatsThisGame, batterLine } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -40,5 +40,44 @@ describe("atBatsThisGame", () => {
       { inning: 1, half: "top", label: "左安", result: "single" },
       { inning: 3, half: "top", label: "三振", result: "strikeout" },
     ]);
+  });
+});
+
+describe("batterLine", () => {
+  it("打数-安打.打率の順で出す", () => {
+    expect(
+      batterLine({
+        playerId: "1",
+        name: "A",
+        order: 1,
+        side: "first",
+        ab: 3,
+        h: 1,
+        bb: 0,
+        hbp: 0,
+        sf: 0,
+        tb: 1,
+        sb: 0,
+        cs: 0,
+        r: 0,
+      }),
+    ).toBe("3-1.333");
+    expect(
+      batterLine({
+        playerId: "1",
+        name: "A",
+        order: 1,
+        side: "first",
+        ab: 4,
+        h: 0,
+        bb: 1,
+        hbp: 0,
+        sf: 0,
+        tb: 0,
+        sb: 0,
+        cs: 0,
+        r: 0,
+      }),
+    ).toBe("4-0.000 四1");
   });
 });
