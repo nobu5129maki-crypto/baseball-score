@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
-import { db } from "@/lib/db";
+import { db, saveTeamName } from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { decodeRoster, encodeRoster } from "@/lib/roster-share";
 import type { Player } from "@/lib/types";
@@ -24,37 +24,62 @@ export default function TeamsPage() {
   const [importText, setImportText] = useState("");
   const [share, setShare] = useState("");
   const [saved, setSaved] = useState("");
+  const [busy, setBusy] = useState(false);
+  const nameReady = useRef(false);
 
-  async function saveTeam() {
+  useEffect(() => {
+    if (team && !nameReady.current) {
+      setTeamName(team.name);
+      nameReady.current = true;
+    }
+  }, [team]);
+
+  async function persist() {
     if (!team) return;
-    const next = (teamName.trim() || team.name).trim();
-    await db.teams.update(team.id, { name: next });
-    setSaved("チーム名を保存しました");
-    router.push("/");
+    const next = teamName.trim();
+    if (next) await saveTeamName(team.id, next);
+    if (editing) {
+      await db.players.update(editing.id, { name: editing.name, number: editing.number });
+      setEditing(null);
+    }
+  }
+
+  async function finish() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await persist();
+      router.push("/");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <main className="max-w-lg mx-auto w-full min-h-dvh">
-      <AppHeader title="チーム・選手" backHref="/" />
+      <AppHeader title="チーム・選手" onBack={() => void finish()} />
       <div className="p-4 flex flex-col gap-4">
         {saved ? <p className="text-sm text-[#3ddc84]">{saved}</p> : null}
-        <button type="button" className="tap tap-accent" onClick={() => router.push("/")}>
-          完了してホームへ
-        </button>
         {team ? (
-          <div className="flex gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-[#9aa894]">チーム名</span>
             <input
-              className="tap flex-1 px-3 bg-[#121a14]"
+              className="tap px-3 bg-[#121a14]"
               lang="ja"
-              defaultValue={team.name}
+              autoCapitalize="off"
+              autoComplete="off"
+              value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               aria-label="チーム名"
             />
-            <button type="button" className="tap tap-accent px-4" onClick={() => void saveTeam()}>
-              保存
-            </button>
-          </div>
-        ) : null}
+          </label>
+        ) : (
+          <p className="text-sm text-[#9aa894]">読み込み中…</p>
+        )}
+
+        <button type="button" className="tap tap-accent" disabled={busy || !team} onClick={() => void finish()}>
+          完了してホームへ
+        </button>
 
         <ul className="flex flex-col gap-2">
           {players.map((p) => (
@@ -151,10 +176,6 @@ export default function TeamsPage() {
           </button>
         </div>
 
-        <button type="button" className="tap" onClick={() => router.push("/")}>
-          ホームに戻る
-        </button>
-
         <div className="border-t border-[#2c3c30] pt-4 flex flex-col gap-2">
           <h2 className="font-bold">メンバー交換</h2>
           <p className="text-sm text-[#9aa894]">同じアプリの相手と、名前・背番号を送り合えます。</p>
@@ -164,7 +185,7 @@ export default function TeamsPage() {
             onClick={async () => {
               if (!team) return;
               const code = encodeRoster(
-                team.name,
+                teamName.trim() || team.name,
                 players.map((p) => ({ name: p.name, number: p.number, kana: p.kana })),
               );
               setShare(code);

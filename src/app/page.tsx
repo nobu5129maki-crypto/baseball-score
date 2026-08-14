@@ -10,6 +10,7 @@ import type { Game } from "@/lib/types";
 export default function HomePage() {
   const games =
     useLiveQuery(() => db.games.orderBy("updatedAt").reverse().toArray()) ?? [];
+  const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
 
   const active = games.filter((g) => g.status === "in_progress");
   const setup = games.filter((g) => g.status === "lineup");
@@ -20,6 +21,7 @@ export default function HomePage() {
       <header className="px-4 py-5">
         <p className="text-sm text-[#9aa894]">記号いらずのスコア記録</p>
         <h1 className="text-2xl font-bold mt-1">らくスコア</h1>
+        {team ? <p className="text-sm text-[#f5c518] mt-1">{team.name}</p> : null}
       </header>
 
       <section className="px-4 flex flex-col gap-3 flex-1">

@@ -32,6 +32,18 @@ export async function saveGame(game: Game): Promise<void> {
   await db.games.put({ ...game, updatedAt: Date.now() });
 }
 
+export async function saveTeamName(teamId: string, name: string): Promise<void> {
+  const next = name.trim();
+  if (!next) return;
+  await db.teams.update(teamId, { name: next });
+  const games = await db.games.toArray();
+  const touched = games.filter((g) => g.myTeamId === teamId && g.myTeamName !== next);
+  if (touched.length === 0) return;
+  await db.games.bulkPut(
+    touched.map((g) => ({ ...g, myTeamName: next, updatedAt: Date.now() })),
+  );
+}
+
 export async function getSettings(): Promise<Settings> {
   const row = await db.settings.get("app");
   if (row) return row;

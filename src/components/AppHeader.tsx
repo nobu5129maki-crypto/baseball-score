@@ -6,15 +6,21 @@ import Link from "next/link";
 export function AppHeader({
   title,
   backHref,
+  onBack,
   trailing,
 }: {
   title: string;
   backHref?: string;
+  onBack?: () => void;
   trailing?: ReactNode;
 }) {
   return (
     <header className="flex items-center gap-2 px-3 py-2 min-h-14 border-b border-[#2c3c30]">
-      {backHref ? (
+      {onBack ? (
+        <button type="button" className="tap tap-ghost px-3 text-sm" onClick={onBack}>
+          ←
+        </button>
+      ) : backHref ? (
         <Link href={backHref} className="tap tap-ghost px-3 text-sm">
           ←
         </Link>
