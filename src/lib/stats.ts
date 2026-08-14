@@ -61,7 +61,7 @@ export function atBatsThisGame(
     }
     const before = reduceGame(cursor);
     const who = getBatter(before);
-    if (battingSide(before.half) === side && (who.playerId === batter.playerId || who.order === batter.order)) {
+    if (battingSide(before.half) === side && who.playerId === batter.playerId) {
       const play = event as PlayEvent;
       notes.push({
         inning: before.inning,

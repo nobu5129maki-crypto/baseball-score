@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commitPlay } from "./engine";
+import { commitPinchHitter, commitPlay } from "./engine";
 import { atBatsThisGame, batterLine } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
@@ -39,6 +39,16 @@ describe("atBatsThisGame", () => {
     expect(notes).toEqual([
       { inning: 1, half: "top", label: "左安", result: "single" },
       { inning: 3, half: "top", label: "三振", result: "strikeout" },
+    ]);
+  });
+
+  it("代打は同じ打順でも前の打者の打席を出さない", () => {
+    let game = makeGame();
+    for (let i = 0; i < 18; i++) game = commitPlay(game, "strikeout");
+    game = commitPinchHitter(game, "PH1", "代打太");
+    expect(atBatsThisGame(game, { playerId: "PH1", order: 1 }, "top")).toEqual([]);
+    expect(atBatsThisGame(game, { playerId: "A1", order: 1 }, "top")).toEqual([
+      { inning: 1, half: "top", label: "三振", result: "strikeout" },
     ]);
   });
 });
