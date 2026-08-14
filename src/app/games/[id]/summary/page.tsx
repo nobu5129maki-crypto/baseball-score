@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { InningScoreTable } from "@/components/InningScoreTable";
+import { ScorebookView } from "@/components/ScorebookView";
 import { db } from "@/lib/db";
 import { reduceGame, totalRuns } from "@/lib/engine";
-import { buildScorebook, type BookCell } from "@/lib/scorebook";
+import { buildScorebook } from "@/lib/scorebook";
 import { batterLine, formatObp, gameSlashes } from "@/lib/stats";
 
 export default function SummaryPage() {
@@ -24,35 +25,28 @@ export default function SummaryPage() {
   const second = game.mySide === "second" ? game.myTeamName : game.opponentName;
   const fr = totalRuns(state.scores.first);
   const sr = totalRuns(state.scores.second);
-  const winner =
-    fr === sr ? "引き分け" : fr > sr ? `${first}の勝ち` : `${second}の勝ち`;
+  const winner = fr === sr ? "引き分け" : fr > sr ? `${first}の勝ち` : `${second}の勝ち`;
   const book = buildScorebook(game);
   const slashes = gameSlashes(game);
 
   return (
-    <main className="max-w-lg mx-auto w-full min-h-dvh print:max-w-none">
+    <main className="print-root max-w-lg mx-auto w-full min-h-dvh print:max-w-none">
       <div className="print:hidden">
         <AppHeader title="試合結果" backHref="/" />
       </div>
-      <div className="p-4 flex flex-col gap-4">
-        <p className="text-sm text-[#9aa894]">{game.date}</p>
-        <h2 className="text-2xl font-bold text-center">
-          {first} {fr} — {sr} {second}
-        </h2>
-        <p className="text-center text-[#f5c518] font-bold">{winner}</p>
+      <div className="p-4 flex flex-col gap-4 print:p-0">
+        <header className="print-heading">
+          <p className="text-sm text-[#9aa894] print:text-black">{game.date}　スコアブック</p>
+          <h2 className="text-2xl font-bold text-center mt-1">
+            {first} {fr} — {sr} {second}
+          </h2>
+          <p className="text-center text-[#f5c518] font-bold print:text-black">{winner}</p>
+        </header>
+
         <InningScoreTable state={state} firstName={first} secondName={second} />
 
-        <h3 className="font-bold mt-2">スコアブック</h3>
-        <ScorebookTable
-          title={`先攻 ${first}`}
-          lineup={game.firstLineup}
-          grid={book[0]}
-        />
-        <ScorebookTable
-          title={`後攻 ${second}`}
-          lineup={game.secondLineup}
-          grid={book[1]}
-        />
+        <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
+        <ScorebookView title={`後攻 ${second}`} side={book.second} innings={book.innings} />
 
         <h3 className="font-bold mt-2">打撃成績</h3>
         <ul className="text-sm flex flex-col gap-1">
@@ -76,53 +70,10 @@ export default function SummaryPage() {
             記録を見直す
           </Link>
         </div>
-        <p className="text-xs text-[#9aa894] print:hidden">印刷ダイアログで「PDFに保存」も選べます。</p>
+        <p className="text-xs text-[#9aa894] print:hidden">
+          印刷するとスコアブックが用紙に出ます。ダイアログで「PDFに保存」も選べます。
+        </p>
       </div>
     </main>
-  );
-}
-
-function ScorebookTable({
-  title,
-  lineup,
-  grid,
-}: {
-  title: string;
-  lineup: { order: number; playerName: string }[];
-  grid: BookCell[][][];
-}) {
-  const cols = 12;
-  return (
-    <div className="overflow-x-auto">
-      <p className="text-sm font-bold mb-1">{title}</p>
-      <table className="w-full text-center text-[11px] border-collapse">
-        <thead>
-          <tr className="text-[#9aa894]">
-            <th className="p-1 text-left">打順</th>
-            {Array.from({ length: cols }, (_, i) => (
-              <th key={i} className="p-1 min-w-10">
-                {i + 1}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {lineup.map((slot, row) => (
-            <tr key={slot.order} className="border-t border-[#2c3c30]">
-              <td className="p-1 text-left font-bold whitespace-nowrap">
-                {slot.order} {slot.playerName}
-              </td>
-              {Array.from({ length: cols }, (_, col) => (
-                <td key={col} className="p-1 align-top">
-                  {(grid[row]?.[col] ?? []).map((c, i) => (
-                    <div key={i}>{c.label}</div>
-                  ))}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }

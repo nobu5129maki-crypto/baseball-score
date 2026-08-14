@@ -123,32 +123,94 @@ select {
 }
 
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
   html,
   body {
     background: #fff !important;
     color: #111 !important;
     padding: 0;
   }
-  body * {
+
+  .print-root,
+  .print-root * {
     color: #111 !important;
-    border-color: #333 !important;
+    background: #fff !important;
+    box-shadow: none !important;
   }
+
   .print\:hidden {
     display: none !important;
   }
-  header,
-  nav,
-  .tap,
-  button {
+
+  header:not(.print-heading),
+  nav {
     display: none !important;
   }
-  table {
+
+  .tap,
+  .print-root button {
+    display: none !important;
+  }
+
+  .scorebook-table {
     width: 100%;
     border-collapse: collapse;
+    font-size: 11px;
   }
-  th,
-  td {
-    border: 1px solid #333;
-    padding: 4px;
+
+  .scorebook-table th,
+  .scorebook-table td,
+  table th,
+  table td {
+    border: 1px solid #111 !important;
+    padding: 3px 4px;
   }
+
+  .scorebook-team {
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+
+  .scorebook-name {
+    width: 7.5em;
+    white-space: nowrap;
+  }
+
+  .scorebook-cell {
+    min-width: 2.4em;
+    height: 2.6em;
+  }
+}
+
+.scorebook-table {
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.scorebook-table th,
+.scorebook-table td {
+  border: 1px solid var(--line);
+  padding: 4px 5px;
+}
+
+.scorebook-name {
+  min-width: 6.5rem;
+  max-width: 8.5rem;
+}
+
+.scorebook-inning {
+  min-width: 2.4rem;
+}
+
+.scorebook-cell {
+  min-width: 2.4rem;
+  min-height: 2.4rem;
+}
+
+.scorebook-empty {
+  opacity: 0.2;
 }
