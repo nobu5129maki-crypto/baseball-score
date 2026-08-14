@@ -252,7 +252,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       <DiamondMap
         state={state}
         selectedId={confirm?.selectedId ?? null}
-        edit={Boolean(confirm) || sheet === "steal" || sheet === "cs" || sheet === "pickoff" || sheet === "hit_runner"}
+        edit={Boolean(confirm)}
+        showOutButton={Boolean(confirm)}
         onSelectRunner={onSelectRunner}
         onSelectDest={onSelectDest}
       />
@@ -333,15 +334,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             />
             <Action
               disabled={occupiedCount === 0}
-              onClick={() => {
-                if (occupiedCount === 1) {
-                  const from = ((state.bases.findIndex(Boolean) + 1) || 1) as Base;
-                  const moves = proposeRunnerHit(state, batter, from);
-                  setConfirm({ result: "runner_hit", moves, selectedId: null });
-                  return;
-                }
-                setSheet("hit_runner");
-              }}
+              onClick={() => setSheet("hit_runner")}
               label="走者当たり"
               help={() => {
                 setGlossaryId("rh");
@@ -350,21 +343,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               }}
             />
           </div>
-          {sheet === "steal" || sheet === "cs" || sheet === "pickoff" || sheet === "hit_runner" ? (
-            <p className="px-3 pb-2 text-sm text-[#f5c518]">
-              {sheet === "steal"
-                ? "進塁させる走者をタップ"
-                : sheet === "pickoff"
-                  ? "牽制アウトにする走者をタップ"
-                  : sheet === "hit_runner"
-                    ? "打球が当たった走者をタップ"
-                    : "アウトにする走者をタップ"}
-              <button type="button" className="ml-2 underline" onClick={() => setSheet(null)}>
-                キャンセル
-              </button>
-            </p>
-          ) : null}
-
           <div className={`px-2 pb-2 ${leftHanded ? "flex flex-col-reverse" : ""}`}>
             <div className="grid grid-cols-3 gap-2 mb-2">
               <button type="button" className="tap" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
@@ -520,6 +498,62 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             void patch((g) => commitSub(g, s, order, playerId, playerName, position));
             setSheet(null);
           }}
+        />
+      ) : null}
+      {sheet === "steal" ? (
+        <RunnerPickSheet
+          title="盗塁"
+          hint="進塁させる走者を1人選んでください。盗塁ボタンをもう一度押す必要はありません。"
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} を ${b === 3 ? "本塁" : `${b + 1}塁`}へ`}
+          onPick={(from) => {
+            const to: Dest = from === 3 ? 4 : ((from + 1) as Dest);
+            void patch((g) => commitSteal(g, from, to));
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "cs" ? (
+        <RunnerPickSheet
+          title="盗塁死"
+          hint="アウトになった走者を1人選んでください。"
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} を盗塁死（アウト）`}
+          danger
+          onPick={(from) => {
+            void patch((g) => commitSteal(g, from, "out"));
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "pickoff" ? (
+        <RunnerPickSheet
+          title="牽制アウト"
+          hint="アウトになった走者を1人選んでください。牽制ボタンをもう一度押したり、「アウトにする」を押す必要はありません。"
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} を牽制アウト`}
+          danger
+          onPick={(from) => {
+            void patch((g) => commitPickoff(g, from));
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "hit_runner" ? (
+        <RunnerPickSheet
+          title="走者当たり"
+          hint="打球が当たった走者を1人選んでください。"
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} に当たった`}
+          onPick={(from) => {
+            const moves = proposeRunnerHit(state, batter, from);
+            setConfirm({ result: "runner_hit", moves, selectedId: null });
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
         />
       ) : null}
       {sheet === "pr" ? (
@@ -707,6 +741,46 @@ function SubSheet({
           ))}
         </div>
       )}
+    </Sheet>
+  );
+}
+
+function RunnerPickSheet({
+  title,
+  hint,
+  bases,
+  action,
+  danger,
+  onPick,
+  onClose,
+}: {
+  title: string;
+  hint: string;
+  bases: Array<RunnerOnBase | null>;
+  action: (base: Base, name: string) => string;
+  danger?: boolean;
+  onPick: (base: Base) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">{hint}</p>
+      <div className="flex flex-col gap-2">
+        {([1, 2, 3] as Base[]).map((b) => {
+          const runner = bases[b - 1];
+          if (!runner) return null;
+          return (
+            <button
+              key={b}
+              type="button"
+              className={`tap tap-result w-full ${danger ? "tap-danger" : "tap-accent"}`}
+              onClick={() => onPick(b)}
+            >
+              {action(b, runner.playerName)}
+            </button>
+          );
+        })}
+      </div>
     </Sheet>
   );
 }

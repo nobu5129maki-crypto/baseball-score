@@ -6,6 +6,7 @@ type Props = {
   state: GameState;
   selectedId: string | null;
   edit: boolean;
+  showOutButton?: boolean;
   displayBases?: GameState["bases"];
   onSelectRunner: (runner: RunnerOnBase, from: 0 | 1 | 2 | 3) => void;
   onSelectDest: (to: Dest) => void;
@@ -15,6 +16,7 @@ export function DiamondMap({
   state,
   selectedId,
   edit,
+  showOutButton,
   displayBases,
   onSelectRunner,
   onSelectDest,
@@ -65,7 +67,7 @@ export function DiamondMap({
           }}
         />
       </svg>
-      {edit ? (
+      {showOutButton ? (
         <div className="flex gap-2 px-1">
           <button type="button" className="tap tap-danger flex-1 text-sm" onClick={() => onSelectDest("out")}>
             アウトにする
