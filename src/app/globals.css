@@ -10,6 +10,7 @@
   --ball: #3ddc84;
   --strike: #f5c518;
   --foul: #ff8a3d;
+  --hit: #4aa8ff;
   --out: #ff5a5a;
   --accent: #f5c518;
   --accent-ink: #14180c;
@@ -80,6 +81,18 @@ select {
   background: var(--foul);
   color: var(--accent-ink);
   border-color: var(--foul);
+}
+
+.tap-hit {
+  background: var(--hit);
+  color: var(--accent-ink);
+  border-color: var(--hit);
+}
+
+.tap-out {
+  background: var(--out);
+  color: #fff;
+  border-color: var(--out);
 }
 
 .tap-danger {

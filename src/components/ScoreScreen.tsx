@@ -359,10 +359,10 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               </button>
             </div>
             <div className="grid grid-cols-4 gap-2 mb-2">
-              <button type="button" className="tap tap-result tap-accent" onClick={() => setSheet("hit")}>
+              <button type="button" className="tap tap-result tap-hit" onClick={() => setSheet("hit")}>
                 ヒット
               </button>
-              <button type="button" className="tap tap-result" onClick={() => setSheet("out")}>
+              <button type="button" className="tap tap-result tap-out" onClick={() => setSheet("out")}>
                 アウト
               </button>
               <button type="button" className="tap tap-result" onClick={() => startResult("strikeout")}>
