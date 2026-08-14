@@ -261,6 +261,17 @@ describe("らくスコア engine", () => {
     expect(state.bases[0]?.playerId).toBe("A1");
   });
 
+  it("併殺は打者と走者がアウトになる", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "gidp");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(2);
+    expect(state.bases[0]).toBeNull();
+    expect(state.bases[1]).toBeNull();
+    expect(state.bases[2]).toBeNull();
+    expect(getBatter(state).playerId).toBe("A3");
+  });
+
   it("牽制アウトで走者が消える", () => {
     let game = commitPlay(makeGame(), "single");
     game = commitPickoff(game, 1);

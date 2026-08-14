@@ -162,7 +162,6 @@ export function proposeMoves(
   state: GameState,
   batter: LineupSlot,
 ): RunnerMove[] {
-  const r1 = state.bases[0];
   const r3 = state.bases[2];
   const batterMove = (to: Dest): RunnerMove => ({
     playerId: batter.playerId,
@@ -190,13 +189,15 @@ export function proposeMoves(
     case "flyout":
     case "lineout":
       return [batterMove("out")];
-    case "gidp":
+    case "gidp": {
+      const force = ([1, 2, 3] as const).find((base) => state.bases[base - 1]);
       return [
         batterMove("out"),
-        ...(r1
-          ? [{ playerId: r1.playerId, from: 1 as const, to: "out" as const }]
+        ...(force
+          ? [{ playerId: state.bases[force - 1]!.playerId, from: force, to: "out" as const }]
           : []),
       ];
+    }
     case "sac_bunt":
       return [batterMove("out"), ...plus(state.bases, 1)];
     case "sac_fly":

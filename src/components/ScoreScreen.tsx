@@ -380,6 +380,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               <button type="button" className="tap tap-result" onClick={() => startResult("error")}>
                 エラー
               </button>
+              <button
+                type="button"
+                className="tap tap-result"
+                disabled={occupiedCount === 0}
+                onClick={() => startResult("gidp")}
+              >
+                併殺
+              </button>
               <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
                 その他
               </button>
