@@ -4,7 +4,6 @@ import type { Dest, GameState, RunnerOnBase } from "@/lib/types";
 
 type Props = {
   state: GameState;
-  batterName: string;
   selectedId: string | null;
   edit: boolean;
   displayBases?: GameState["bases"];
@@ -14,7 +13,6 @@ type Props = {
 
 export function DiamondMap({
   state,
-  batterName,
   selectedId,
   edit,
   displayBases,
@@ -62,7 +60,6 @@ export function DiamondMap({
           label="本"
           runner={null}
           selected={false}
-          batterName={batterName}
           onClick={() => {
             if (edit) onSelectDest(4);
           }}
@@ -85,7 +82,6 @@ function BasePad({
   label,
   runner,
   selected,
-  batterName,
   onClick,
 }: {
   x: number;
@@ -93,7 +89,6 @@ function BasePad({
   label: string;
   runner: RunnerOnBase | null;
   selected: boolean;
-  batterName?: string;
   onClick: () => void;
 }) {
   const occupied = Boolean(runner);
@@ -123,11 +118,6 @@ function BasePad({
       {runner ? (
         <text x={x} y={y + 28} textAnchor="middle" fill="#3ddc84" fontSize="10">
           {runner.playerName}
-        </text>
-      ) : null}
-      {batterName && label === "本" ? (
-        <text x={x} y={y + 28} textAnchor="middle" fill="#9aa894" fontSize="10">
-          {batterName}
         </text>
       ) : null}
     </g>

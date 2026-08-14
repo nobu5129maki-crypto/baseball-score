@@ -217,7 +217,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
 
       <DiamondMap
         state={state}
-        batterName={batter.playerName}
         selectedId={confirm?.selectedId ?? null}
         edit={Boolean(confirm) || sheet === "steal" || sheet === "cs" || sheet === "pickoff"}
         onSelectRunner={onSelectRunner}
