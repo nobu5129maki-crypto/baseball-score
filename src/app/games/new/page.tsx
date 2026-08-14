@@ -14,39 +14,48 @@ import type { Side } from "@/lib/types";
 export default function NewGamePage() {
   const router = useRouter();
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
-  const players = useLiveQuery(
-    () => (team ? db.players.where("teamId").equals(team.id).toArray() : []),
-    [team?.id],
-  ) ?? [];
+  const players =
+    useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
+      team?.id,
+    ]) ?? [];
 
   const today = new Date().toISOString().slice(0, 10);
   const [opponent, setOpponent] = useState("相手チーム");
   const [date, setDate] = useState(today);
   const [mySide, setMySide] = useState<Side>("second");
   const [innings, setInnings] = useState(7);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function create() {
-    if (!team) return;
-    const mine = lineupFromPlayers(players);
-    const opp = opponentLineup();
-    const sides = sidesFor(mySide, mine, opp);
-    const id = newId();
-    await saveGame({
-      id,
-      myTeamId: team.id,
-      myTeamName: team.name,
-      opponentName: opponent.trim() || "相手",
-      mySide,
-      scheduledInnings: innings,
-      date,
-      status: "lineup",
-      firstLineup: sides.firstLineup,
-      secondLineup: sides.secondLineup,
-      events: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-    router.push(`/games/${id}/lineup`);
+    if (!team || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const mine = lineupFromPlayers(players);
+      const opp = opponentLineup();
+      const sides = sidesFor(mySide, mine, opp);
+      const id = newId();
+      await saveGame({
+        id,
+        myTeamId: team.id,
+        myTeamName: team.name,
+        opponentName: opponent.trim() || "相手",
+        mySide,
+        scheduledInnings: innings,
+        date,
+        status: "lineup",
+        firstLineup: sides.firstLineup,
+        secondLineup: sides.secondLineup,
+        events: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      router.push(`/games/${id}/lineup`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "試合を作れませんでした");
+      setBusy(false);
+    }
   }
 
   return (
@@ -113,8 +122,9 @@ export default function NewGamePage() {
             ))}
           </select>
         </label>
-        <button type="submit" className="tap tap-accent mt-2" disabled={!team}>
-          打順へ進む
+        {error ? <p className="text-sm text-[#ff5a5a]">{error}</p> : null}
+        <button type="submit" className="tap tap-accent mt-2" disabled={!team || busy}>
+          {busy ? "作成中…" : "打順へ進む"}
         </button>
       </form>
     </main>

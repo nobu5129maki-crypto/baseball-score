@@ -1,7 +1,7 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { InningScoreTable } from "@/components/InningScoreTable";
@@ -10,11 +10,12 @@ import { reduceGame, totalRuns } from "@/lib/engine";
 import { buildScorebook, type BookCell } from "@/lib/scorebook";
 import { batterLine, formatObp, gameSlashes } from "@/lib/stats";
 
-export default function SummaryPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const game = useLiveQuery(() => db.games.get(id), [id]);
+export default function SummaryPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const game = useLiveQuery(() => (id ? db.games.get(id) : undefined), [id]);
 
-  if (!game) {
+  if (!id || !game) {
     return <p className="p-6 text-[#9aa894]">読み込み中…</p>;
   }
 

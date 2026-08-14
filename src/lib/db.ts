@@ -23,6 +23,13 @@ export class RakuScoreDB extends Dexie {
       settings: "id",
       rosters: "id, name",
     });
+    this.version(3).stores({
+      teams: "id, name",
+      players: "id, teamId, name",
+      games: "id, updatedAt, status",
+      settings: "id",
+      rosters: "id, name, createdAt",
+    });
   }
 }
 
