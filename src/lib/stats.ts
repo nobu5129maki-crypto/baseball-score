@@ -1,6 +1,6 @@
 import { playLabel } from "./labels";
-import { battingSide, getBatter, otherSide, reduceGame, totalRuns } from "./engine";
-import type { Game, GameEvent, Half, PlayEvent, PlayResult, Side } from "./types";
+import { battingSide, fieldingSide, getBatter, getLineup, otherSide, reduceGame, totalRuns } from "./engine";
+import type { Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
   playerId: string;
@@ -205,6 +205,50 @@ function applyEventToStats(
 
 export function slashFor(game: Game, playerId: string): PlayerSlash | undefined {
   return gameSlashes(game).find((p) => p.playerId === playerId);
+}
+
+export type PitcherLine = {
+  playerId: string;
+  name: string;
+  pitches: number;
+};
+
+export function myTeamPitchers(game: Game): PitcherLine[] {
+  const rows: PitcherLine[] = [];
+  const index = new Map<string, number>();
+
+  const ensure = (slot: LineupSlot) => {
+    const existing = index.get(slot.playerId);
+    if (existing === undefined) {
+      index.set(slot.playerId, rows.length);
+      rows.push({ playerId: slot.playerId, name: slot.playerName, pitches: 0 });
+      return;
+    }
+    rows[existing].name = slot.playerName;
+  };
+
+  let cursor: Game = { ...game, events: [] };
+  const starter = pitcherOnSide(reduceGame(cursor), game.mySide);
+  if (starter) ensure(starter);
+
+  for (const event of game.events) {
+    const before = reduceGame(cursor);
+    if (event.t === "pitch" && fieldingSide(before.half) === game.mySide) {
+      const pitcher = pitcherOnSide(before, game.mySide);
+      if (pitcher) {
+        ensure(pitcher);
+        rows[index.get(pitcher.playerId)!].pitches += 1;
+      }
+    }
+    cursor = { ...cursor, events: [...cursor.events, event] };
+    const after = pitcherOnSide(reduceGame(cursor), game.mySide);
+    if (after) ensure(after);
+  }
+  return rows;
+}
+
+function pitcherOnSide(state: ReturnType<typeof reduceGame>, side: Side): LineupSlot | undefined {
+  return getLineup(state, side).find((slot) => slot.position === "P");
 }
 
 function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {

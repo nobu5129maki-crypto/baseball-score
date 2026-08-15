@@ -181,6 +181,11 @@ select {
     margin-bottom: 12px;
   }
 
+  .result-block {
+    break-inside: avoid;
+    margin-bottom: 10px;
+  }
+
   .scorebook-name {
     width: 7.5em;
     white-space: nowrap;

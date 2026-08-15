@@ -9,7 +9,7 @@ import { ScorebookView } from "@/components/ScorebookView";
 import { db } from "@/lib/db";
 import { reduceGame, totalRuns } from "@/lib/engine";
 import { buildScorebook } from "@/lib/scorebook";
-import { batterLine, formatObp, gameSlashes } from "@/lib/stats";
+import { batterLine, formatObp, gameSlashes, myTeamPitchers, type PitcherLine, type PlayerSlash } from "@/lib/stats";
 
 export default function SummaryPage() {
   const params = useParams<{ id: string }>();
@@ -45,22 +45,17 @@ export default function SummaryPage() {
 
         <InningScoreTable game={game} state={state} firstName={first} secondName={second} />
 
+        <PitcherLines teamName={game.myTeamName} pitchers={myTeamPitchers(game)} />
+
         <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
         <ScorebookView title={`後攻 ${second}`} side={book.second} innings={book.innings} />
 
-        <h3 className="font-bold mt-2">打撃成績</h3>
-        <ul className="text-sm flex flex-col gap-1">
-          {slashes.map((p) => (
-            <li key={p.playerId} className="flex justify-between border-b border-[#2c3c30] py-1">
-              <span>
-                {p.order} {p.name}
-              </span>
-              <span>
-                {batterLine(p)} 出塁{formatObp(p)} 盗{p.sb}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <BattingLines
+          mineName={game.myTeamName}
+          theirsName={game.opponentName}
+          mine={slashes.filter((p) => p.side === game.mySide)}
+          theirs={slashes.filter((p) => p.side !== game.mySide)}
+        />
 
         <div className="flex gap-2 print:hidden">
           <button type="button" className="tap tap-accent flex-1" onClick={() => window.print()}>
@@ -75,5 +70,78 @@ export default function SummaryPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function PitcherLines({ teamName, pitchers }: { teamName: string; pitchers: PitcherLine[] }) {
+  return (
+    <section className="result-block rounded-2xl border border-[#2c3c30] p-4">
+      <h3 className="font-bold">投手成績</h3>
+      <p className="text-sm text-[#9aa894] mt-1">{teamName}（自チーム）</p>
+      {pitchers.length === 0 ? (
+        <p className="text-sm text-[#9aa894] mt-3">投手の記録はありません。</p>
+      ) : (
+        <ul className="text-sm flex flex-col gap-1 mt-3">
+          {pitchers.map((p) => (
+            <li key={p.playerId} className="flex justify-between border-b border-[#2c3c30] py-2 last:border-b-0">
+              <span className="font-bold">{p.name}</span>
+              <span>{p.pitches}球</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function BattingLines({
+  mineName,
+  theirsName,
+  mine,
+  theirs,
+}: {
+  mineName: string;
+  theirsName: string;
+  mine: PlayerSlash[];
+  theirs: PlayerSlash[];
+}) {
+  return (
+    <section className="flex flex-col gap-6 mt-2">
+      <h3 className="font-bold">打撃成績</h3>
+      <BattingTeam title={`${mineName}（自チーム）`} rows={mine} />
+      <BattingTeam title={`${theirsName}（相手）`} rows={theirs} opponent />
+    </section>
+  );
+}
+
+function BattingTeam({
+  title,
+  rows,
+  opponent,
+}: {
+  title: string;
+  rows: PlayerSlash[];
+  opponent?: boolean;
+}) {
+  return (
+    <div className={`result-block rounded-2xl border p-4 ${opponent ? "border-[#3a4a3e] bg-[#0b100c]" : "border-[#2c3c30]"}`}>
+      <h4 className="font-bold mb-3">{title}</h4>
+      {rows.length === 0 ? (
+        <p className="text-sm text-[#9aa894]">打席の記録はありません。</p>
+      ) : (
+        <ul className="text-sm flex flex-col gap-1">
+          {rows.map((p) => (
+            <li key={p.playerId} className="flex justify-between gap-3 border-b border-[#2c3c30] py-2 last:border-b-0">
+              <span className="shrink-0">
+                {p.order} {p.name}
+              </span>
+              <span className="text-right">
+                {batterLine(p)} 出塁{formatObp(p)} 盗{p.sb}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

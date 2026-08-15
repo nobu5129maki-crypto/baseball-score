@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { commitEnd, commitPinchHitter, commitPlay, commitSteal } from "./engine";
-import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes } from "./stats";
+import { commitEnd, commitPinchHitter, commitPlay, commitPitch, commitSteal, commitSub } from "./engine";
+import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -128,6 +128,42 @@ describe("formatOps / myTeamSlashes", () => {
     expect(plateAppearances(a1!)).toBe(1);
     expect(a1!.ab).toBe(0);
     expect(formatObp(a1!)).toBe("1.000");
+  });
+});
+
+describe("myTeamPitchers", () => {
+  it("先発投手の投球数を数える", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "foul");
+    const rows = myTeamPitchers(game);
+    expect(rows).toEqual([{ playerId: "B1", name: "B1", pitches: 3 }]);
+  });
+
+  it("相手の投球は自チームに入れない", () => {
+    let game: Game = { ...makeGame(), mySide: "first" };
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    expect(myTeamPitchers(game)).toEqual([{ playerId: "A1", name: "A1", pitches: 0 }]);
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "strike");
+    expect(myTeamPitchers(game)).toEqual([{ playerId: "A1", name: "A1", pitches: 2 }]);
+  });
+
+  it("投手交代後は投手ごとに球数を分ける", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    game = commitSub(game, "second", 1, "PX", "新投手", "P");
+    game = commitPitch(game, "strike");
+    expect(myTeamPitchers(game)).toEqual([
+      { playerId: "B1", name: "B1", pitches: 2 },
+      { playerId: "PX", name: "新投手", pitches: 1 },
+    ]);
   });
 });
 
