@@ -73,7 +73,12 @@ export default function StatsPage() {
                   <tr className="text-[#9aa894] text-right bg-[#121a14]">
                     <th className="p-2 text-left font-medium sticky left-0 bg-[#121a14]">選手</th>
                     <th className="p-2 font-medium whitespace-nowrap">打席</th>
-                    <th className="p-2 font-medium whitespace-nowrap">打数</th>
+                    <th className="p-2 font-medium whitespace-nowrap">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        打数
+                        <HelpMark label="打数の説明" onClick={() => setHelp("ab")} />
+                      </span>
+                    </th>
                     <th className="p-2 font-medium whitespace-nowrap">安打</th>
                     <th className="p-2 font-medium whitespace-nowrap">打率</th>
                     <th className="p-2 font-medium whitespace-nowrap">出塁率</th>
@@ -81,7 +86,7 @@ export default function StatsPage() {
                     <th className="p-2 font-medium whitespace-nowrap">
                       <span className="inline-flex items-center justify-end gap-1">
                         OPS
-                        <HelpMark onClick={() => setHelp("ops")} />
+                        <HelpMark label="OPSの説明" onClick={() => setHelp("ops")} />
                       </span>
                     </th>
                   </tr>
@@ -114,12 +119,12 @@ export default function StatsPage() {
   );
 }
 
-function HelpMark({ onClick }: { onClick: () => void }) {
+function HelpMark({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       className="print:hidden inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#2c3c30] bg-[#070a08] text-xs font-bold text-[#f5c518]"
-      aria-label="OPSの説明"
+      aria-label={label}
       onClick={onClick}
     >
       ?
@@ -132,7 +137,7 @@ function Stat({ label, value, onHelp }: { label: string; value: string; onHelp?:
     <div className="relative border-b border-r border-[#2c3c30] px-2 py-3 last:border-r-0">
       <dt className="text-xs text-[#9aa894] flex items-center justify-center gap-1">
         {label}
-        {onHelp ? <HelpMark onClick={onHelp} /> : null}
+        {onHelp ? <HelpMark label={`${label}の説明`} onClick={onHelp} /> : null}
       </dt>
       <dd className="font-bold mt-1 break-words">{value}</dd>
     </div>

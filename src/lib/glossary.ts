@@ -77,6 +77,15 @@ export const GLOSSARY: GlossaryTerm[] = [
       "成績で選手やチームの打撃を比べるとき。打率だけだと四球や長打が分からないので、OPSも見ます。",
     symbol: "OPS",
   },
+  {
+    id: "ab",
+    title: "打数（だすう）",
+    plain:
+      "打席のうち、打率の計算に入れる回数です。ヒットやアウトになった打席は打数に入ります。次のものは打数に入りません。四球、死球、犠牲バント、犠牲フライ、打撃妨害・走塁妨害、打席の途中での交代です。これらは打席には数えますが、打数には入れないので打率が下がりません。",
+    when:
+      "成績の打率を見るとき。四球が多い選手は打席が多くても打数は少なくなります。",
+    symbol: "AB",
+  },
 ];
 
 export function glossaryById(id: string): GlossaryTerm | undefined {
