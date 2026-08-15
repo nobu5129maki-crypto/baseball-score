@@ -1,5 +1,5 @@
 import { playLabel } from "./labels";
-import { battingSide, fieldingSide, getBatter, getLineup, otherSide, reduceGame, totalRuns } from "./engine";
+import { battingSide, fieldingSide, getBatter, getLineup, otherSide, playAddsPitch, reduceGame, totalRuns } from "./engine";
 import type { Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
@@ -233,7 +233,12 @@ export function myTeamPitchers(game: Game): PitcherLine[] {
 
   for (const event of game.events) {
     const before = reduceGame(cursor);
-    if (event.t === "pitch" && fieldingSide(before.half) === game.mySide) {
+    if (
+      ((event.t === "pitch" && fieldingSide(before.half) === game.mySide) ||
+        (event.t === "play" &&
+          playAddsPitch(event.result, before) &&
+          fieldingSide(before.half) === game.mySide))
+    ) {
       const pitcher = pitcherOnSide(before, game.mySide);
       if (pitcher) {
         ensure(pitcher);

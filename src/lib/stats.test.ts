@@ -165,6 +165,14 @@ describe("myTeamPitchers", () => {
       { playerId: "PX", name: "新投手", pitches: 1 },
     ]);
   });
+
+  it("ヒットとアウトも投球数に入る", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    expect(myTeamPitchers(game)).toEqual([{ playerId: "B1", name: "B1", pitches: 1 }]);
+    game = commitPlay(game, "groundout");
+    expect(myTeamPitchers(game)[0]?.pitches).toBe(2);
+  });
 });
 
 describe("myTeamSeason", () => {

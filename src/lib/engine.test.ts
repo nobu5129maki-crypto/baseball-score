@@ -14,6 +14,7 @@ import {
   getBatter,
   needsStrikeThreeChoice,
   canDroppedThird,
+  playAddsPitch,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -170,6 +171,38 @@ describe("らくスコア engine", () => {
     const state = reduceGame(game);
     expect(state.bases[0]?.playerId).toBe("A1");
     expect(state.hits.first).toBe(1);
+    expect(state.pitchesThrown.second).toBe(1);
+  });
+
+  it("ゴロアウトも1球として数える", () => {
+    const game = commitPlay(makeGame(), "groundout");
+    expect(reduceGame(game).pitchesThrown.second).toBe(1);
+  });
+
+  it("ボールのあとのヒットは球数が1増える", () => {
+    let game = commitPitch(makeGame(), "ball");
+    expect(reduceGame(game).pitchesThrown.second).toBe(1);
+    game = commitPlay(game, "single");
+    expect(reduceGame(game).pitchesThrown.second).toBe(2);
+  });
+
+  it("四球はボール4つだけで数え、もう1球足さない", () => {
+    let game = makeGame();
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    expect(reduceGame(game).pitchesThrown.second).toBe(4);
+    expect(playAddsPitch("walk", { balls: 4, strikes: 0 })).toBe(false);
+  });
+
+  it("三振はストライク3つだけで数え、もう1球足さない", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPlay(game, "strikeout");
+    expect(reduceGame(game).pitchesThrown.second).toBe(3);
   });
 
   it("1塁走者ありの単打で1・2塁", () => {

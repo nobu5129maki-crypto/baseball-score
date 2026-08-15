@@ -99,6 +99,12 @@ export function canDroppedThird(state: GameState): boolean {
   return state.bases[0] == null;
 }
 
+export function playAddsPitch(result: PlayResult, state: Pick<GameState, "balls" | "strikes">): boolean {
+  if (result === "walk") return state.balls < 4;
+  if (result === "strikeout" || result === "dropped_third") return state.strikes < 3;
+  return true;
+}
+
 export function needsFieldPosition(result: PlayResult): boolean {
   return (
     result === "single" ||
@@ -420,6 +426,15 @@ function applyOccupancy(
     lineupIndex[side] = (lineupIndex[side] + 1) % 9;
   }
 
+  const fielding = fieldingSide(state.half);
+  let pitchesThrown = state.pitchesThrown;
+  if (opts.consumeAtBat && result && playAddsPitch(result, state)) {
+    pitchesThrown = {
+      ...pitchesThrown,
+      [fielding]: pitchesThrown[fielding] + 1,
+    };
+  }
+
   let next: GameState = {
     ...state,
     outs,
@@ -430,6 +445,7 @@ function applyOccupancy(
     errors,
     scores,
     lineupIndex,
+    pitchesThrown,
     pitchCountAtBat: opts.consumeAtBat ? 0 : state.pitchCountAtBat,
   };
 
