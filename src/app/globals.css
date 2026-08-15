@@ -156,6 +156,12 @@ select {
     display: none !important;
   }
 
+  .stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
   .scorebook-table {
     width: 100%;
     border-collapse: collapse;

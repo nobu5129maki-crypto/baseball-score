@@ -1,5 +1,5 @@
 import { playLabel } from "./labels";
-import { battingSide, getBatter, reduceGame } from "./engine";
+import { battingSide, getBatter, otherSide, reduceGame, totalRuns } from "./engine";
 import type { Game, GameEvent, Half, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
@@ -246,4 +246,76 @@ export function myTeamSlashes(games: Game[]): PlayerSlash[] {
       const bAvg = b.ab === 0 ? -1 : b.h / b.ab;
       return bAvg - aAvg || b.ab - a.ab || b.h - a.h || a.name.localeCompare(b.name, "ja");
     });
+}
+
+export function sumSlashes(rows: PlayerSlash[], name = "チーム計"): PlayerSlash {
+  const acc = emptySlash("team-total", name, 0, "first");
+  for (const row of rows) {
+    acc.ab += row.ab;
+    acc.h += row.h;
+    acc.bb += row.bb;
+    acc.hbp += row.hbp;
+    acc.sf += row.sf;
+    acc.sh += row.sh;
+    acc.tb += row.tb;
+    acc.sb += row.sb;
+    acc.cs += row.cs;
+    acc.r += row.r;
+  }
+  return acc;
+}
+
+export type TeamSeason = {
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  runsFor: number;
+  runsAgainst: number;
+  hitsFor: number;
+  hitsAgainst: number;
+  errors: number;
+  batting: PlayerSlash;
+};
+
+export function myTeamSeason(games: Game[]): TeamSeason {
+  const batting = sumSlashes(myTeamSlashes(games));
+  let played = 0;
+  let wins = 0;
+  let losses = 0;
+  let draws = 0;
+  let runsFor = 0;
+  let runsAgainst = 0;
+  let hitsFor = 0;
+  let hitsAgainst = 0;
+  let errors = 0;
+
+  for (const game of games) {
+    if (game.status !== "ended") continue;
+    played += 1;
+    const state = reduceGame(game);
+    const mine = totalRuns(state.scores[game.mySide]);
+    const theirs = totalRuns(state.scores[otherSide(game.mySide)]);
+    if (mine > theirs) wins += 1;
+    else if (mine < theirs) losses += 1;
+    else draws += 1;
+    runsFor += mine;
+    runsAgainst += theirs;
+    hitsFor += state.hits[game.mySide];
+    hitsAgainst += state.hits[otherSide(game.mySide)];
+    errors += state.errors[game.mySide];
+  }
+
+  return {
+    played,
+    wins,
+    losses,
+    draws,
+    runsFor,
+    runsAgainst,
+    hitsFor,
+    hitsAgainst,
+    errors,
+    batting,
+  };
 }

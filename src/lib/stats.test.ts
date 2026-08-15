@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPinchHitter, commitPlay, commitSteal } from "./engine";
-import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamSlashes, plateAppearances } from "./stats";
+import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -128,5 +128,22 @@ describe("formatOps / myTeamSlashes", () => {
     expect(plateAppearances(a1!)).toBe(1);
     expect(a1!.ab).toBe(0);
     expect(formatObp(a1!)).toBe("1.000");
+  });
+});
+
+describe("myTeamSeason", () => {
+  function mine(): Game {
+    return { ...makeGame(), mySide: "first" };
+  }
+
+  it("終了試合の勝敗と個人合計をチーム成績にする", () => {
+    let win = commitPlay({ ...mine(), id: "w" }, "homerun");
+    win = commitEnd(win);
+    let lose = commitPlay({ ...mine(), id: "l", mySide: "second" }, "homerun");
+    lose = commitEnd(lose);
+    const season = myTeamSeason([win, lose]);
+    expect(season).toMatchObject({ played: 2, wins: 1, losses: 1, draws: 0 });
+    expect(season.batting.h).toBe(1);
+    expect(sumSlashes(myTeamSlashes([win, lose])).h).toBe(1);
   });
 });
