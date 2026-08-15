@@ -90,6 +90,10 @@ export function getPitcher(state: GameState): LineupSlot | undefined {
   return getLineup(state, side).find((slot) => slot.position === "P");
 }
 
+export function needsStrikeThreeChoice(state: GameState): boolean {
+  return !state.ended && state.strikes >= 3;
+}
+
 export function needsFieldPosition(result: PlayResult): boolean {
   return (
     result === "single" ||
@@ -550,13 +554,12 @@ function append(game: Game, event: DistributiveOmit<GameEvent, "id" | "seq">): G
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 export function commitPitch(game: Game, kind: PitchKind): Game {
+  const before = reduceGame(game);
+  if (before.ended || before.strikes >= 3) return game;
   const next = append(game, { t: "pitch", kind });
   const state = reduceGame(next);
   if (state.balls >= 4) {
     return commitPlay(next, "walk");
-  }
-  if (state.strikes >= 3) {
-    return commitPlay(next, "strikeout");
   }
   return next;
 }

@@ -22,6 +22,7 @@ import {
   inningLabel,
   needsFieldPosition,
   needsRunnerConfirm,
+  needsStrikeThreeChoice,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -111,6 +112,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const firstName = game.mySide === "first" ? game.myTeamName : game.opponentName;
   const secondName = game.mySide === "second" ? game.myTeamName : game.opponentName;
   const occupiedCount = state.bases.filter(Boolean).length;
+  const chooseK = needsStrikeThreeChoice(state);
   const slash = slashFor(game, batter.playerId);
   const atBats = atBatsThisGame(game, batter, state.half);
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
@@ -356,51 +358,60 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             />
           </div>
           <div className={`px-2 pb-2 ${leftHanded ? "flex flex-col-reverse" : ""}`}>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              <button type="button" className="tap tap-ball" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
-                ボール
-              </button>
-              <button type="button" className="tap tap-strike" onClick={() => void patch((g) => commitPitch(g, "strike"))}>
-                ストライク
-              </button>
-              <button type="button" className="tap tap-foul" onClick={() => void patch((g) => commitPitch(g, "foul"))}>
-                ファウル
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-2 mb-2">
-              <button type="button" className="tap tap-result tap-hit" onClick={() => setSheet("hit")}>
-                ヒット
-              </button>
-              <button type="button" className="tap tap-result tap-out" onClick={() => setSheet("out")}>
-                アウト
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("strikeout")}>
-                三振
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("dropped_third")}>
-                振り逃げ
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("walk")}>
-                四球
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("hbp")}>
-                死球
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("error")}>
-                エラー
-              </button>
-              <button
-                type="button"
-                className="tap tap-result"
-                disabled={occupiedCount === 0}
-                onClick={() => startResult("gidp")}
-              >
-                併殺
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
-                その他
-              </button>
-            </div>
+            {chooseK ? (
+              <div className="mb-2">
+                <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
+                  3ストライクです。三振か振り逃げを選んでください。
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className="tap tap-result tap-out" onClick={() => startResult("strikeout")}>
+                    三振
+                  </button>
+                  <button type="button" className="tap tap-result tap-hit" onClick={() => startResult("dropped_third")}>
+                    振り逃げ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <button type="button" className="tap tap-ball" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
+                    ボール
+                  </button>
+                  <button type="button" className="tap tap-strike" onClick={() => void patch((g) => commitPitch(g, "strike"))}>
+                    ストライク
+                  </button>
+                  <button type="button" className="tap tap-foul" onClick={() => void patch((g) => commitPitch(g, "foul"))}>
+                    ファウル
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <button type="button" className="tap tap-result tap-hit" onClick={() => setSheet("hit")}>
+                    ヒット
+                  </button>
+                  <button type="button" className="tap tap-result tap-out" onClick={() => setSheet("out")}>
+                    アウト
+                  </button>
+                  <button type="button" className="tap tap-result" onClick={() => startResult("hbp")}>
+                    死球
+                  </button>
+                  <button type="button" className="tap tap-result" onClick={() => startResult("error")}>
+                    エラー
+                  </button>
+                  <button
+                    type="button"
+                    className="tap tap-result"
+                    disabled={occupiedCount === 0}
+                    onClick={() => startResult("gidp")}
+                  >
+                    併殺
+                  </button>
+                  <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
+                    その他
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="px-2 pb-4 flex gap-2">

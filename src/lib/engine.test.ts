@@ -12,6 +12,7 @@ import {
   commitSub,
   commitWp,
   getBatter,
+  needsStrikeThreeChoice,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -76,15 +77,45 @@ describe("らくスコア engine", () => {
     expect(game.events.some((e) => e.t === "play" && e.result === "walk")).toBe(true);
   });
 
-  it("ストライク3つで三振、1アウト", () => {
+  it("ストライク3つでは三振にせず、三振か振り逃げを待つ", () => {
     let game = makeGame();
     game = commitPitch(game, "strike");
     game = commitPitch(game, "strike");
     game = commitPitch(game, "strike");
-    const state = reduceGame(game);
+    let state = reduceGame(game);
+    expect(state.strikes).toBe(3);
+    expect(state.outs).toBe(0);
+    expect(state.pitchCountAtBat).toBe(3);
+    expect(game.events.some((e) => e.t === "play")).toBe(false);
+    expect(needsStrikeThreeChoice(state)).toBe(true);
+    game = commitPlay(game, "strikeout");
+    state = reduceGame(game);
     expect(state.outs).toBe(1);
-    expect(state.bases.every((b) => b === null)).toBe(true);
+    expect(state.strikes).toBe(0);
     expect(getBatter(state).playerId).toBe("A2");
+  });
+
+  it("3ストライク後に振り逃げすると打者が1塁、球数は3のまま", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPlay(game, "dropped_third");
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A1");
+    expect(state.outs).toBe(0);
+    expect(state.pitchesThrown.second).toBe(3);
+  });
+
+  it("3ストライク後の追加の球は記録しない", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    const paused = game;
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    expect(game.events).toEqual(paused.events);
   });
 
   it("2ストライク後のファウルはストライクが増えない", () => {
