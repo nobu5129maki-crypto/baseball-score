@@ -68,6 +68,15 @@ export const GLOSSARY: GlossaryTerm[] = [
     when: "投手がセットから変な動きをして、審判がボークを宣告したとき。",
     symbol: "BK",
   },
+  {
+    id: "ops",
+    title: "OPS（おーぴーえす）",
+    plain:
+      "出塁率と長打率を足した数字です。出塁率は「どれだけ塁に出たか」、長打率は「どれだけ長打を打ったか」です。2つを足すので、数字が大きいほど得点につながりやすい打者です。1.000に近い、またはそれを超えるととてもよく打っています。",
+    when:
+      "成績で選手やチームの打撃を比べるとき。打率だけだと四球や長打が分からないので、OPSも見ます。",
+    symbol: "OPS",
+  },
 ];
 
 export function glossaryById(id: string): GlossaryTerm | undefined {

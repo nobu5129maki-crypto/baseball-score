@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
+import { GlossarySheet } from "@/components/GlossarySheet";
 import { db } from "@/lib/db";
 import {
   formatAvg,
@@ -28,6 +30,7 @@ export default function StatsPage() {
   const season = myTeamSeason(mine);
   const total = sumSlashes(rows);
   const teamName = team?.name ?? "自チーム";
+  const [help, setHelp] = useState<string | null>(null);
 
   return (
     <main className="print-root max-w-lg mx-auto w-full min-h-dvh print:max-w-none">
@@ -40,7 +43,6 @@ export default function StatsPage() {
             {teamName}　{endedCount}試合の累積（進行中の試合も含む）
           </p>
           <h2 className="text-2xl font-bold mt-1">{teamName} の成績</h2>
-          <p className="text-xs text-[#9aa894] mt-1 print:text-black">OPSは出塁率＋長打率です。</p>
         </header>
 
         <section>
@@ -55,7 +57,7 @@ export default function StatsPage() {
               <Stat label="失策" value={String(season.errors)} />
               <Stat label="打率" value={formatAvg(season.batting.h, season.batting.ab)} />
               <Stat label="出塁率" value={formatObp(season.batting)} />
-              <Stat label="OPS" value={formatOps(season.batting)} />
+              <Stat label="OPS" value={formatOps(season.batting)} onHelp={() => setHelp("ops")} />
             </dl>
           </div>
         </section>
@@ -76,7 +78,12 @@ export default function StatsPage() {
                     <th className="p-2 font-medium whitespace-nowrap">打率</th>
                     <th className="p-2 font-medium whitespace-nowrap">出塁率</th>
                     <th className="p-2 font-medium whitespace-nowrap">盗塁</th>
-                    <th className="p-2 font-medium whitespace-nowrap">OPS</th>
+                    <th className="p-2 font-medium whitespace-nowrap">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        OPS
+                        <HelpMark onClick={() => setHelp("ops")} />
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -102,14 +109,31 @@ export default function StatsPage() {
           印刷すると成績表が用紙に出ます。ダイアログで「PDFに保存」も選べます。
         </p>
       </div>
+      {help ? <GlossarySheet termId={help} onClose={() => setHelp(null)} /> : null}
     </main>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function HelpMark({ onClick }: { onClick: () => void }) {
   return (
-    <div className="border-b border-r border-[#2c3c30] px-2 py-3 last:border-r-0">
-      <dt className="text-xs text-[#9aa894]">{label}</dt>
+    <button
+      type="button"
+      className="print:hidden inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#2c3c30] bg-[#070a08] text-xs font-bold text-[#f5c518]"
+      aria-label="OPSの説明"
+      onClick={onClick}
+    >
+      ?
+    </button>
+  );
+}
+
+function Stat({ label, value, onHelp }: { label: string; value: string; onHelp?: () => void }) {
+  return (
+    <div className="relative border-b border-r border-[#2c3c30] px-2 py-3 last:border-r-0">
+      <dt className="text-xs text-[#9aa894] flex items-center justify-center gap-1">
+        {label}
+        {onHelp ? <HelpMark onClick={onHelp} /> : null}
+      </dt>
       <dd className="font-bold mt-1 break-words">{value}</dd>
     </div>
   );
