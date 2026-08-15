@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPinchHitter, commitPlay, commitPitch, commitSteal, commitSub } from "./engine";
-import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes } from "./stats";
+import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes, teamPitchers } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -172,6 +172,14 @@ describe("myTeamPitchers", () => {
     expect(myTeamPitchers(game)).toEqual([{ playerId: "B1", name: "B1", pitches: 1 }]);
     game = commitPlay(game, "groundout");
     expect(myTeamPitchers(game)[0]?.pitches).toBe(2);
+  });
+
+  it("相手投手の投球数もチームごとに数える", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPitch(game, "strike");
+    expect(teamPitchers(game, "first")).toEqual([{ playerId: "A1", name: "A1", pitches: 0 }]);
+    expect(teamPitchers(game, "second")[0]?.pitches).toBe(2);
   });
 });
 

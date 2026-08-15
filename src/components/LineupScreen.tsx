@@ -82,7 +82,15 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     const nextSlot = { ...slot, ...patch };
     if (latest.status === "in_progress") {
       await saveGame(
-        commitSub(latest, tab, order, nextSlot.playerId, nextSlot.playerName, nextSlot.position),
+        commitSub(
+          latest,
+          tab,
+          order,
+          nextSlot.playerId,
+          nextSlot.playerName,
+          nextSlot.position,
+          nextSlot.number,
+        ),
       );
       return;
     }
@@ -105,9 +113,9 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     }
     if (latest.status === "in_progress") {
       let next = latest;
-      next = commitSub(next, tab, a.order, a.playerId, a.playerName, a.position);
+      next = commitSub(next, tab, a.order, a.playerId, a.playerName, a.position, a.number);
       if (b && b.order !== a.order) {
-        next = commitSub(next, tab, b.order, b.playerId, b.playerName, b.position);
+        next = commitSub(next, tab, b.order, b.playerId, b.playerName, b.position, b.number);
       }
       await saveGame(next);
       return;
@@ -137,8 +145,8 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     const latest = await db.games.get(gameId);
     if (!latest) return;
     if (latest.status === "in_progress") {
-      let next = commitSub(latest, tab, a.order, a.playerId, a.playerName, a.position);
-      next = commitSub(next, tab, b.order, b.playerId, b.playerName, b.position);
+      let next = commitSub(latest, tab, a.order, a.playerId, a.playerName, a.position, a.number);
+      next = commitSub(next, tab, b.order, b.playerId, b.playerName, b.position, b.number);
       await saveGame(next);
       return;
     }

@@ -123,6 +123,7 @@ export type SubEvent = {
   playerId: string;
   playerName: string;
   position: Position;
+  number?: string;
 };
 
 export type PinchRunnerEvent = {
@@ -133,6 +134,7 @@ export type PinchRunnerEvent = {
   playerId: string;
   playerName: string;
   position: Position;
+  number?: string;
 };
 
 export type EndEvent = { id: string; seq: number; t: "end_game" };

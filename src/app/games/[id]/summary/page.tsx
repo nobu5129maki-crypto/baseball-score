@@ -7,9 +7,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { InningScoreTable } from "@/components/InningScoreTable";
 import { ScorebookView } from "@/components/ScorebookView";
 import { db } from "@/lib/db";
-import { reduceGame, totalRuns } from "@/lib/engine";
+import { otherSide, reduceGame, totalRuns } from "@/lib/engine";
 import { buildScorebook } from "@/lib/scorebook";
-import { batterLine, formatObp, gameSlashes, myTeamPitchers, type PitcherLine, type PlayerSlash } from "@/lib/stats";
+import { batterLine, formatObp, gameSlashes, teamPitchers, type PitcherLine, type PlayerSlash } from "@/lib/stats";
 
 export default function SummaryPage() {
   const params = useParams<{ id: string }>();
@@ -45,7 +45,12 @@ export default function SummaryPage() {
 
         <InningScoreTable game={game} state={state} firstName={first} secondName={second} />
 
-        <PitcherLines teamName={game.myTeamName} pitchers={myTeamPitchers(game)} />
+        <PitcherStaff
+          mineName={game.myTeamName}
+          theirsName={game.opponentName}
+          mine={teamPitchers(game, game.mySide)}
+          theirs={teamPitchers(game, otherSide(game.mySide))}
+        />
 
         <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
         <ScorebookView title={`後攻 ${second}`} side={book.second} innings={book.innings} />
@@ -73,15 +78,42 @@ export default function SummaryPage() {
   );
 }
 
-function PitcherLines({ teamName, pitchers }: { teamName: string; pitchers: PitcherLine[] }) {
+function PitcherStaff({
+  mineName,
+  theirsName,
+  mine,
+  theirs,
+}: {
+  mineName: string;
+  theirsName: string;
+  mine: PitcherLine[];
+  theirs: PitcherLine[];
+}) {
   return (
-    <section className="result-block rounded-2xl border border-[#2c3c30] p-4">
+    <section className="flex flex-col gap-4">
       <h3 className="font-bold">投手成績</h3>
-      <p className="text-sm text-[#9aa894] mt-1">{teamName}（自チーム）</p>
+      <PitcherTeam title={`${mineName}（自チーム）`} pitchers={mine} />
+      <PitcherTeam title={`${theirsName}（相手）`} pitchers={theirs} opponent />
+    </section>
+  );
+}
+
+function PitcherTeam({
+  title,
+  pitchers,
+  opponent,
+}: {
+  title: string;
+  pitchers: PitcherLine[];
+  opponent?: boolean;
+}) {
+  return (
+    <div className={`result-block rounded-2xl border p-4 ${opponent ? "border-[#3a4a3e] bg-[#0b100c]" : "border-[#2c3c30]"}`}>
+      <h4 className="font-bold mb-3">{title}</h4>
       {pitchers.length === 0 ? (
-        <p className="text-sm text-[#9aa894] mt-3">投手の記録はありません。</p>
+        <p className="text-sm text-[#9aa894]">投手の記録はありません。</p>
       ) : (
-        <ul className="text-sm flex flex-col gap-1 mt-3">
+        <ul className="text-sm flex flex-col gap-1">
           {pitchers.map((p) => (
             <li key={p.playerId} className="flex justify-between border-b border-[#2c3c30] py-2 last:border-b-0">
               <span className="font-bold">{p.name}</span>
@@ -90,7 +122,7 @@ function PitcherLines({ teamName, pitchers }: { teamName: string; pitchers: Pitc
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
 

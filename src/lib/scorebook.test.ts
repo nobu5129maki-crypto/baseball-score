@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commitEnd, commitPinchHitter, commitPlay, commitSteal, commitSub, reduceGame } from "./engine";
+import { commitEnd, commitPickoff, commitPinchHitter, commitPlay, commitSteal, commitSub, reduceGame } from "./engine";
 import { buildScorebook, displayInnings, lastPlayedInning } from "./scorebook";
 import type { Game, LineupSlot, Position } from "./types";
 
@@ -46,6 +46,34 @@ describe("buildScorebook", () => {
     expect(row.players.map((p) => p.name)).toEqual(["A1", "代打太"]);
     expect(row.players[1].via).toBe("ph");
     expect(row.innings[0].map((m) => m.label)).toEqual(["代打", "右安"]);
+  });
+
+  it("本塁打は方向を付けて左本と書く", () => {
+    const game = commitPlay(makeGame(), "homerun", undefined, "LF");
+    expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toEqual(["左本"]);
+  });
+
+  it("牽制アウトは走者のマスに牽制死と書く", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPickoff(game, 1);
+    expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("牽制死");
+  });
+
+  it("守備交代はマスに書かず名前欄を替える", () => {
+    const game = commitSub(makeGame(), "second", 1, "PX", "新投手", "P");
+    const row = buildScorebook(game).second.orders[0];
+    expect(row.players.map((p) => p.name)).toEqual(["B1", "新投手"]);
+    expect(row.players[1].via).toBe("sub");
+    expect(row.innings.flat().map((m) => m.label)).not.toContain("守交代");
+    expect(buildScorebook(game).first.orders.flatMap((o) => o.innings.flat().map((m) => m.label))).not.toContain(
+      "守交代",
+    );
+  });
+
+  it("背番号を選手に載せる", () => {
+    const game = makeGame();
+    game.firstLineup[0] = { ...game.firstLineup[0], number: "18" };
+    expect(buildScorebook(game).first.orders[0].players[0].number).toBe("18");
   });
 
   it("盗塁が走者の打順と回に入る", () => {

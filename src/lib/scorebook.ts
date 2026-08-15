@@ -1,5 +1,5 @@
-import { PLAY_SHORT, playLabel } from "./labels";
-import { battingSide, getBatter, getLineup, reduceGame } from "./engine";
+import { playLabel } from "./labels";
+import { battingSide, getBatter, reduceGame } from "./engine";
 import type { Game, LineupSlot, PlayResult, Position, Side } from "./types";
 
 export type ScorebookMark = {
@@ -9,6 +9,7 @@ export type ScorebookMark = {
 export type ScorebookPlayer = {
   playerId: string;
   name: string;
+  number?: string;
   position: Position;
   via: "start" | "ph" | "pr" | "sub";
 };
@@ -50,8 +51,7 @@ export function displayInnings(game: Game, liveInning = 0): number {
 }
 
 function bookPlayLabel(result: PlayResult, field?: Position): string {
-  if (field) return playLabel(result, field);
-  return PLAY_SHORT[result];
+  return playLabel(result, field);
 }
 
 function emptySide(lineup: LineupSlot[], innings: number): ScorebookSide {
@@ -65,6 +65,7 @@ function emptySide(lineup: LineupSlot[], innings: number): ScorebookSide {
           {
             playerId: slot.playerId,
             name: slot.playerName,
+            number: slot.number,
             position: slot.position,
             via: "start",
           },
@@ -93,6 +94,7 @@ function applyPlayerChange(
   name: string,
   position: Position,
   via: ScorebookPlayer["via"],
+  number?: string,
 ) {
   const row = side.orders.find((o) => o.order === order);
   if (!row) return;
@@ -100,9 +102,10 @@ function applyPlayerChange(
   if (last && last.playerId === playerId) {
     last.position = position;
     last.name = name;
+    if (number !== undefined) last.number = number;
     return;
   }
-  row.players.push({ playerId, name, position, via });
+  row.players.push({ playerId, name, number, position, via });
 }
 
 export function buildScorebook(game: Game): Scorebook {
@@ -136,7 +139,7 @@ export function buildScorebook(game: Game): Scorebook {
     } else if (event.t === "pickoff") {
       const runner = before.bases[event.from - 1];
       if (runner) {
-        pushMark(battingBook, runner.battingOrder, before.inning, "牽制");
+        pushMark(battingBook, runner.battingOrder, before.inning, "牽制死");
       }
     } else if (event.t === "wp" || event.t === "pb" || event.t === "bk") {
       const label = event.t === "wp" ? "暴" : event.t === "pb" ? "捕逸" : "ボ";
@@ -146,7 +149,15 @@ export function buildScorebook(game: Game): Scorebook {
     } else if (event.t === "pr") {
       const runner = before.bases[event.base - 1];
       const order = runner?.battingOrder ?? event.base;
-      applyPlayerChange(battingBook, order, event.playerId, event.playerName, event.position, "pr");
+      applyPlayerChange(
+        battingBook,
+        order,
+        event.playerId,
+        event.playerName,
+        event.position,
+        "pr",
+        event.number,
+      );
       pushMark(battingBook, order, before.inning, "代走");
     } else if (event.t === "sub") {
       const teamBook = sideOf(book, event.side);
@@ -156,17 +167,19 @@ export function buildScorebook(game: Game): Scorebook {
       let via: ScorebookPlayer["via"] = "sub";
       if (isBatting && batter.order === event.order) via = "ph";
       else if (isBatting && onBase) via = "pr";
-      applyPlayerChange(teamBook, event.order, event.playerId, event.playerName, event.position, via);
+      applyPlayerChange(
+        teamBook,
+        event.order,
+        event.playerId,
+        event.playerName,
+        event.position,
+        via,
+        event.number,
+      );
       if (via === "ph") {
         pushMark(teamBook, event.order, before.inning, "代打");
       } else if (via === "pr") {
         pushMark(teamBook, event.order, before.inning, "代走");
-      } else if (!isBatting) {
-        const lineup = getLineup(before, event.side);
-        const prev = lineup.find((s) => s.order === event.order);
-        if (prev && prev.playerId !== event.playerId) {
-          pushMark(teamBook, event.order, before.inning, "守交代");
-        }
       }
     }
 

@@ -29,7 +29,7 @@ export const PLAY_SHORT: Record<PlayResult, string> = {
   dropped_third: "振逃",
   walk: "四",
   hbp: "死",
-  groundout: "ゴロ",
+  groundout: "ゴ",
   flyout: "飛",
   lineout: "直",
   gidp: "併",
@@ -48,6 +48,7 @@ export const FIELD_RESULTS: PlayResult[] = [
   "single",
   "double",
   "triple",
+  "homerun",
   "groundout",
   "flyout",
   "lineout",
@@ -63,6 +64,7 @@ export function needsField(result: PlayResult): boolean {
 }
 
 export function playLabel(result: PlayResult, field?: Position): string {
-  if (!field) return PLAY_LABELS[result];
-  return `${POSITION_SHORT[field]}${PLAY_SHORT[result]}`;
+  const short = PLAY_SHORT[result];
+  if (!field) return short;
+  return `${POSITION_SHORT[field]}${short}`;
 }

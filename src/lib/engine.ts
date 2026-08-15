@@ -14,6 +14,7 @@ import type {
   RunnerOnBase,
   Side,
 } from "./types";
+import { needsField } from "./labels";
 import { SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
@@ -131,19 +132,7 @@ export function nextStealBaseOpen(state: GameState, from: Base): boolean {
 }
 
 export function needsFieldPosition(result: PlayResult): boolean {
-  return (
-    result === "single" ||
-    result === "double" ||
-    result === "triple" ||
-    result === "groundout" ||
-    result === "flyout" ||
-    result === "lineout" ||
-    result === "error" ||
-    result === "gidp" ||
-    result === "fielders_choice" ||
-    result === "sac_bunt" ||
-    result === "sac_fly"
-  );
+  return needsField(result);
 }
 
 export function previewAfterMoves(
@@ -329,9 +318,17 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
         event.playerId,
         event.playerName,
         event.position,
+        event.number,
       );
     case "pr":
-      return applyPinchRunner(state, event.base, event.playerId, event.playerName, event.position);
+      return applyPinchRunner(
+        state,
+        event.base,
+        event.playerId,
+        event.playerName,
+        event.position,
+        event.number,
+      );
     case "end_game":
       return { ...state, ended: true };
   }
@@ -560,11 +557,20 @@ function applySub(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): GameState {
   const current = getLineup(state, side);
-  const nextLineup = current.map((slot) =>
-    slot.order === order ? { ...slot, playerId, playerName, position } : slot,
-  );
+  const nextLineup = current.map((slot) => {
+    if (slot.order !== order) return slot;
+    const samePlayer = slot.playerId === playerId;
+    return {
+      ...slot,
+      playerId,
+      playerName,
+      position,
+      number: samePlayer ? (number ?? slot.number) : number,
+    };
+  });
   const oldPitcher = current.find((slot) => slot.position === "P")?.playerId;
   const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId;
   const pitchesThrown =
@@ -583,11 +589,12 @@ function applyPinchRunner(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): GameState {
   const runner = state.bases[base - 1];
   if (!runner) return state;
   const side = battingSide(state.half);
-  const next = applySub(state, side, runner.battingOrder, playerId, playerName, position);
+  const next = applySub(state, side, runner.battingOrder, playerId, playerName, position, number);
   const bases: GameState["bases"] = [...next.bases];
   bases[base - 1] = {
     playerId,
@@ -690,8 +697,9 @@ export function commitSub(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): Game {
-  return commitEvent(game, { t: "sub", side, order, playerId, playerName, position });
+  return commitEvent(game, { t: "sub", side, order, playerId, playerName, position, number });
 }
 
 export function commitPinchRunner(
@@ -700,18 +708,28 @@ export function commitPinchRunner(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): Game {
-  return commitEvent(game, { t: "pr", base, playerId, playerName, position });
+  return commitEvent(game, { t: "pr", base, playerId, playerName, position, number });
 }
 
 export function commitPinchHitter(
   game: Game,
   playerId: string,
   playerName: string,
+  number?: string,
 ): Game {
   const state = reduceGame(game);
   const batter = getBatter(state);
-  return commitSub(game, battingSide(state.half), batter.order, playerId, playerName, batter.position);
+  return commitSub(
+    game,
+    battingSide(state.half),
+    batter.order,
+    playerId,
+    playerName,
+    batter.position,
+    number,
+  );
 }
 
 export function commitPositionSwap(game: Game, side: Side, orderA: number, orderB: number): Game {

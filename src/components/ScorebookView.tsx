@@ -7,7 +7,7 @@ const VIA: Record<ScorebookPlayer["via"], string> = {
   start: "",
   ph: "代打",
   pr: "代走",
-  sub: "交代",
+  sub: "守",
 };
 
 export function ScorebookView({
@@ -31,7 +31,7 @@ export function ScorebookView({
         <table className="scorebook-table w-full text-center border-collapse">
           <thead>
             <tr>
-              <th className="scorebook-name">打順</th>
+              <th className="scorebook-name">打順 / 選手</th>
               {Array.from({ length: innings }, (_, i) => (
                 <th key={i} className="scorebook-inning">
                   {i + 1}
@@ -67,6 +67,19 @@ export function ScorebookView({
   );
 }
 
+function playerLine(p: ScorebookPlayer) {
+  const num = p.number ? `${p.number} ` : "";
+  return (
+    <>
+      <span className="font-bold">
+        {num}
+        {p.name}
+      </span>{" "}
+      <span className="text-[#9aa894]">{POSITION_SHORT[p.position]}</span>
+    </>
+  );
+}
+
 function OrderNames({ row }: { row: ScorebookOrder }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -76,15 +89,12 @@ function OrderNames({ row }: { row: ScorebookOrder }) {
           <div key={`${p.playerId}-${i}`} className="leading-tight">
             {i === 0 ? (
               <>
-                <span className="font-bold">{row.order}</span>{" "}
-                <span className="font-bold">{p.name}</span>{" "}
-                <span className="text-[#9aa894]">{POSITION_SHORT[p.position]}</span>
+                <span className="font-bold">{row.order}</span> {playerLine(p)}
               </>
             ) : (
               <>
                 {via ? <span className="text-[#9aa894]">{via} </span> : null}
-                <span className="font-bold">{p.name}</span>{" "}
-                <span className="text-[#9aa894]">{POSITION_SHORT[p.position]}</span>
+                {playerLine(p)}
               </>
             )}
           </div>

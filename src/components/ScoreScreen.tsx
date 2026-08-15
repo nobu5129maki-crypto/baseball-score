@@ -242,7 +242,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           {state.half === "top" ? firstName : secondName} の攻撃
         </p>
         <p className="text-2xl font-bold leading-tight mt-0.5 break-words">
-          {batter.order}番 {batter.playerName}
+          {batter.order}番{batter.number ? ` ${batter.number}` : ""} {batter.playerName}
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
         {atBats.length > 0 ? (
@@ -661,7 +661,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           players={players ?? []}
           onClose={() => setSheet(null)}
           onPick={(base, player, position) => {
-            void patch((g) => commitPinchRunner(g, base, player.id, player.name, position));
+            void patch((g) => commitPinchRunner(g, base, player.id, player.name, position, player.number));
             setSheet(null);
           }}
         />
@@ -674,7 +674,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           players={players ?? []}
           onClose={() => setSheet(null)}
           onPick={(player) => {
-            void patch((g) => commitPinchHitter(g, player.id, player.name));
+            void patch((g) => commitPinchHitter(g, player.id, player.name, player.number));
             setSheet(null);
           }}
         />
@@ -816,9 +816,13 @@ function PinchSheet({
   battingLineup: Game["firstLineup"];
   myTeamBatting: boolean;
   stateBases: Array<RunnerOnBase | null>;
-  players: { id: string; name: string }[];
+  players: { id: string; name: string; number?: string }[];
   onClose: () => void;
-  onPick: (base: Base, player: { id: string; name: string }, position: Game["firstLineup"][0]["position"]) => void;
+  onPick: (
+    base: Base,
+    player: { id: string; name: string; number?: string },
+    position: Game["firstLineup"][0]["position"],
+  ) => void;
 }) {
   const firstOccupied = ([1, 2, 3] as Base[]).find((b) => stateBases[b - 1]) ?? 1;
   const [base, setBase] = useState<Base>(firstOccupied);
@@ -861,6 +865,7 @@ function PinchSheet({
           disabled={!runner}
           onClick={() => onPick(base, p, position)}
         >
+          {p.number ? `${p.number} ` : ""}
           {p.name} を代走に
         </button>
       ))}
@@ -898,9 +903,9 @@ function PinchHitterSheet({
   batter: LineupSlot;
   battingLineup: Game["firstLineup"];
   myTeamBatting: boolean;
-  players: { id: string; name: string }[];
+  players: { id: string; name: string; number?: string }[];
   onClose: () => void;
-  onPick: (player: { id: string; name: string }) => void;
+  onPick: (player: { id: string; name: string; number?: string }) => void;
 }) {
   const [name, setName] = useState("");
   const activeIds = new Set(battingLineup.map((s) => s.playerId));
@@ -918,6 +923,7 @@ function PinchHitterSheet({
           className="tap tap-result tap-accent w-full mb-2"
           onClick={() => onPick(p)}
         >
+          {p.number ? `${p.number} ` : ""}
           {p.name} を代打に
         </button>
       ))}

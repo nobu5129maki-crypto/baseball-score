@@ -213,7 +213,7 @@ export type PitcherLine = {
   pitches: number;
 };
 
-export function myTeamPitchers(game: Game): PitcherLine[] {
+export function teamPitchers(game: Game, side: Side): PitcherLine[] {
   const rows: PitcherLine[] = [];
   const index = new Map<string, number>();
 
@@ -228,28 +228,30 @@ export function myTeamPitchers(game: Game): PitcherLine[] {
   };
 
   let cursor: Game = { ...game, events: [] };
-  const starter = pitcherOnSide(reduceGame(cursor), game.mySide);
+  const starter = pitcherOnSide(reduceGame(cursor), side);
   if (starter) ensure(starter);
 
   for (const event of game.events) {
     const before = reduceGame(cursor);
     if (
-      ((event.t === "pitch" && fieldingSide(before.half) === game.mySide) ||
-        (event.t === "play" &&
-          playAddsPitch(event.result, before) &&
-          fieldingSide(before.half) === game.mySide))
+      ((event.t === "pitch" && fieldingSide(before.half) === side) ||
+        (event.t === "play" && playAddsPitch(event.result, before) && fieldingSide(before.half) === side))
     ) {
-      const pitcher = pitcherOnSide(before, game.mySide);
+      const pitcher = pitcherOnSide(before, side);
       if (pitcher) {
         ensure(pitcher);
         rows[index.get(pitcher.playerId)!].pitches += 1;
       }
     }
     cursor = { ...cursor, events: [...cursor.events, event] };
-    const after = pitcherOnSide(reduceGame(cursor), game.mySide);
+    const after = pitcherOnSide(reduceGame(cursor), side);
     if (after) ensure(after);
   }
   return rows;
+}
+
+export function myTeamPitchers(game: Game): PitcherLine[] {
+  return teamPitchers(game, game.mySide);
 }
 
 function pitcherOnSide(state: ReturnType<typeof reduceGame>, side: Side): LineupSlot | undefined {

@@ -53,6 +53,7 @@ export function lineupFromPlayers(players: Player[]): LineupSlot[] {
       order: i + 1,
       playerId: player?.id ?? `vacant-${i + 1}`,
       playerName: player?.name ?? `選手${i + 1}`,
+      number: player?.number,
       position,
     };
   });

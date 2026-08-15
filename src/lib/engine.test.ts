@@ -14,6 +14,7 @@ import {
   getBatter,
   needsStrikeThreeChoice,
   canDroppedThird,
+  needsFieldPosition,
   playAddsPitch,
   playBlockedReason,
   nextStealBaseOpen,
@@ -419,6 +420,22 @@ describe("らくスコア engine", () => {
     expect(getBatter(state).position).toBe("P");
     expect(state.strikes).toBe(1);
     expect(state.balls).toBe(1);
+  });
+
+  it("本塁打と安打は打球方向が必要", () => {
+    expect(needsFieldPosition("homerun")).toBe(true);
+    expect(needsFieldPosition("single")).toBe(true);
+    expect(needsFieldPosition("strikeout")).toBe(false);
+    expect(needsFieldPosition("walk")).toBe(false);
+  });
+
+  it("交代すると前の選手の背番号は残さない", () => {
+    const start = makeGame();
+    start.firstLineup[0] = { ...start.firstLineup[0], number: "18" };
+    const game = commitPinchHitter(start, "PH1", "代打太", "7");
+    const batter = getBatter(reduceGame(game));
+    expect(batter.playerId).toBe("PH1");
+    expect(batter.number).toBe("7");
   });
 
   it("打球方向付きのヒットを記録できる", () => {

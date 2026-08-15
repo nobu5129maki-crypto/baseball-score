@@ -187,7 +187,7 @@ select {
   }
 
   .scorebook-name {
-    width: 7.5em;
+    width: 8.5em;
     white-space: nowrap;
   }
 
@@ -209,8 +209,8 @@ select {
 }
 
 .scorebook-name {
-  min-width: 6.5rem;
-  max-width: 8.5rem;
+  min-width: 7.5rem;
+  max-width: 10rem;
 }
 
 .scorebook-inning {
