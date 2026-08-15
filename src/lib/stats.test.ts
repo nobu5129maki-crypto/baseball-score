@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPinchHitter, commitPlay, commitSteal } from "./engine";
-import { atBatsThisGame, batterLine, formatOps, myTeamSlashes } from "./stats";
+import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamSlashes, plateAppearances } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -66,6 +66,7 @@ describe("batterLine", () => {
         bb: 0,
         hbp: 0,
         sf: 0,
+        sh: 0,
         tb: 1,
         sb: 0,
         cs: 0,
@@ -83,6 +84,7 @@ describe("batterLine", () => {
         bb: 1,
         hbp: 0,
         sf: 0,
+        sh: 0,
         tb: 0,
         sb: 0,
         cs: 0,
@@ -117,5 +119,14 @@ describe("formatOps / myTeamSlashes", () => {
     const g2 = commitEnd(commitPlay({ ...mine(), id: "g2" }, "single"));
     const a1 = myTeamSlashes([g1, g2]).find((p) => p.playerId === "A1");
     expect(a1).toMatchObject({ ab: 2, h: 2, sb: 1 });
+  });
+
+  it("四球は打席に入り打数には入らない", () => {
+    const game = commitPlay(mine(), "walk");
+    const a1 = myTeamSlashes([game]).find((p) => p.playerId === "A1");
+    expect(a1).toBeTruthy();
+    expect(plateAppearances(a1!)).toBe(1);
+    expect(a1!.ab).toBe(0);
+    expect(formatObp(a1!)).toBe("1.000");
   });
 });

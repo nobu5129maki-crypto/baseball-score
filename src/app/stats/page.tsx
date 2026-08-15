@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { db } from "@/lib/db";
-import { formatAvg, formatOps, myTeamSlashes } from "@/lib/stats";
+import { formatAvg, formatObp, formatOps, myTeamSlashes, plateAppearances } from "@/lib/stats";
 
 export default function StatsPage() {
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
@@ -37,9 +37,11 @@ export default function StatsPage() {
               <thead>
                 <tr className="text-[#9aa894] text-right bg-[#121a14]">
                   <th className="p-2 text-left font-medium sticky left-0 bg-[#121a14]">選手</th>
+                  <th className="p-2 font-medium whitespace-nowrap">打席</th>
                   <th className="p-2 font-medium whitespace-nowrap">打数</th>
                   <th className="p-2 font-medium whitespace-nowrap">安打</th>
                   <th className="p-2 font-medium whitespace-nowrap">打率</th>
+                  <th className="p-2 font-medium whitespace-nowrap">出塁率</th>
                   <th className="p-2 font-medium whitespace-nowrap">盗塁</th>
                   <th className="p-2 font-medium whitespace-nowrap">OPS</th>
                 </tr>
@@ -50,9 +52,11 @@ export default function StatsPage() {
                     <td className="p-2 text-left font-bold sticky left-0 bg-[#070a08] whitespace-nowrap">
                       {p.name}
                     </td>
+                    <td className="p-2">{plateAppearances(p)}</td>
                     <td className="p-2">{p.ab}</td>
                     <td className="p-2">{p.h}</td>
                     <td className="p-2 font-bold">{formatAvg(p.h, p.ab)}</td>
+                    <td className="p-2">{formatObp(p)}</td>
                     <td className="p-2">{p.sb}</td>
                     <td className="p-2">{formatOps(p)}</td>
                   </tr>

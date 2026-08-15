@@ -12,11 +12,16 @@ export type PlayerSlash = {
   bb: number;
   hbp: number;
   sf: number;
+  sh: number;
   tb: number;
   sb: number;
   cs: number;
   r: number;
 };
+
+export function plateAppearances(p: Pick<PlayerSlash, "ab" | "bb" | "hbp" | "sf" | "sh">): number {
+  return p.ab + p.bb + p.hbp + p.sf + p.sh;
+}
 
 export function formatAvg(h: number, ab: number): string {
   if (ab === 0) return "-";
@@ -103,6 +108,7 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
     bb: 0,
     hbp: 0,
     sf: 0,
+    sh: 0,
     tb: 0,
     sb: 0,
     cs: 0,
@@ -170,6 +176,7 @@ function applyEventToStats(
     if (play.result === "walk") row.bb += 1;
     if (play.result === "hbp") row.hbp += 1;
     if (play.result === "sac_fly") row.sf += 1;
+    if (play.result === "sac_bunt") row.sh += 1;
     const hv = hitValue(play.result);
     if (hv) {
       row.h += 1;
@@ -208,6 +215,7 @@ function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {
   prev.bb += row.bb;
   prev.hbp += row.hbp;
   prev.sf += row.sf;
+  prev.sh += row.sh;
   prev.tb += row.tb;
   prev.sb += row.sb;
   prev.cs += row.cs;
@@ -232,7 +240,7 @@ export function myTeamSlashes(games: Game[]): PlayerSlash[] {
     }
   }
   return [...map.values()]
-    .filter((p) => p.ab + p.bb + p.hbp + p.sf + p.sb + p.cs > 0)
+    .filter((p) => plateAppearances(p) + p.sb + p.cs > 0)
     .sort((a, b) => {
       const aAvg = a.ab === 0 ? -1 : a.h / a.ab;
       const bAvg = b.ab === 0 ? -1 : b.h / b.ab;
