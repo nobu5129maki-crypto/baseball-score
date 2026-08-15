@@ -29,7 +29,25 @@ export type Scorebook = {
   second: ScorebookSide;
 };
 
-const MAX_INNINGS = 12;
+export const REGULATION_DISPLAY_INNINGS = 9;
+export const MAX_INNINGS = 12;
+
+export function lastPlayedInning(game: Game): number {
+  let last = 0;
+  let cursor: Game = { ...game, events: [] };
+  for (const event of game.events) {
+    if (event.t === "end_game") continue;
+    const before = reduceGame(cursor);
+    last = Math.max(last, before.inning);
+    cursor = { ...cursor, events: [...cursor.events, event] };
+  }
+  return last;
+}
+
+export function displayInnings(game: Game, liveInning = 0): number {
+  const played = Math.max(lastPlayedInning(game), liveInning);
+  return Math.min(MAX_INNINGS, Math.max(REGULATION_DISPLAY_INNINGS, played));
+}
 
 function bookPlayLabel(result: PlayResult, field?: Position): string {
   if (field) return playLabel(result, field);
@@ -95,12 +113,10 @@ export function buildScorebook(game: Game): Scorebook {
     second: emptySide(game.secondLineup, innings),
   };
 
-  let lastInning = game.scheduledInnings;
   let cursor: Game = { ...game, events: [] };
 
   for (const event of game.events) {
     const before = reduceGame(cursor);
-    lastInning = Math.max(lastInning, before.inning);
     const batting = battingSide(before.half);
     const battingBook = sideOf(book, batting);
 
@@ -157,7 +173,7 @@ export function buildScorebook(game: Game): Scorebook {
     cursor = { ...cursor, events: [...cursor.events, event] };
   }
 
-  const used = Math.min(MAX_INNINGS, Math.max(game.scheduledInnings, lastInning, 7));
+  const used = displayInnings(game);
   return {
     innings: used,
     first: trimSide(book.first, used),

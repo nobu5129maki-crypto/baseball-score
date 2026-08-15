@@ -1,21 +1,21 @@
 import { totalRuns } from "@/lib/engine";
-import { SCOREBOARD_INNINGS } from "@/lib/types";
-import type { GameState } from "@/lib/types";
+import { displayInnings, lastPlayedInning } from "@/lib/scorebook";
+import type { Game, GameState } from "@/lib/types";
 
 export function InningScoreTable({
+  game,
   state,
   firstName,
   secondName,
 }: {
+  game: Game;
   state: GameState;
   firstName: string;
   secondName: string;
 }) {
-  const cols = Math.max(
-    SCOREBOARD_INNINGS,
-    state.scores.first.length,
-    state.scores.second.length,
-  );
+  const liveInning = game.status === "ended" ? 0 : state.inning;
+  const cols = displayInnings(game, liveInning);
+  const played = Math.max(lastPlayedInning(game), liveInning);
   const headers = Array.from({ length: cols }, (_, i) => String(i + 1));
 
   return (
@@ -37,7 +37,7 @@ export function InningScoreTable({
         <tbody>
           <ScoreRow
             name={firstName}
-            innings={pad(state.scores.first, cols)}
+            innings={cells(state.scores.first, cols, played)}
             r={totalRuns(state.scores.first)}
             h={state.hits.first}
             e={state.errors.first}
@@ -45,7 +45,7 @@ export function InningScoreTable({
           />
           <ScoreRow
             name={secondName}
-            innings={pad(state.scores.second, cols)}
+            innings={cells(state.scores.second, cols, played)}
             r={totalRuns(state.scores.second)}
             h={state.hits.second}
             e={state.errors.second}
@@ -57,10 +57,8 @@ export function InningScoreTable({
   );
 }
 
-function pad(arr: number[], n: number): Array<number | null> {
-  const out: Array<number | null> = [...arr];
-  while (out.length < n) out.push(null);
-  return out;
+function cells(scores: number[], cols: number, played: number): Array<number | null> {
+  return Array.from({ length: cols }, (_, i) => (i < played ? (scores[i] ?? 0) : null));
 }
 
 function ScoreRow({

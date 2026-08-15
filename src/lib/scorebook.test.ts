@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { commitEnd, commitPinchHitter, commitPlay, commitSteal, commitSub } from "./engine";
-import { buildScorebook } from "./scorebook";
+import { commitEnd, commitPinchHitter, commitPlay, commitSteal, commitSub, reduceGame } from "./engine";
+import { buildScorebook, displayInnings, lastPlayedInning } from "./scorebook";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -36,7 +36,7 @@ describe("buildScorebook", () => {
     const book = buildScorebook(game);
     const marks = book.first.orders[0].innings[0].map((m) => m.label);
     expect(marks).toContain("左安");
-    expect(book.innings).toBe(7);
+    expect(book.innings).toBe(9);
   });
 
   it("代打の名前が同じ打順に残る", () => {
@@ -67,5 +67,51 @@ describe("buildScorebook", () => {
     const row = buildScorebook(game).first.orders[0];
     expect(row.players).toHaveLength(1);
     expect(row.players[0].position).toBe("LF");
+  });
+});
+
+function strikeouts(game: Game, n: number): Game {
+  let next = game;
+  for (let i = 0; i < n; i++) next = commitPlay(next, "strikeout");
+  return next;
+}
+
+describe("displayInnings", () => {
+  it("通常は9回まで表示する", () => {
+    expect(displayInnings(makeGame())).toBe(9);
+    expect(buildScorebook(makeGame()).innings).toBe(9);
+    expect(lastPlayedInning(makeGame())).toBe(0);
+  });
+
+  it("規定回で終わっても9回列のままにする", () => {
+    const game = commitEnd(strikeouts(makeGame(), 42));
+    expect(reduceGame(game).inning).toBeGreaterThan(7);
+    expect(lastPlayedInning(game)).toBe(7);
+    expect(displayInnings(game)).toBe(9);
+    expect(buildScorebook(game).innings).toBe(9);
+  });
+
+  it("9回終了後は延長していないので9回のまま", () => {
+    const nine = { ...makeGame(), scheduledInnings: 9 };
+    const game = commitEnd(strikeouts(nine, 54));
+    expect(reduceGame(game).inning).toBe(10);
+    expect(lastPlayedInning(game)).toBe(9);
+    expect(displayInnings(game)).toBe(9);
+  });
+
+  it("10回まで行ったら10回まで出す", () => {
+    const nine = { ...makeGame(), scheduledInnings: 9 };
+    const game = commitEnd(strikeouts(nine, 55));
+    expect(lastPlayedInning(game)).toBe(10);
+    expect(displayInnings(game)).toBe(10);
+    expect(buildScorebook(game).innings).toBe(10);
+  });
+
+  it("12回まで行ったら12回まで出す", () => {
+    const nine = { ...makeGame(), scheduledInnings: 9 };
+    const game = commitEnd(strikeouts(nine, 67));
+    expect(lastPlayedInning(game)).toBe(12);
+    expect(displayInnings(game)).toBe(12);
+    expect(buildScorebook(game).innings).toBe(12);
   });
 });

@@ -487,7 +487,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       {sheet === "menu" ? (
         <Sheet title="試合メニュー" onClose={() => setSheet(null)}>
           <div className="flex flex-col gap-3">
-            <InningScoreTable state={state} firstName={firstName} secondName={secondName} />
+            <InningScoreTable game={game} state={state} firstName={firstName} secondName={secondName} />
             <button type="button" className="tap w-full" onClick={() => setSheet("sub")}>
               守備位置・交代
             </button>

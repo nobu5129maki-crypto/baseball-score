@@ -43,7 +43,7 @@ export default function SummaryPage() {
           <p className="text-center text-[#f5c518] font-bold print:text-black">{winner}</p>
         </header>
 
-        <InningScoreTable state={state} firstName={first} secondName={second} />
+        <InningScoreTable game={game} state={state} firstName={first} secondName={second} />
 
         <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
         <ScorebookView title={`後攻 ${second}`} side={book.second} innings={book.innings} />
