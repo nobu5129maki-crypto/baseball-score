@@ -13,10 +13,11 @@ export function InningScoreTable({
   firstName: string;
   secondName: string;
 }) {
-  const liveInning = game.status === "ended" ? 0 : state.inning;
+  const liveInning = state.ended ? 0 : state.inning;
   const cols = displayInnings(game, liveInning);
   const played = Math.max(lastPlayedInning(game), liveInning);
   const headers = Array.from({ length: cols }, (_, i) => String(i + 1));
+  const skipBottomAt = state.bottomUnplayed ? state.inning : 0;
 
   return (
     <div className="overflow-x-auto">
@@ -41,15 +42,15 @@ export function InningScoreTable({
             r={totalRuns(state.scores.first)}
             h={state.hits.first}
             e={state.errors.first}
-            active={state.half === "top"}
+            active={!state.ended && state.half === "top"}
           />
           <ScoreRow
             name={secondName}
-            innings={cells(state.scores.second, cols, played)}
+            innings={cells(state.scores.second, cols, played, skipBottomAt)}
             r={totalRuns(state.scores.second)}
             h={state.hits.second}
             e={state.errors.second}
-            active={state.half === "bottom"}
+            active={!state.ended && state.half === "bottom" && !state.bottomUnplayed}
           />
         </tbody>
       </table>
@@ -57,8 +58,16 @@ export function InningScoreTable({
   );
 }
 
-function cells(scores: number[], cols: number, played: number): Array<number | null> {
-  return Array.from({ length: cols }, (_, i) => (i < played ? (scores[i] ?? 0) : null));
+function cells(
+  scores: number[],
+  cols: number,
+  played: number,
+  skipAt = 0,
+): Array<number | "X" | null> {
+  return Array.from({ length: cols }, (_, i) => {
+    if (skipAt > 0 && i === skipAt - 1) return "X";
+    return i < played ? (scores[i] ?? 0) : null;
+  });
 }
 
 function ScoreRow({
@@ -70,7 +79,7 @@ function ScoreRow({
   active,
 }: {
   name: string;
-  innings: Array<number | null>;
+  innings: Array<number | "X" | null>;
   r: number;
   h: number;
   e: number;

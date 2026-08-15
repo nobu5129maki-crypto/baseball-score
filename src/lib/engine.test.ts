@@ -15,6 +15,8 @@ import {
   needsStrikeThreeChoice,
   canDroppedThird,
   playAddsPitch,
+  playBlockedReason,
+  nextStealBaseOpen,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -444,7 +446,73 @@ describe("らくスコア engine", () => {
     const state = reduceGame(game);
     expect(state.outs).toBe(1);
     expect(state.bases[0]?.playerId).toBe(batter.playerId);
-    expect(state.hits.first).toBe(1);
+    expect(state.hits.first).toBe(2);
     expect(getBatter(state).playerId).toBe("A3");
+  });
+
+  it("2アウトでは併殺・犠飛・犠打にならない", () => {
+    let game = makeGame();
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(2);
+    expect(playBlockedReason("gidp", state)).toBeTruthy();
+    expect(playBlockedReason("sac_fly", state)).toBeTruthy();
+    expect(playBlockedReason("sac_bunt", state)).toBeTruthy();
+  });
+
+  it("3塁走者がいて2アウト未満なら犠飛にできる", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.bases[2]).toBeTruthy();
+    expect(playBlockedReason("sac_fly", state)).toBeNull();
+  });
+
+  it("次の塁に走者がいる盗塁はできない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(nextStealBaseOpen(state, 1)).toBe(false);
+    expect(nextStealBaseOpen(state, 2)).toBe(true);
+  });
+
+  it("規定回の裏で後攻が勝ち越したらサヨナラで終了する", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 1 };
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    expect(reduceGame(game).half).toBe("bottom");
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.ended).toBe(true);
+    expect(state.bottomUnplayed).toBe(false);
+    expect(game.status).toBe("ended");
+    expect(state.outs).toBe(0);
+  });
+
+  it("規定回表のあと後攻がリードしていれば裏は行わない", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 2 };
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "homerun");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    expect(reduceGame(game).ended).toBe(false);
+    expect(reduceGame(game).inning).toBe(2);
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    const state = reduceGame(game);
+    expect(state.ended).toBe(true);
+    expect(state.bottomUnplayed).toBe(true);
+    expect(state.inning).toBe(2);
   });
 });

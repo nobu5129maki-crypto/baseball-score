@@ -135,7 +135,7 @@ function isAb(result: PlayResult): boolean {
 }
 
 function hitValue(result: PlayResult): number {
-  if (result === "single") return 1;
+  if (result === "single" || result === "runner_hit") return 1;
   if (result === "double") return 2;
   if (result === "triple") return 3;
   if (result === "homerun") return 4;

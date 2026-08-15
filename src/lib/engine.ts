@@ -52,6 +52,7 @@ export function emptyState(
     secondLineup: game.secondLineup.map((slot) => ({ ...slot })),
     ended: false,
     regulationComplete: false,
+    bottomUnplayed: false,
   };
 }
 
@@ -103,6 +104,30 @@ export function playAddsPitch(result: PlayResult, state: Pick<GameState, "balls"
   if (result === "walk") return state.balls < 4;
   if (result === "strikeout" || result === "dropped_third") return state.strikes < 3;
   return true;
+}
+
+export function playBlockedReason(result: PlayResult, state: GameState): string | null {
+  if (result === "sac_fly") {
+    if (state.outs >= 2) return "2アウトでは犠牲フライになりません。";
+    if (!state.bases[2]) return "3塁に走者がいないと犠牲フライになりません。";
+  }
+  if (result === "sac_bunt") {
+    if (state.outs >= 2) return "2アウトでは送りバント（犠打）になりません。";
+    if (!state.bases.some(Boolean)) return "走者がいないと送りバントになりません。";
+  }
+  if (result === "fielders_choice") {
+    if (!state.bases.some(Boolean)) return "走者がいないと野選になりません。";
+  }
+  if (result === "gidp") {
+    if (state.outs >= 2) return "2アウトでは併殺になりません。";
+    if (!state.bases.some(Boolean)) return "走者がいないと併殺になりません。";
+  }
+  return null;
+}
+
+export function nextStealBaseOpen(state: GameState, from: Base): boolean {
+  if (from === 3) return true;
+  return state.bases[from] == null;
 }
 
 export function needsFieldPosition(result: PlayResult): boolean {
@@ -292,6 +317,7 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       return applySteal(game, state, event.from, "out");
     case "wp":
     case "pb":
+    case "bk":
       return applyOccupancy(game, state, plus(state.bases, 1), {
         consumeAtBat: false,
       });
@@ -409,7 +435,8 @@ function applyOccupancy(
     result === "single" ||
     result === "double" ||
     result === "triple" ||
-    result === "homerun"
+    result === "homerun" ||
+    result === "runner_hit"
   ) {
     hits[side] += 1;
   }
@@ -449,14 +476,38 @@ function applyOccupancy(
     pitchCountAtBat: opts.consumeAtBat ? 0 : state.pitchCountAtBat,
   };
 
+  if (isWalkOff(next, game.scheduledInnings)) {
+    return { ...next, ended: true, regulationComplete: true };
+  }
   if (outs >= 3) {
     next = advanceHalf(next, game.scheduledInnings);
   }
   return next;
 }
 
+function isWalkOff(state: GameState, scheduledInnings: number): boolean {
+  if (state.half !== "bottom") return false;
+  if (state.inning < scheduledInnings) return false;
+  return totalRuns(state.scores.second) > totalRuns(state.scores.first);
+}
+
 function advanceHalf(state: GameState, scheduledInnings: number): GameState {
   if (state.half === "top") {
+    const homeAhead = totalRuns(state.scores.second) > totalRuns(state.scores.first);
+    if (state.inning >= scheduledInnings && homeAhead) {
+      return {
+        ...state,
+        half: "bottom",
+        outs: 0,
+        balls: 0,
+        strikes: 0,
+        bases: [null, null, null],
+        pitchCountAtBat: 0,
+        ended: true,
+        regulationComplete: true,
+        bottomUnplayed: true,
+      };
+    }
     return {
       ...state,
       half: "bottom",
@@ -466,6 +517,14 @@ function advanceHalf(state: GameState, scheduledInnings: number): GameState {
       bases: [null, null, null],
       pitchCountAtBat: 0,
     };
+  }
+
+  const tied = totalRuns(state.scores.first) === totalRuns(state.scores.second);
+  if (state.inning >= scheduledInnings && !tied) {
+    return { ...state, ended: true, regulationComplete: true };
+  }
+  if (state.inning >= SCOREBOARD_INNINGS) {
+    return { ...state, ended: true, regulationComplete: true };
   }
 
   const inning = state.inning + 1;
@@ -572,6 +631,12 @@ function append(game: Game, event: DistributiveOmit<GameEvent, "id" | "seq">): G
   return touch(game, [...game.events, full], "in_progress");
 }
 
+function commitEvent(game: Game, event: DistributiveOmit<GameEvent, "id" | "seq">): Game {
+  if (reduceGame(game).ended) return game;
+  const next = append(game, event);
+  return reduceGame(next).ended ? { ...next, status: "ended" } : next;
+}
+
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 export function commitPitch(game: Game, kind: PitchKind): Game {
@@ -592,25 +657,30 @@ export function commitPlay(
   field?: Position,
 ): Game {
   const state = reduceGame(game);
+  if (state.ended) return game;
   const batter = getBatter(state);
   const resolved = moves ?? proposeMoves(result, state, batter);
-  return append(game, { t: "play", result, moves: resolved, field });
+  return commitEvent(game, { t: "play", result, moves: resolved, field });
 }
 
 export function commitSteal(game: Game, from: Base, to: Dest): Game {
-  return append(game, { t: "steal", from, to });
+  return commitEvent(game, { t: "steal", from, to });
 }
 
 export function commitPickoff(game: Game, from: Base): Game {
-  return append(game, { t: "pickoff", from });
+  return commitEvent(game, { t: "pickoff", from });
 }
 
 export function commitWp(game: Game): Game {
-  return append(game, { t: "wp" });
+  return commitEvent(game, { t: "wp" });
 }
 
 export function commitPb(game: Game): Game {
-  return append(game, { t: "pb" });
+  return commitEvent(game, { t: "pb" });
+}
+
+export function commitBk(game: Game): Game {
+  return commitEvent(game, { t: "bk" });
 }
 
 export function commitSub(
@@ -621,7 +691,7 @@ export function commitSub(
   playerName: string,
   position: Position,
 ): Game {
-  return append(game, { t: "sub", side, order, playerId, playerName, position });
+  return commitEvent(game, { t: "sub", side, order, playerId, playerName, position });
 }
 
 export function commitPinchRunner(
@@ -631,7 +701,7 @@ export function commitPinchRunner(
   playerName: string,
   position: Position,
 ): Game {
-  return append(game, { t: "pr", base, playerId, playerName, position });
+  return commitEvent(game, { t: "pr", base, playerId, playerName, position });
 }
 
 export function commitPinchHitter(

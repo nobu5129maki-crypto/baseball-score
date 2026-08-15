@@ -105,6 +105,7 @@ export type StealEvent = {
 
 export type WpEvent = { id: string; seq: number; t: "wp" };
 export type PbEvent = { id: string; seq: number; t: "pb" };
+export type BkEvent = { id: string; seq: number; t: "bk" };
 
 export type PickoffEvent = {
   id: string;
@@ -142,6 +143,7 @@ export type GameEvent =
   | StealEvent
   | WpEvent
   | PbEvent
+  | BkEvent
   | PickoffEvent
   | SubEvent
   | PinchRunnerEvent
@@ -223,6 +225,7 @@ export type GameState = {
   secondLineup: LineupSlot[];
   ended: boolean;
   regulationComplete: boolean;
+  bottomUnplayed: boolean;
 };
 
 export type AppSettings = Settings;

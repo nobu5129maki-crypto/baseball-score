@@ -138,8 +138,8 @@ export function buildScorebook(game: Game): Scorebook {
       if (runner) {
         pushMark(battingBook, runner.battingOrder, before.inning, "牽制");
       }
-    } else if (event.t === "wp" || event.t === "pb") {
-      const label = event.t === "wp" ? "暴" : "捕逸";
+    } else if (event.t === "wp" || event.t === "pb" || event.t === "bk") {
+      const label = event.t === "wp" ? "暴" : event.t === "pb" ? "捕逸" : "ボ";
       for (const runner of before.bases) {
         if (runner) pushMark(battingBook, runner.battingOrder, before.inning, label);
       }
