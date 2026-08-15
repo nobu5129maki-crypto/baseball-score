@@ -23,6 +23,7 @@ import {
   needsFieldPosition,
   needsRunnerConfirm,
   needsStrikeThreeChoice,
+  canDroppedThird,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -113,6 +114,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const secondName = game.mySide === "second" ? game.myTeamName : game.opponentName;
   const occupiedCount = state.bases.filter(Boolean).length;
   const chooseK = needsStrikeThreeChoice(state);
+  const allowDroppedThird = canDroppedThird(state);
   const slash = slashFor(game, batter.playerId);
   const atBats = atBatsThisGame(game, batter, state.half);
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
@@ -360,17 +362,33 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           <div className={`px-2 pb-2 ${leftHanded ? "flex flex-col-reverse" : ""}`}>
             {chooseK ? (
               <div className="mb-2">
-                <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
-                  3ストライクです。三振か振り逃げを選んでください。
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" className="tap tap-result tap-out" onClick={() => startResult("strikeout")}>
-                    三振
-                  </button>
-                  <button type="button" className="tap tap-result tap-hit" onClick={() => startResult("dropped_third")}>
-                    振り逃げ
-                  </button>
-                </div>
+                {allowDroppedThird ? (
+                  <>
+                    <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
+                      3ストライクです。三振か振り逃げを選んでください。
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" className="tap tap-result tap-out" onClick={() => startResult("strikeout")}>
+                        三振
+                      </button>
+                      <button type="button" className="tap tap-result tap-hit" onClick={() => startResult("dropped_third")}>
+                        振り逃げ
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-[#f5c518] text-center font-bold mb-1 leading-relaxed">
+                      3ストライクです。三振を選んでください。
+                    </p>
+                    <p className="text-xs text-[#9aa894] text-center mb-2 leading-relaxed">
+                      1塁に走者がいて2死未満のため、振り逃げはできません。
+                    </p>
+                    <button type="button" className="tap tap-result tap-out w-full" onClick={() => startResult("strikeout")}>
+                      三振
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <>

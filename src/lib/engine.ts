@@ -94,6 +94,11 @@ export function needsStrikeThreeChoice(state: GameState): boolean {
   return !state.ended && state.strikes >= 3;
 }
 
+export function canDroppedThird(state: GameState): boolean {
+  if (state.outs >= 2) return true;
+  return state.bases[0] == null;
+}
+
 export function needsFieldPosition(result: PlayResult): boolean {
   return (
     result === "single" ||

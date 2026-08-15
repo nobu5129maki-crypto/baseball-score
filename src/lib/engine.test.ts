@@ -13,6 +13,7 @@ import {
   commitWp,
   getBatter,
   needsStrikeThreeChoice,
+  canDroppedThird,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -116,6 +117,41 @@ describe("らくスコア engine", () => {
     game = commitPitch(game, "strike");
     game = commitPitch(game, "ball");
     expect(game.events).toEqual(paused.events);
+  });
+
+  it("満塁で2死未満は振り逃げできない", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.bases.every(Boolean)).toBe(true);
+    expect(state.outs).toBe(0);
+    expect(canDroppedThird(state)).toBe(false);
+  });
+
+  it("1塁に走者がいて2死未満なら振り逃げできない", () => {
+    const onFirst = reduceGame(commitPlay(makeGame(), "single"));
+    expect(onFirst.bases[0]).toBeTruthy();
+    expect(onFirst.outs).toBe(0);
+    expect(canDroppedThird(onFirst)).toBe(false);
+  });
+
+  it("満塁でも2アウトなら振り逃げできる", () => {
+    let game = makeGame();
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(2);
+    expect(state.bases.every(Boolean)).toBe(true);
+    expect(canDroppedThird(state)).toBe(true);
+  });
+
+  it("1塁が空なら0アウトでも振り逃げできる", () => {
+    expect(canDroppedThird(reduceGame(makeGame()))).toBe(true);
   });
 
   it("2ストライク後のファウルはストライクが増えない", () => {
