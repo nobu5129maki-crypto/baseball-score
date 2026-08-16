@@ -127,6 +127,7 @@ describe("formatOps / myTeamSlashes", () => {
     expect(a1).toBeTruthy();
     expect(plateAppearances(a1!)).toBe(1);
     expect(a1!.ab).toBe(0);
+    expect(a1!.bb).toBe(1);
     expect(formatObp(a1!)).toBe("1.000");
   });
 });
