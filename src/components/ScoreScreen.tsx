@@ -37,7 +37,7 @@ import {
 } from "@/lib/engine";
 import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
-import { batterAtBatLine, batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
+import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { BsopBar } from "./BsopBar";
@@ -79,6 +79,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     if (!g) return [];
     return db.players.where("teamId").equals(g.myTeamId).toArray();
   }, [gameId]);
+  const allGames = useLiveQuery(() => db.games.toArray(), []);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [glossaryId, setGlossaryId] = useState<string | "index">("index");
   const [glossaryBack, setGlossaryBack] = useState<SheetKind>(null);
@@ -121,7 +122,10 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const gidpBlocked = playBlockedReason("gidp", state);
   const otherResults = OTHER_RESULTS.filter((r) => !playBlockedReason(r, state));
   const outResults = OUT_RESULTS.filter((r) => !playBlockedReason(r, state));
-  const slash = slashFor(game, batter.playerId);
+  const gameSlash = slashFor(game, batter.playerId);
+  const slash =
+    slashAcrossGames(careerGames(allGames ?? [game], game.myTeamId, game), batter.playerId) ??
+    gameSlash;
   const atBats = atBatsThisGame(game, batter, state.half);
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
   const preview = confirm
@@ -246,7 +250,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
         <p className="text-sm font-bold mt-1">
-          {batterAtBatLine(slash ?? { ab: 0, h: 0, hr: 0 })}
+          {batterAtBatLine(slash ?? { ab: 0, h: 0, hr: 0, rbi: 0 })}
         </p>
         {atBats.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -262,8 +266,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         ) : (
           <p className="text-sm text-[#9aa894] mt-1">今試合 まだ打席なし</p>
         )}
-        {slash && atBats.length > 0 ? (
-          <p className="text-xs text-[#9aa894] mt-1">{batterLine(slash)}</p>
+        {gameSlash && atBats.length > 0 ? (
+          <p className="text-xs text-[#9aa894] mt-1">今試合 {batterLine(gameSlash)}</p>
         ) : null}
       </div>
 

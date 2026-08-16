@@ -10,6 +10,7 @@ export type PlayerSlash = {
   ab: number;
   h: number;
   hr: number;
+  rbi: number;
   bb: number;
   hbp: number;
   sf: number;
@@ -62,8 +63,8 @@ export function batterLine(p: PlayerSlash): string {
   return extra.length ? `${line} ${extra.join(" ")}` : line;
 }
 
-export function batterAtBatLine(p: Pick<PlayerSlash, "ab" | "h" | "hr">): string {
-  return `打率${formatAvg(p.h, p.ab)}（${p.ab}-${p.h}）本塁打${p.hr}`;
+export function batterAtBatLine(p: Pick<PlayerSlash, "ab" | "h" | "hr" | "rbi">): string {
+  return `打率${formatAvg(p.h, p.ab)}（${p.ab}-${p.h}）本塁打${p.hr}打点${p.rbi}`;
 }
 
 export type AtBatNote = {
@@ -111,6 +112,7 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
     ab: 0,
     h: 0,
     hr: 0,
+    rbi: 0,
     bb: 0,
     hbp: 0,
     sf: 0,
@@ -138,6 +140,11 @@ function isAb(result: PlayResult): boolean {
     result === "fielders_choice" ||
     result === "runner_hit"
   );
+}
+
+function playRbi(result: PlayResult, moves: PlayEvent["moves"]): number {
+  if (result === "error" || result === "gidp" || result === "runner_hit") return 0;
+  return moves.filter((m) => m.to === 4).length;
 }
 
 function hitValue(result: PlayResult): number {
@@ -189,6 +196,7 @@ function applyEventToStats(
       row.tb += hv;
     }
     if (play.result === "homerun") row.hr += 1;
+    row.rbi += playRbi(play.result, play.moves);
     map.set(batter.playerId, row);
     for (const move of play.moves) {
       if (move.to === 4) {
@@ -212,6 +220,18 @@ function applyEventToStats(
 
 export function slashFor(game: Game, playerId: string): PlayerSlash | undefined {
   return gameSlashes(game).find((p) => p.playerId === playerId);
+}
+
+export function careerGames(games: Game[], teamId: string, current?: Game): Game[] {
+  const pool = games.filter(
+    (g) => g.myTeamId === teamId && (g.status === "ended" || g.status === "in_progress"),
+  );
+  if (current && !pool.some((g) => g.id === current.id)) pool.push(current);
+  return pool;
+}
+
+export function slashAcrossGames(games: Game[], playerId: string): PlayerSlash | undefined {
+  return mergeSlashes(games).find((p) => p.playerId === playerId);
 }
 
 export type PitcherLine = {
@@ -271,6 +291,7 @@ function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {
   prev.ab += row.ab;
   prev.h += row.h;
   prev.hr += row.hr;
+  prev.rbi += row.rbi;
   prev.bb += row.bb;
   prev.hbp += row.hbp;
   prev.sf += row.sf;
@@ -313,6 +334,7 @@ export function sumSlashes(rows: PlayerSlash[], name = "チーム計"): PlayerSl
     acc.ab += row.ab;
     acc.h += row.h;
     acc.hr += row.hr;
+    acc.rbi += row.rbi;
     acc.bb += row.bb;
     acc.hbp += row.hbp;
     acc.sf += row.sf;

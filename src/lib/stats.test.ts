@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPinchHitter, commitPlay, commitPitch, commitSteal, commitSub } from "./engine";
-import { atBatsThisGame, batterAtBatLine, batterLine, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, slashFor, sumSlashes, teamPitchers } from "./stats";
+import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, slashAcrossGames, slashFor, sumSlashes, teamPitchers } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -64,6 +64,7 @@ describe("batterLine", () => {
         ab: 3,
         h: 1,
         hr: 0,
+        rbi: 0,
         bb: 0,
         hbp: 0,
         sf: 0,
@@ -83,6 +84,7 @@ describe("batterLine", () => {
         ab: 4,
         h: 0,
         hr: 0,
+        rbi: 0,
         bb: 1,
         hbp: 0,
         sf: 0,
@@ -98,9 +100,9 @@ describe("batterLine", () => {
 
 describe("batterAtBatLine", () => {
   it("打率と打数-安打と本塁打を出す", () => {
-    expect(batterAtBatLine({ ab: 3, h: 1, hr: 0 })).toBe("打率.333（3-1）本塁打0");
-    expect(batterAtBatLine({ ab: 4, h: 4, hr: 2 })).toBe("打率1.000（4-4）本塁打2");
-    expect(batterAtBatLine({ ab: 0, h: 0, hr: 0 })).toBe("打率-（0-0）本塁打0");
+    expect(batterAtBatLine({ ab: 3, h: 1, hr: 0, rbi: 1 })).toBe("打率.333（3-1）本塁打0打点1");
+    expect(batterAtBatLine({ ab: 4, h: 4, hr: 2, rbi: 5 })).toBe("打率1.000（4-4）本塁打2打点5");
+    expect(batterAtBatLine({ ab: 0, h: 0, hr: 0, rbi: 0 })).toBe("打率-（0-0）本塁打0打点0");
   });
 });
 
@@ -144,8 +146,22 @@ describe("formatOps / myTeamSlashes", () => {
   it("本塁打は安打と本塁打数に入る", () => {
     const game = commitPlay(mine(), "homerun", undefined, "LF");
     const a1 = slashFor(game, "A1");
-    expect(a1).toMatchObject({ ab: 1, h: 1, hr: 1 });
-    expect(batterAtBatLine(a1!)).toBe("打率1.000（1-1）本塁打1");
+    expect(a1).toMatchObject({ ab: 1, h: 1, hr: 1, rbi: 1 });
+    expect(batterAtBatLine(a1!)).toBe("打率1.000（1-1）本塁打1打点1");
+  });
+
+  it("走者を還した本塁打は打点が入る", () => {
+    let game = commitPlay(mine(), "single");
+    game = commitPlay(game, "homerun", undefined, "CF");
+    expect(slashFor(game, "A2")).toMatchObject({ hr: 1, rbi: 2 });
+  });
+
+  it("過去の試合と今試合を通算する", () => {
+    const past = commitEnd(commitPlay({ ...mine(), id: "past", status: "ended" }, "single"));
+    const live = commitPlay({ ...mine(), id: "live" }, "homerun", undefined, "LF");
+    const a1 = slashAcrossGames(careerGames([past, live], "t1", live), "A1");
+    expect(a1).toMatchObject({ ab: 2, h: 2, hr: 1, rbi: 1 });
+    expect(batterAtBatLine(a1!)).toBe("打率1.000（2-2）本塁打1打点1");
   });
 });
 
