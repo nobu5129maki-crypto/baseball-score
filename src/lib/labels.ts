@@ -1,3 +1,4 @@
+import { FIELD_RESULTS, needsField } from "./rules";
 import { POSITION_SHORT, type PlayResult, type Position } from "./types";
 
 export const PLAY_LABELS: Record<PlayResult, string> = {
@@ -44,24 +45,7 @@ export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun
 export const OUT_RESULTS: PlayResult[] = ["groundout", "flyout", "lineout", "gidp"];
 export const OTHER_RESULTS: PlayResult[] = ["fielders_choice", "sac_bunt", "sac_fly"];
 
-export const FIELD_RESULTS: PlayResult[] = [
-  "single",
-  "double",
-  "triple",
-  "homerun",
-  "groundout",
-  "flyout",
-  "lineout",
-  "gidp",
-  "error",
-  "fielders_choice",
-  "sac_bunt",
-  "sac_fly",
-];
-
-export function needsField(result: PlayResult): boolean {
-  return FIELD_RESULTS.includes(result);
-}
+export { FIELD_RESULTS, needsField };
 
 export function playLabel(result: PlayResult, field?: Position): string {
   const short = PLAY_SHORT[result];

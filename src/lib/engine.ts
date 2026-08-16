@@ -14,7 +14,7 @@ import type {
   RunnerOnBase,
   Side,
 } from "./types";
-import { needsField } from "./labels";
+import { droppedThirdAllowed, needsField } from "./rules";
 import { SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
@@ -96,34 +96,16 @@ export function needsStrikeThreeChoice(state: GameState): boolean {
   return !state.ended && state.strikes >= 3;
 }
 
+export { playBlockedReason } from "./rules";
+
 export function canDroppedThird(state: GameState): boolean {
-  if (state.outs >= 2) return true;
-  return state.bases[0] == null;
+  return droppedThirdAllowed(state);
 }
 
 export function playAddsPitch(result: PlayResult, state: Pick<GameState, "balls" | "strikes">): boolean {
   if (result === "walk") return state.balls < 4;
   if (result === "strikeout" || result === "dropped_third") return state.strikes < 3;
   return true;
-}
-
-export function playBlockedReason(result: PlayResult, state: GameState): string | null {
-  if (result === "sac_fly") {
-    if (state.outs >= 2) return "2アウトでは犠牲フライになりません。";
-    if (!state.bases[2]) return "3塁に走者がいないと犠牲フライになりません。";
-  }
-  if (result === "sac_bunt") {
-    if (state.outs >= 2) return "2アウトでは送りバント（犠打）になりません。";
-    if (!state.bases.some(Boolean)) return "走者がいないと送りバントになりません。";
-  }
-  if (result === "fielders_choice") {
-    if (!state.bases.some(Boolean)) return "走者がいないと野選になりません。";
-  }
-  if (result === "gidp") {
-    if (state.outs >= 2) return "2アウトでは併殺になりません。";
-    if (!state.bases.some(Boolean)) return "走者がいないと併殺になりません。";
-  }
-  return null;
 }
 
 export function nextStealBaseOpen(state: GameState, from: Base): boolean {

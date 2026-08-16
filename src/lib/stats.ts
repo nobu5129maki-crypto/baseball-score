@@ -1,5 +1,6 @@
 import { playLabel } from "./labels";
 import { battingSide, fieldingSide, getBatter, getLineup, otherSide, playAddsPitch, reduceGame, totalRuns } from "./engine";
+import { playAwardsRbi, playHitValue, playIsAtBat } from "./rules";
 import type { Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
@@ -125,34 +126,16 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
 }
 
 function isAb(result: PlayResult): boolean {
-  return (
-    result === "single" ||
-    result === "double" ||
-    result === "triple" ||
-    result === "homerun" ||
-    result === "strikeout" ||
-    result === "dropped_third" ||
-    result === "groundout" ||
-    result === "flyout" ||
-    result === "lineout" ||
-    result === "gidp" ||
-    result === "error" ||
-    result === "fielders_choice" ||
-    result === "runner_hit"
-  );
+  return playIsAtBat(result);
 }
 
 function playRbi(result: PlayResult, moves: PlayEvent["moves"]): number {
-  if (result === "error" || result === "gidp" || result === "runner_hit") return 0;
+  if (!playAwardsRbi(result)) return 0;
   return moves.filter((m) => m.to === 4).length;
 }
 
 function hitValue(result: PlayResult): number {
-  if (result === "single" || result === "runner_hit") return 1;
-  if (result === "double") return 2;
-  if (result === "triple") return 3;
-  if (result === "homerun") return 4;
-  return 0;
+  return playHitValue(result);
 }
 
 export function gameSlashes(game: Game): PlayerSlash[] {

@@ -37,6 +37,7 @@ import {
 } from "@/lib/engine";
 import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
+import { DROPPED_THIRD } from "@/lib/rules";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
@@ -421,7 +422,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                 {allowDroppedThird ? (
                   <>
                     <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
-                      3ストライクです。三振か振り逃げを選んでください。
+                      {DROPPED_THIRD.choosePrompt}
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <button type="button" className="tap tap-result tap-out" onClick={() => startResult("strikeout")}>
@@ -435,10 +436,10 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                 ) : (
                   <>
                     <p className="text-sm text-[#f5c518] text-center font-bold mb-1 leading-relaxed">
-                      3ストライクです。三振を選んでください。
+                      {DROPPED_THIRD.strikeoutOnlyPrompt}
                     </p>
                     <p className="text-xs text-[#9aa894] text-center mb-2 leading-relaxed">
-                      1塁に走者がいて2死未満のため、振り逃げはできません。
+                      {DROPPED_THIRD.blockedHint}
                     </p>
                     <button type="button" className="tap tap-result tap-out w-full" onClick={() => startResult("strikeout")}>
                       三振
