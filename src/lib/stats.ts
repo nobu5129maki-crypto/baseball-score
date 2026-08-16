@@ -9,6 +9,7 @@ export type PlayerSlash = {
   side: Side;
   ab: number;
   h: number;
+  hr: number;
   bb: number;
   hbp: number;
   sf: number;
@@ -61,6 +62,10 @@ export function batterLine(p: PlayerSlash): string {
   return extra.length ? `${line} ${extra.join(" ")}` : line;
 }
 
+export function batterAtBatLine(p: Pick<PlayerSlash, "ab" | "h" | "hr">): string {
+  return `打率${formatAvg(p.h, p.ab)}（${p.ab}-${p.h}）本塁打${p.hr}`;
+}
+
 export type AtBatNote = {
   inning: number;
   half: Half;
@@ -105,6 +110,7 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
     side,
     ab: 0,
     h: 0,
+    hr: 0,
     bb: 0,
     hbp: 0,
     sf: 0,
@@ -182,6 +188,7 @@ function applyEventToStats(
       row.h += 1;
       row.tb += hv;
     }
+    if (play.result === "homerun") row.hr += 1;
     map.set(batter.playerId, row);
     for (const move of play.moves) {
       if (move.to === 4) {
@@ -263,6 +270,7 @@ function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {
   prev.name = row.name;
   prev.ab += row.ab;
   prev.h += row.h;
+  prev.hr += row.hr;
   prev.bb += row.bb;
   prev.hbp += row.hbp;
   prev.sf += row.sf;
@@ -304,6 +312,7 @@ export function sumSlashes(rows: PlayerSlash[], name = "チーム計"): PlayerSl
   for (const row of rows) {
     acc.ab += row.ab;
     acc.h += row.h;
+    acc.hr += row.hr;
     acc.bb += row.bb;
     acc.hbp += row.hbp;
     acc.sf += row.sf;

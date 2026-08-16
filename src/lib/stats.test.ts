@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPinchHitter, commitPlay, commitPitch, commitSteal, commitSub } from "./engine";
-import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes, teamPitchers } from "./stats";
+import { atBatsThisGame, batterAtBatLine, batterLine, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, slashFor, sumSlashes, teamPitchers } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -63,6 +63,7 @@ describe("batterLine", () => {
         side: "first",
         ab: 3,
         h: 1,
+        hr: 0,
         bb: 0,
         hbp: 0,
         sf: 0,
@@ -81,6 +82,7 @@ describe("batterLine", () => {
         side: "first",
         ab: 4,
         h: 0,
+        hr: 0,
         bb: 1,
         hbp: 0,
         sf: 0,
@@ -91,6 +93,14 @@ describe("batterLine", () => {
         r: 0,
       }),
     ).toBe("4打数0安打 四球1");
+  });
+});
+
+describe("batterAtBatLine", () => {
+  it("打率と打数-安打と本塁打を出す", () => {
+    expect(batterAtBatLine({ ab: 3, h: 1, hr: 0 })).toBe("打率.333（3-1）本塁打0");
+    expect(batterAtBatLine({ ab: 4, h: 4, hr: 2 })).toBe("打率1.000（4-4）本塁打2");
+    expect(batterAtBatLine({ ab: 0, h: 0, hr: 0 })).toBe("打率-（0-0）本塁打0");
   });
 });
 
@@ -129,6 +139,13 @@ describe("formatOps / myTeamSlashes", () => {
     expect(a1!.ab).toBe(0);
     expect(a1!.bb).toBe(1);
     expect(formatObp(a1!)).toBe("1.000");
+  });
+
+  it("本塁打は安打と本塁打数に入る", () => {
+    const game = commitPlay(mine(), "homerun", undefined, "LF");
+    const a1 = slashFor(game, "A1");
+    expect(a1).toMatchObject({ ab: 1, h: 1, hr: 1 });
+    expect(batterAtBatLine(a1!)).toBe("打率1.000（1-1）本塁打1");
   });
 });
 

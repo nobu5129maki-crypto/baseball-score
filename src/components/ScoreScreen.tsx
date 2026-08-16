@@ -37,7 +37,7 @@ import {
 } from "@/lib/engine";
 import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
-import { batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
+import { batterAtBatLine, batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { BsopBar } from "./BsopBar";
@@ -245,6 +245,9 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           {batter.order}番{batter.number ? ` ${batter.number}` : ""} {batter.playerName}
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
+        <p className="text-sm font-bold mt-1">
+          {batterAtBatLine(slash ?? { ab: 0, h: 0, hr: 0 })}
+        </p>
         {atBats.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {atBats.map((ab, i) => (
