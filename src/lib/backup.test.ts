@@ -3,6 +3,7 @@ import {
   BACKUP_KIND,
   backupFileName,
   backupSummary,
+  gameBackupFileName,
   makeBackup,
   parseBackup,
   stringifyBackup,
@@ -55,6 +56,9 @@ describe("backup", () => {
 
   it("ファイル名は日付付きになる", () => {
     expect(backupFileName(Date.UTC(2026, 7, 15, 3, 0, 0))).toBe("らくスコア-バックアップ-2026-08-15.json");
+    expect(gameBackupFileName({ date: "2026-08-16", opponentName: "太陽" })).toBe(
+      "らくスコア-試合-2026-08-16-太陽.json",
+    );
   });
 
   it("件数の要約が出る", () => {

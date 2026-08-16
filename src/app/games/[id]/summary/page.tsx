@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { InningScoreTable } from "@/components/InningScoreTable";
 import { ScorebookView } from "@/components/ScorebookView";
+import { collectGameBackup, gameBackupFileName, stringifyBackup } from "@/lib/backup";
+import { deliverBackupFile } from "@/lib/backup-export";
 import { db } from "@/lib/db";
 import { otherSide, reduceGame, totalRuns } from "@/lib/engine";
 import { buildScorebook } from "@/lib/scorebook";
@@ -15,6 +18,33 @@ export default function SummaryPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const game = useLiveQuery(() => (id ? db.games.get(id) : undefined), [id]);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
+  const [shareError, setShareError] = useState("");
+
+  async function shareGame() {
+    if (!id || shareBusy) return;
+    setShareBusy(true);
+    setShareMessage("");
+    setShareError("");
+    try {
+      const backup = await collectGameBackup(id);
+      if (!backup || !backup.games[0]) {
+        setShareError("この試合を書き出せませんでした。");
+        return;
+      }
+      const file = new File([stringifyBackup(backup)], gameBackupFileName(backup.games[0]), {
+        type: "application/json",
+      });
+      const delivered = await deliverBackupFile(file, { title: "らくスコア 試合記録" });
+      if (delivered === "cancelled") return;
+      setShareMessage("この試合を書き出しました。LINEやメールで集計係に送ってください。集計係は設定から足し合わせます。");
+    } catch {
+      setShareError("書き出せませんでした。もう一度試してください。");
+    } finally {
+      setShareBusy(false);
+    }
+  }
 
   if (!id || !game) {
     return <p className="p-6 text-[#9aa894]">読み込み中…</p>;
@@ -62,16 +92,23 @@ export default function SummaryPage() {
           theirs={slashes.filter((p) => p.side !== game.mySide)}
         />
 
-        <div className="flex gap-2 print:hidden">
-          <button type="button" className="tap tap-accent flex-1" onClick={() => window.print()}>
-            印刷 / PDF
+        <div className="flex flex-col gap-2 print:hidden">
+          <button type="button" className="tap tap-accent w-full" disabled={shareBusy} onClick={() => void shareGame()}>
+            {shareBusy ? "書き出し中…" : "この試合を集計係に送る"}
           </button>
-          <Link href={`/games/${id}/score`} className="tap flex-1 flex items-center justify-center">
-            記録を見直す
-          </Link>
+          {shareMessage ? <p className="text-sm text-[#3ddc84]">{shareMessage}</p> : null}
+          {shareError ? <p className="text-sm text-[#ff5a5a]">{shareError}</p> : null}
+          <div className="flex gap-2">
+            <button type="button" className="tap flex-1" onClick={() => window.print()}>
+              印刷 / PDF
+            </button>
+            <Link href={`/games/${id}/score`} className="tap flex-1 flex items-center justify-center">
+              記録を見直す
+            </Link>
+          </div>
         </div>
         <p className="text-xs text-[#9aa894] print:hidden">
-          印刷するとスコアブックが用紙に出ます。ダイアログで「PDFに保存」も選べます。
+          印刷するとスコアブックが用紙に出ます。代わりの人が記録した試合は「この試合を集計係に送る」で渡せます。
         </p>
       </div>
     </main>

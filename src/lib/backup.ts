@@ -39,6 +39,30 @@ export function stringifyBackup(backup: AppBackup): string {
   return `${JSON.stringify(backup, null, 2)}\n`;
 }
 
+export function gameBackupFileName(game: Pick<Game, "date" | "opponentName">): string {
+  const opponent = game.opponentName.replace(/[\\/:*?"<>|]/g, "").trim() || "相手";
+  return `らくスコア-試合-${game.date}-${opponent}.json`;
+}
+
+export async function collectGameBackup(gameId: string): Promise<AppBackup | null> {
+  const game = await db.games.get(gameId);
+  if (!game) return null;
+  const [teams, players, rosters] = await Promise.all([
+    db.teams.toArray(),
+    db.players.toArray(),
+    db.rosters.toArray(),
+  ]);
+  const team = teams.find((row) => row.id === game.myTeamId) ?? teams[0];
+  const mine = players.filter((p) => p.teamId === game.myTeamId);
+  return makeBackup({
+    teams: team ? [team] : [],
+    players: mine,
+    games: [game],
+    settings: [],
+    rosters,
+  });
+}
+
 export function backupFileName(exportedAt: number): string {
   const day = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",

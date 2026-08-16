@@ -15,12 +15,13 @@ export async function deliverBackupFile(
     navigator?: ShareNavigator;
     download?: (next: File) => void;
     allowShare?: boolean;
+    title?: string;
   } = {},
 ): Promise<BackupDelivery> {
   const nav = options.navigator ?? (typeof navigator === "undefined" ? {} : navigator);
   const download = options.download ?? downloadBackupFile;
   const allowShare = options.allowShare ?? prefersMobileShare();
-  const shared = allowShare ? await tryShareBackup(file, nav) : "skipped";
+  const shared = allowShare ? await tryShareBackup(file, nav, options.title) : "skipped";
   if (shared === "shared") return "shared";
   if (shared === "cancelled") return "cancelled";
   download(file);
@@ -44,9 +45,13 @@ export function downloadBackupFile(file: File, doc: Document = document): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function tryShareBackup(file: File, nav: ShareNavigator): Promise<"shared" | "skipped" | "cancelled"> {
+async function tryShareBackup(
+  file: File,
+  nav: ShareNavigator,
+  title = "らくスコア バックアップ",
+): Promise<"shared" | "skipped" | "cancelled"> {
   if (typeof nav.share !== "function") return "skipped";
-  const data: ShareData = { files: [file], title: "らくスコア バックアップ" };
+  const data: ShareData = { files: [file], title };
   try {
     if (typeof nav.canShare === "function" && !nav.canShare(data)) return "skipped";
   } catch {
