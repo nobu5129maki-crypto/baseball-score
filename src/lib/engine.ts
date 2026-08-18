@@ -14,6 +14,7 @@ import type {
   RunnerOnBase,
   Side,
 } from "./types";
+import { droppedThirdAllowed, needsField } from "./rules";
 import { SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
@@ -52,6 +53,7 @@ export function emptyState(
     secondLineup: game.secondLineup.map((slot) => ({ ...slot })),
     ended: false,
     regulationComplete: false,
+    bottomUnplayed: false,
   };
 }
 
@@ -90,20 +92,29 @@ export function getPitcher(state: GameState): LineupSlot | undefined {
   return getLineup(state, side).find((slot) => slot.position === "P");
 }
 
+export function needsStrikeThreeChoice(state: GameState): boolean {
+  return !state.ended && state.strikes >= 3;
+}
+
+export { playBlockedReason } from "./rules";
+
+export function canDroppedThird(state: GameState): boolean {
+  return droppedThirdAllowed(state);
+}
+
+export function playAddsPitch(result: PlayResult, state: Pick<GameState, "balls" | "strikes">): boolean {
+  if (result === "walk") return state.balls < 4;
+  if (result === "strikeout" || result === "dropped_third") return state.strikes < 3;
+  return true;
+}
+
+export function nextStealBaseOpen(state: GameState, from: Base): boolean {
+  if (from === 3) return true;
+  return state.bases[from] == null;
+}
+
 export function needsFieldPosition(result: PlayResult): boolean {
-  return (
-    result === "single" ||
-    result === "double" ||
-    result === "triple" ||
-    result === "groundout" ||
-    result === "flyout" ||
-    result === "lineout" ||
-    result === "error" ||
-    result === "gidp" ||
-    result === "fielders_choice" ||
-    result === "sac_bunt" ||
-    result === "sac_fly"
-  );
+  return needsField(result);
 }
 
 export function previewAfterMoves(
@@ -277,6 +288,7 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       return applySteal(game, state, event.from, "out");
     case "wp":
     case "pb":
+    case "bk":
       return applyOccupancy(game, state, plus(state.bases, 1), {
         consumeAtBat: false,
       });
@@ -288,9 +300,17 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
         event.playerId,
         event.playerName,
         event.position,
+        event.number,
       );
     case "pr":
-      return applyPinchRunner(state, event.base, event.playerId, event.playerName, event.position);
+      return applyPinchRunner(
+        state,
+        event.base,
+        event.playerId,
+        event.playerName,
+        event.position,
+        event.number,
+      );
     case "end_game":
       return { ...state, ended: true };
   }
@@ -394,7 +414,8 @@ function applyOccupancy(
     result === "single" ||
     result === "double" ||
     result === "triple" ||
-    result === "homerun"
+    result === "homerun" ||
+    result === "runner_hit"
   ) {
     hits[side] += 1;
   }
@@ -411,6 +432,15 @@ function applyOccupancy(
     lineupIndex[side] = (lineupIndex[side] + 1) % 9;
   }
 
+  const fielding = fieldingSide(state.half);
+  let pitchesThrown = state.pitchesThrown;
+  if (opts.consumeAtBat && result && playAddsPitch(result, state)) {
+    pitchesThrown = {
+      ...pitchesThrown,
+      [fielding]: pitchesThrown[fielding] + 1,
+    };
+  }
+
   let next: GameState = {
     ...state,
     outs,
@@ -421,17 +451,42 @@ function applyOccupancy(
     errors,
     scores,
     lineupIndex,
+    pitchesThrown,
     pitchCountAtBat: opts.consumeAtBat ? 0 : state.pitchCountAtBat,
   };
 
+  if (isWalkOff(next, game.scheduledInnings)) {
+    return { ...next, ended: true, regulationComplete: true };
+  }
   if (outs >= 3) {
     next = advanceHalf(next, game.scheduledInnings);
   }
   return next;
 }
 
+function isWalkOff(state: GameState, scheduledInnings: number): boolean {
+  if (state.half !== "bottom") return false;
+  if (state.inning < scheduledInnings) return false;
+  return totalRuns(state.scores.second) > totalRuns(state.scores.first);
+}
+
 function advanceHalf(state: GameState, scheduledInnings: number): GameState {
   if (state.half === "top") {
+    const homeAhead = totalRuns(state.scores.second) > totalRuns(state.scores.first);
+    if (state.inning >= scheduledInnings && homeAhead) {
+      return {
+        ...state,
+        half: "bottom",
+        outs: 0,
+        balls: 0,
+        strikes: 0,
+        bases: [null, null, null],
+        pitchCountAtBat: 0,
+        ended: true,
+        regulationComplete: true,
+        bottomUnplayed: true,
+      };
+    }
     return {
       ...state,
       half: "bottom",
@@ -441,6 +496,14 @@ function advanceHalf(state: GameState, scheduledInnings: number): GameState {
       bases: [null, null, null],
       pitchCountAtBat: 0,
     };
+  }
+
+  const tied = totalRuns(state.scores.first) === totalRuns(state.scores.second);
+  if (state.inning >= scheduledInnings && !tied) {
+    return { ...state, ended: true, regulationComplete: true };
+  }
+  if (state.inning >= SCOREBOARD_INNINGS) {
+    return { ...state, ended: true, regulationComplete: true };
   }
 
   const inning = state.inning + 1;
@@ -476,13 +539,23 @@ function applySub(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): GameState {
   const current = getLineup(state, side);
-  const nextLineup = current.map((slot) =>
-    slot.order === order
-      ? { order: slot.order, playerId, playerName, position, number: slot.number }
-      : slot,
-  );
+  const nextLineup = current.map((slot) => {
+    if (slot.order !== order) return slot;
+    const samePlayer = slot.playerId === playerId;
+    if (samePlayer) {
+      return {
+        ...slot,
+        playerId,
+        playerName,
+        position,
+        number: number ?? slot.number,
+      };
+    }
+    return { order: slot.order, playerId, playerName, position, number };
+  });
   const oldPitcher = current.find((slot) => slot.position === "P")?.playerId;
   const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId;
   const pitchesThrown =
@@ -501,11 +574,12 @@ function applyPinchRunner(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): GameState {
   const runner = state.bases[base - 1];
   if (!runner) return state;
   const side = battingSide(state.half);
-  const next = applySub(state, side, runner.battingOrder, playerId, playerName, position);
+  const next = applySub(state, side, runner.battingOrder, playerId, playerName, position, number);
   const bases: GameState["bases"] = [...next.bases];
   bases[base - 1] = {
     playerId,
@@ -549,16 +623,21 @@ function append(game: Game, event: DistributiveOmit<GameEvent, "id" | "seq">): G
   return touch(game, [...game.events, full], "in_progress");
 }
 
+function commitEvent(game: Game, event: DistributiveOmit<GameEvent, "id" | "seq">): Game {
+  if (reduceGame(game).ended) return game;
+  const next = append(game, event);
+  return reduceGame(next).ended ? { ...next, status: "ended" } : next;
+}
+
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 export function commitPitch(game: Game, kind: PitchKind): Game {
+  const before = reduceGame(game);
+  if (before.ended || before.strikes >= 3) return game;
   const next = append(game, { t: "pitch", kind });
   const state = reduceGame(next);
   if (state.balls >= 4) {
     return commitPlay(next, "walk");
-  }
-  if (state.strikes >= 3) {
-    return commitPlay(next, "strikeout");
   }
   return next;
 }
@@ -570,25 +649,30 @@ export function commitPlay(
   field?: Position,
 ): Game {
   const state = reduceGame(game);
+  if (state.ended) return game;
   const batter = getBatter(state);
   const resolved = moves ?? proposeMoves(result, state, batter);
-  return append(game, { t: "play", result, moves: resolved, field });
+  return commitEvent(game, { t: "play", result, moves: resolved, field });
 }
 
 export function commitSteal(game: Game, from: Base, to: Dest): Game {
-  return append(game, { t: "steal", from, to });
+  return commitEvent(game, { t: "steal", from, to });
 }
 
 export function commitPickoff(game: Game, from: Base): Game {
-  return append(game, { t: "pickoff", from });
+  return commitEvent(game, { t: "pickoff", from });
 }
 
 export function commitWp(game: Game): Game {
-  return append(game, { t: "wp" });
+  return commitEvent(game, { t: "wp" });
 }
 
 export function commitPb(game: Game): Game {
-  return append(game, { t: "pb" });
+  return commitEvent(game, { t: "pb" });
+}
+
+export function commitBk(game: Game): Game {
+  return commitEvent(game, { t: "bk" });
 }
 
 export function commitSub(
@@ -598,8 +682,9 @@ export function commitSub(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): Game {
-  return append(game, { t: "sub", side, order, playerId, playerName, position });
+  return commitEvent(game, { t: "sub", side, order, playerId, playerName, position, number });
 }
 
 export function commitPinchRunner(
@@ -608,18 +693,28 @@ export function commitPinchRunner(
   playerId: string,
   playerName: string,
   position: Position,
+  number?: string,
 ): Game {
-  return append(game, { t: "pr", base, playerId, playerName, position });
+  return commitEvent(game, { t: "pr", base, playerId, playerName, position, number });
 }
 
 export function commitPinchHitter(
   game: Game,
   playerId: string,
   playerName: string,
+  number?: string,
 ): Game {
   const state = reduceGame(game);
   const batter = getBatter(state);
-  return commitSub(game, battingSide(state.half), batter.order, playerId, playerName, batter.position);
+  return commitSub(
+    game,
+    battingSide(state.half),
+    batter.order,
+    playerId,
+    playerName,
+    batter.position,
+    number,
+  );
 }
 
 export function commitPositionSwap(game: Game, side: Side, orderA: number, orderB: number): Game {

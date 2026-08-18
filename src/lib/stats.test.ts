@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { commitEnd, commitPinchHitter, commitPlay, commitSteal } from "./engine";
-import { atBatsThisGame, batterLine, formatObp, formatOps, myTeamSeason, myTeamSlashes, plateAppearances, sumSlashes } from "./stats";
+import { commitEnd, commitPinchHitter, commitPlay, commitPitch, commitSteal, commitSub } from "./engine";
+import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, slashAcrossGames, slashFor, sumSlashes, teamPitchers } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -63,6 +63,8 @@ describe("batterLine", () => {
         side: "first",
         ab: 3,
         h: 1,
+        hr: 0,
+        rbi: 0,
         bb: 0,
         hbp: 0,
         sf: 0,
@@ -81,6 +83,8 @@ describe("batterLine", () => {
         side: "first",
         ab: 4,
         h: 0,
+        hr: 0,
+        rbi: 0,
         bb: 1,
         hbp: 0,
         sf: 0,
@@ -91,6 +95,14 @@ describe("batterLine", () => {
         r: 0,
       }),
     ).toBe("4打数0安打 四球1");
+  });
+});
+
+describe("batterAtBatLine", () => {
+  it("打率と打数-安打と本塁打を出す", () => {
+    expect(batterAtBatLine({ ab: 3, h: 1, hr: 0, rbi: 1 })).toBe("打率.333（3-1）本塁打0打点1");
+    expect(batterAtBatLine({ ab: 4, h: 4, hr: 2, rbi: 5 })).toBe("打率1.000（4-4）本塁打2打点5");
+    expect(batterAtBatLine({ ab: 0, h: 0, hr: 0, rbi: 0 })).toBe("打率-（0-0）本塁打0打点0");
   });
 });
 
@@ -127,7 +139,81 @@ describe("formatOps / myTeamSlashes", () => {
     expect(a1).toBeTruthy();
     expect(plateAppearances(a1!)).toBe(1);
     expect(a1!.ab).toBe(0);
+    expect(a1!.bb).toBe(1);
     expect(formatObp(a1!)).toBe("1.000");
+  });
+
+  it("本塁打は安打と本塁打数に入る", () => {
+    const game = commitPlay(mine(), "homerun", undefined, "LF");
+    const a1 = slashFor(game, "A1");
+    expect(a1).toMatchObject({ ab: 1, h: 1, hr: 1, rbi: 1 });
+    expect(batterAtBatLine(a1!)).toBe("打率1.000（1-1）本塁打1打点1");
+  });
+
+  it("走者を還した本塁打は打点が入る", () => {
+    let game = commitPlay(mine(), "single");
+    game = commitPlay(game, "homerun", undefined, "CF");
+    expect(slashFor(game, "A2")).toMatchObject({ hr: 1, rbi: 2 });
+  });
+
+  it("過去の試合と今試合を通算する", () => {
+    const past = commitEnd(commitPlay({ ...mine(), id: "past", status: "ended" }, "single"));
+    const live = commitPlay({ ...mine(), id: "live" }, "homerun", undefined, "LF");
+    const a1 = slashAcrossGames(careerGames([past, live], "t1", live), "A1");
+    expect(a1).toMatchObject({ ab: 2, h: 2, hr: 1, rbi: 1 });
+    expect(batterAtBatLine(a1!)).toBe("打率1.000（2-2）本塁打1打点1");
+  });
+});
+
+describe("myTeamPitchers", () => {
+  it("先発投手の投球数を数える", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "foul");
+    const rows = myTeamPitchers(game);
+    expect(rows).toEqual([{ playerId: "B1", name: "B1", pitches: 3 }]);
+  });
+
+  it("相手の投球は自チームに入れない", () => {
+    let game: Game = { ...makeGame(), mySide: "first" };
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    expect(myTeamPitchers(game)).toEqual([{ playerId: "A1", name: "A1", pitches: 0 }]);
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "strike");
+    expect(myTeamPitchers(game)).toEqual([{ playerId: "A1", name: "A1", pitches: 2 }]);
+  });
+
+  it("投手交代後は投手ごとに球数を分ける", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    game = commitSub(game, "second", 1, "PX", "新投手", "P");
+    game = commitPitch(game, "strike");
+    expect(myTeamPitchers(game)).toEqual([
+      { playerId: "B1", name: "B1", pitches: 2 },
+      { playerId: "PX", name: "新投手", pitches: 1 },
+    ]);
+  });
+
+  it("ヒットとアウトも投球数に入る", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    expect(myTeamPitchers(game)).toEqual([{ playerId: "B1", name: "B1", pitches: 1 }]);
+    game = commitPlay(game, "groundout");
+    expect(myTeamPitchers(game)[0]?.pitches).toBe(2);
+  });
+
+  it("相手投手の投球数もチームごとに数える", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPitch(game, "strike");
+    expect(teamPitchers(game, "first")).toEqual([{ playerId: "A1", name: "A1", pitches: 0 }]);
+    expect(teamPitchers(game, "second")[0]?.pitches).toBe(2);
   });
 });
 

@@ -12,6 +12,12 @@ import {
   commitSub,
   commitWp,
   getBatter,
+  needsStrikeThreeChoice,
+  canDroppedThird,
+  needsFieldPosition,
+  playAddsPitch,
+  playBlockedReason,
+  nextStealBaseOpen,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -76,15 +82,80 @@ describe("らくスコア engine", () => {
     expect(game.events.some((e) => e.t === "play" && e.result === "walk")).toBe(true);
   });
 
-  it("ストライク3つで三振、1アウト", () => {
+  it("ストライク3つでは三振にせず、三振か振り逃げを待つ", () => {
     let game = makeGame();
     game = commitPitch(game, "strike");
     game = commitPitch(game, "strike");
     game = commitPitch(game, "strike");
-    const state = reduceGame(game);
+    let state = reduceGame(game);
+    expect(state.strikes).toBe(3);
+    expect(state.outs).toBe(0);
+    expect(state.pitchCountAtBat).toBe(3);
+    expect(game.events.some((e) => e.t === "play")).toBe(false);
+    expect(needsStrikeThreeChoice(state)).toBe(true);
+    game = commitPlay(game, "strikeout");
+    state = reduceGame(game);
     expect(state.outs).toBe(1);
-    expect(state.bases.every((b) => b === null)).toBe(true);
+    expect(state.strikes).toBe(0);
     expect(getBatter(state).playerId).toBe("A2");
+  });
+
+  it("3ストライク後に振り逃げすると打者が1塁、球数は3のまま", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPlay(game, "dropped_third");
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A1");
+    expect(state.outs).toBe(0);
+    expect(state.pitchesThrown.second).toBe(3);
+  });
+
+  it("3ストライク後の追加の球は記録しない", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    const paused = game;
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "ball");
+    expect(game.events).toEqual(paused.events);
+  });
+
+  it("満塁で2死未満は振り逃げできない", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.bases.every(Boolean)).toBe(true);
+    expect(state.outs).toBe(0);
+    expect(canDroppedThird(state)).toBe(false);
+  });
+
+  it("1塁に走者がいて2死未満なら振り逃げできない", () => {
+    const onFirst = reduceGame(commitPlay(makeGame(), "single"));
+    expect(onFirst.bases[0]).toBeTruthy();
+    expect(onFirst.outs).toBe(0);
+    expect(canDroppedThird(onFirst)).toBe(false);
+  });
+
+  it("満塁でも2アウトなら振り逃げできる", () => {
+    let game = makeGame();
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(2);
+    expect(state.bases.every(Boolean)).toBe(true);
+    expect(canDroppedThird(state)).toBe(true);
+  });
+
+  it("1塁が空なら0アウトでも振り逃げできる", () => {
+    expect(canDroppedThird(reduceGame(makeGame()))).toBe(true);
   });
 
   it("2ストライク後のファウルはストライクが増えない", () => {
@@ -103,6 +174,38 @@ describe("らくスコア engine", () => {
     const state = reduceGame(game);
     expect(state.bases[0]?.playerId).toBe("A1");
     expect(state.hits.first).toBe(1);
+    expect(state.pitchesThrown.second).toBe(1);
+  });
+
+  it("ゴロアウトも1球として数える", () => {
+    const game = commitPlay(makeGame(), "groundout");
+    expect(reduceGame(game).pitchesThrown.second).toBe(1);
+  });
+
+  it("ボールのあとのヒットは球数が1増える", () => {
+    let game = commitPitch(makeGame(), "ball");
+    expect(reduceGame(game).pitchesThrown.second).toBe(1);
+    game = commitPlay(game, "single");
+    expect(reduceGame(game).pitchesThrown.second).toBe(2);
+  });
+
+  it("四球はボール4つだけで数え、もう1球足さない", () => {
+    let game = makeGame();
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    expect(reduceGame(game).pitchesThrown.second).toBe(4);
+    expect(playAddsPitch("walk", { balls: 4, strikes: 0 })).toBe(false);
+  });
+
+  it("三振はストライク3つだけで数え、もう1球足さない", () => {
+    let game = makeGame();
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitPlay(game, "strikeout");
+    expect(reduceGame(game).pitchesThrown.second).toBe(3);
   });
 
   it("1塁走者ありの単打で1・2塁", () => {
@@ -319,6 +422,22 @@ describe("らくスコア engine", () => {
     expect(state.balls).toBe(1);
   });
 
+  it("本塁打と安打は打球方向が必要", () => {
+    expect(needsFieldPosition("homerun")).toBe(true);
+    expect(needsFieldPosition("single")).toBe(true);
+    expect(needsFieldPosition("strikeout")).toBe(false);
+    expect(needsFieldPosition("walk")).toBe(false);
+  });
+
+  it("交代すると前の選手の背番号は残さない", () => {
+    const start = makeGame();
+    start.firstLineup[0] = { ...start.firstLineup[0], number: "18" };
+    const game = commitPinchHitter(start, "PH1", "代打太", "7");
+    const batter = getBatter(reduceGame(game));
+    expect(batter.playerId).toBe("PH1");
+    expect(batter.number).toBe("7");
+  });
+
   it("打球方向付きのヒットを記録できる", () => {
     const game = commitPlay(makeGame(), "single", undefined, "LF");
     const play = game.events.find((e) => e.t === "play");
@@ -344,7 +463,73 @@ describe("らくスコア engine", () => {
     const state = reduceGame(game);
     expect(state.outs).toBe(1);
     expect(state.bases[0]?.playerId).toBe(batter.playerId);
-    expect(state.hits.first).toBe(1);
+    expect(state.hits.first).toBe(2);
     expect(getBatter(state).playerId).toBe("A3");
+  });
+
+  it("2アウトでは併殺・犠飛・犠打にならない", () => {
+    let game = makeGame();
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(2);
+    expect(playBlockedReason("gidp", state)).toBeTruthy();
+    expect(playBlockedReason("sac_fly", state)).toBeTruthy();
+    expect(playBlockedReason("sac_bunt", state)).toBeTruthy();
+  });
+
+  it("3塁走者がいて2アウト未満なら犠飛にできる", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(state.bases[2]).toBeTruthy();
+    expect(playBlockedReason("sac_fly", state)).toBeNull();
+  });
+
+  it("次の塁に走者がいる盗塁はできない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    const state = reduceGame(game);
+    expect(nextStealBaseOpen(state, 1)).toBe(false);
+    expect(nextStealBaseOpen(state, 2)).toBe(true);
+  });
+
+  it("規定回の裏で後攻が勝ち越したらサヨナラで終了する", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 1 };
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    expect(reduceGame(game).half).toBe("bottom");
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.ended).toBe(true);
+    expect(state.bottomUnplayed).toBe(false);
+    expect(game.status).toBe("ended");
+    expect(state.outs).toBe(0);
+  });
+
+  it("規定回表のあと後攻がリードしていれば裏は行わない", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 2 };
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "homerun");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    expect(reduceGame(game).ended).toBe(false);
+    expect(reduceGame(game).inning).toBe(2);
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    const state = reduceGame(game);
+    expect(state.ended).toBe(true);
+    expect(state.bottomUnplayed).toBe(true);
+    expect(state.inning).toBe(2);
   });
 });

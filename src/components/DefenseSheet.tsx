@@ -37,7 +37,7 @@ export function DefenseSheet({
   fieldingSide: Side;
   myTeamName: string;
   opponentName: string;
-  players: { id: string; name: string }[];
+  players: { id: string; name: string; number?: string }[];
   onApply: (mut: (g: Game) => Game) => void;
   onClose: () => void;
 }) {
@@ -79,9 +79,11 @@ export function DefenseSheet({
     setPickedOrder(null);
   }
 
-  function sendBench(player: { id: string; name: string }) {
+  function sendBench(player: { id: string; name: string; number?: string }) {
     if (!picked) return;
-    onApply((g) => commitSub(g, side, picked.order, player.id, player.name, picked.position));
+    onApply((g) =>
+      commitSub(g, side, picked.order, player.id, player.name, picked.position, player.number),
+    );
     clearPick();
   }
 
@@ -168,7 +170,11 @@ export function DefenseSheet({
                 <span className="block font-bold text-sm leading-tight break-words">
                   {slot?.playerName ?? "空き"}
                 </span>
-                {slot ? <span className="block text-[10px] text-[#9aa894]">{slot.order}番</span> : null}
+                {slot ? (
+                  <span className="block text-[10px] text-[#9aa894]">
+                    {slot.order}番{slot.number ? ` ${slot.number}` : ""}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -189,6 +195,7 @@ export function DefenseSheet({
               disabled={!picked}
               onClick={() => sendBench(p)}
             >
+              {p.number ? `${p.number} ` : ""}
               {p.name} を出す
             </button>
           ))}

@@ -125,6 +125,7 @@ export function LineupBoard({
                       className="mt-1 text-left text-sm text-[#9aa894] px-1"
                       onClick={() => setPosOrder(slot.order)}
                     >
+                      {slot.number ? `背番号 ${slot.number} · ` : ""}
                       {POSITION_LABELS[slot.position]}
                       {profile ? ` · ${profile}` : ""}
                       {" · 守備を変更"}

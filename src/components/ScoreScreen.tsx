@@ -14,6 +14,7 @@ import {
   commitPlay,
   commitSteal,
   commitWp,
+  commitBk,
   battingSide,
   fieldingSide,
   getBatter,
@@ -21,6 +22,10 @@ import {
   getPitcher,
   needsFieldPosition,
   needsRunnerConfirm,
+  needsStrikeThreeChoice,
+  canDroppedThird,
+  playBlockedReason,
+  nextStealBaseOpen,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
@@ -31,7 +36,8 @@ import {
 import { db, getSettings, saveGame } from "@/lib/db";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
+import { DROPPED_THIRD } from "@/lib/rules";
+import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { DefenseSheet } from "./DefenseSheet";
@@ -72,6 +78,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     if (!g) return [];
     return db.players.where("teamId").equals(g.myTeamId).toArray();
   }, [gameId]);
+  const allGames = useLiveQuery(() => db.games.toArray(), []);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [glossaryId, setGlossaryId] = useState<string | "index">("index");
   const [glossaryBack, setGlossaryBack] = useState<SheetKind>(null);
@@ -109,7 +116,15 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const firstName = game.mySide === "first" ? game.myTeamName : game.opponentName;
   const secondName = game.mySide === "second" ? game.myTeamName : game.opponentName;
   const occupiedCount = state.bases.filter(Boolean).length;
-  const slash = slashFor(game, batter.playerId);
+  const chooseK = needsStrikeThreeChoice(state);
+  const allowDroppedThird = canDroppedThird(state);
+  const gidpBlocked = playBlockedReason("gidp", state);
+  const otherResults = OTHER_RESULTS.filter((r) => !playBlockedReason(r, state));
+  const outResults = OUT_RESULTS.filter((r) => !playBlockedReason(r, state));
+  const gameSlash = slashFor(game, batter.playerId);
+  const slash =
+    slashAcrossGames(careerGames(allGames ?? [game], game.myTeamId, game), batter.playerId) ??
+    gameSlash;
   const atBats = atBatsThisGame(game, batter, state.half);
   const batterProfile = playerProfileLabel(players?.find((p) => p.id === batter.playerId) ?? batter);
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
@@ -126,6 +141,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   function startResult(result: PlayResult) {
     setSheet(null);
     if (!state) return;
+    if (playBlockedReason(result, state)) return;
     if (needsFieldPosition(result)) {
       setPendingResult(result);
       setSheet("field");
@@ -157,6 +173,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   function onSelectRunner(runner: RunnerOnBase, from: 0 | 1 | 2 | 3) {
     if (from === 0) return;
     if (sheet === "steal") {
+      if (!state || !nextStealBaseOpen(state, from)) return;
       const to: Dest = from === 3 ? 4 : ((from + 1) as Dest);
       void patch((g) => commitSteal(g, from, to));
       setSheet(null);
@@ -226,10 +243,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           {state.half === "top" ? firstName : secondName} の攻撃
         </p>
         <p className="text-2xl font-bold leading-tight mt-0.5 break-words">
-          {batter.order}番 {batter.playerName}
+          {batter.order}番{batter.number ? ` ${batter.number}` : ""} {batter.playerName}
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
         {batterProfile ? <p className="text-sm text-[#9aa894]">{batterProfile}</p> : null}
+        <p className="text-sm font-bold mt-1">
+          {batterAtBatLine(slash ?? { ab: 0, h: 0, hr: 0, rbi: 0 })}
+        </p>
         {atBats.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {atBats.map((ab, i) => (
@@ -246,8 +266,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         ) : (
           <p className="text-sm text-[#9aa894] mt-1">今試合 まだ打席なし</p>
         )}
-        {slash && atBats.length > 0 ? (
-          <p className="text-xs text-[#9aa894] mt-1">{batterLine(slash)}</p>
+        {gameSlash && atBats.length > 0 ? (
+          <p className="text-xs text-[#9aa894] mt-1">今試合 {batterLine(gameSlash)}</p>
         ) : null}
       </div>
 
@@ -261,7 +281,38 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         onSelectDest={onSelectDest}
       />
 
-      {confirm ? (
+      {state.ended && !confirm ? (
+        <div className="px-3 pb-4 flex flex-col gap-3">
+          <p className="text-center font-bold text-[#f5c518] leading-relaxed">
+            {state.bottomUnplayed
+              ? "後攻がリードしていたため、この回の裏は行いません。試合終了です。"
+              : state.half === "bottom" && totalRuns(state.scores.second) > totalRuns(state.scores.first)
+                ? "サヨナラで試合終了です。"
+                : "試合終了です。"}
+          </p>
+          <Link href={`/games/${gameId}/summary`} className="tap tap-accent flex items-center justify-center">
+            結果を見る
+          </Link>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="tap flex-1"
+              disabled={game.events.length === 0}
+              onClick={() => void patch((g) => ({ ...g, events: undoLast(g.events), status: "in_progress" }))}
+            >
+              ↩ 1つ戻す
+            </button>
+            <button
+              type="button"
+              className="tap flex-1"
+              disabled={game.events.length === 0}
+              onClick={() => void patch((g) => ({ ...g, events: undoAtBat(g.events), status: "in_progress" }))}
+            >
+              ↩ 打席を戻す
+            </button>
+          </div>
+        </div>
+      ) : confirm ? (
         <div className="px-3 pb-3 flex flex-col gap-2">
           <p className="text-sm text-[#f5c518]">進塁先を直してから確定（走者をタップ→塁をタップ）</p>
           {preview ? (
@@ -323,7 +374,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <Action onClick={() => setSheet("ph")} label="代打" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pr")} label="代走" />
           </div>
-          <div className="px-2 grid grid-cols-3 gap-1 pb-2">
+          <div className="px-2 grid grid-cols-4 gap-1 pb-2">
             <Action
               disabled={occupiedCount === 0}
               onClick={() => void patch(commitWp)}
@@ -346,6 +397,16 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             />
             <Action
               disabled={occupiedCount === 0}
+              onClick={() => void patch(commitBk)}
+              label="ボーク"
+              help={() => {
+                setGlossaryId("bk");
+                setGlossaryBack(null);
+                setSheet("glossary");
+              }}
+            />
+            <Action
+              disabled={occupiedCount === 0}
               onClick={() => setSheet("hit_runner")}
               label="走者当たり"
               help={() => {
@@ -356,51 +417,75 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             />
           </div>
           <div className={`px-2 pb-2 ${leftHanded ? "flex flex-col-reverse" : ""}`}>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              <button type="button" className="tap tap-ball" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
-                ボール
-              </button>
-              <button type="button" className="tap tap-strike" onClick={() => void patch((g) => commitPitch(g, "strike"))}>
-                ストライク
-              </button>
-              <button type="button" className="tap tap-foul" onClick={() => void patch((g) => commitPitch(g, "foul"))}>
-                ファウル
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-2 mb-2">
-              <button type="button" className="tap tap-result tap-hit" onClick={() => setSheet("hit")}>
-                ヒット
-              </button>
-              <button type="button" className="tap tap-result tap-out" onClick={() => setSheet("out")}>
-                アウト
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("strikeout")}>
-                三振
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("dropped_third")}>
-                振り逃げ
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("walk")}>
-                四球
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("hbp")}>
-                死球
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => startResult("error")}>
-                エラー
-              </button>
-              <button
-                type="button"
-                className="tap tap-result"
-                disabled={occupiedCount === 0}
-                onClick={() => startResult("gidp")}
-              >
-                併殺
-              </button>
-              <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
-                その他
-              </button>
-            </div>
+            {chooseK ? (
+              <div className="mb-2">
+                {allowDroppedThird ? (
+                  <>
+                    <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
+                      {DROPPED_THIRD.choosePrompt}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" className="tap tap-result tap-out" onClick={() => startResult("strikeout")}>
+                        三振
+                      </button>
+                      <button type="button" className="tap tap-result tap-hit" onClick={() => startResult("dropped_third")}>
+                        振り逃げ
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-[#f5c518] text-center font-bold mb-1 leading-relaxed">
+                      {DROPPED_THIRD.strikeoutOnlyPrompt}
+                    </p>
+                    <p className="text-xs text-[#9aa894] text-center mb-2 leading-relaxed">
+                      {DROPPED_THIRD.blockedHint}
+                    </p>
+                    <button type="button" className="tap tap-result tap-out w-full" onClick={() => startResult("strikeout")}>
+                      三振
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <button type="button" className="tap tap-ball" onClick={() => void patch((g) => commitPitch(g, "ball"))}>
+                    ボール
+                  </button>
+                  <button type="button" className="tap tap-strike" onClick={() => void patch((g) => commitPitch(g, "strike"))}>
+                    ストライク
+                  </button>
+                  <button type="button" className="tap tap-foul" onClick={() => void patch((g) => commitPitch(g, "foul"))}>
+                    ファウル
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <button type="button" className="tap tap-result tap-hit" onClick={() => setSheet("hit")}>
+                    ヒット
+                  </button>
+                  <button type="button" className="tap tap-result tap-out" onClick={() => setSheet("out")}>
+                    アウト
+                  </button>
+                  <button type="button" className="tap tap-result" onClick={() => startResult("hbp")}>
+                    死球
+                  </button>
+                  <button type="button" className="tap tap-result" onClick={() => startResult("error")}>
+                    エラー
+                  </button>
+                  {!gidpBlocked ? (
+                    <button type="button" className="tap tap-result" onClick={() => startResult("gidp")}>
+                      併殺
+                    </button>
+                  ) : null}
+                  {otherResults.length > 0 ? (
+                    <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
+                      その他
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="px-2 pb-4 flex gap-2">
@@ -428,12 +513,12 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         <ResultSheet title="どんなヒット？" results={HIT_RESULTS} onPick={startResult} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === "out" ? (
-        <ResultSheet title="どんなアウト？" results={OUT_RESULTS} onPick={startResult} onClose={() => setSheet(null)} />
+        <ResultSheet title="どんなアウト？" results={outResults} onPick={startResult} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === "other" ? (
         <Sheet title="その他" onClose={() => setSheet(null)}>
           <div className="flex flex-col gap-2">
-            {OTHER_RESULTS.map((r) => {
+            {otherResults.map((r) => {
               const helpId = OTHER_HELP[r];
               return (
                 <div key={r} className="relative">
@@ -522,9 +607,10 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       {sheet === "steal" ? (
         <RunnerPickSheet
           title="盗塁"
-          hint="進塁させる走者を1人選んでください。盗塁ボタンをもう一度押す必要はありません。"
+          hint="進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。先にその走者を動かしてください。"
           bases={state.bases}
           action={(b, name) => `${b}塁の${name} を ${b === 3 ? "本塁" : `${b + 1}塁`}へ`}
+          canPick={(b) => nextStealBaseOpen(state, b)}
           onPick={(from) => {
             const to: Dest = from === 3 ? 4 : ((from + 1) as Dest);
             void patch((g) => commitSteal(g, from, to));
@@ -583,7 +669,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           players={players ?? []}
           onClose={() => setSheet(null)}
           onPick={(base, player, position) => {
-            void patch((g) => commitPinchRunner(g, base, player.id, player.name, position));
+            void patch((g) => commitPinchRunner(g, base, player.id, player.name, position, player.number));
             setSheet(null);
           }}
         />
@@ -596,7 +682,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           players={players ?? []}
           onClose={() => setSheet(null)}
           onPick={(player) => {
-            void patch((g) => commitPinchHitter(g, player.id, player.name));
+            void patch((g) => commitPinchHitter(g, player.id, player.name, player.number));
             setSheet(null);
           }}
         />
@@ -690,6 +776,7 @@ function RunnerPickSheet({
   bases,
   action,
   danger,
+  canPick,
   onPick,
   onClose,
 }: {
@@ -698,6 +785,7 @@ function RunnerPickSheet({
   bases: Array<RunnerOnBase | null>;
   action: (base: Base, name: string) => string;
   danger?: boolean;
+  canPick?: (base: Base) => boolean;
   onPick: (base: Base) => void;
   onClose: () => void;
 }) {
@@ -708,6 +796,7 @@ function RunnerPickSheet({
         {([1, 2, 3] as Base[]).map((b) => {
           const runner = bases[b - 1];
           if (!runner) return null;
+          if (canPick && !canPick(b)) return null;
           return (
             <button
               key={b}
@@ -735,9 +824,13 @@ function PinchSheet({
   battingLineup: Game["firstLineup"];
   myTeamBatting: boolean;
   stateBases: Array<RunnerOnBase | null>;
-  players: { id: string; name: string }[];
+  players: { id: string; name: string; number?: string }[];
   onClose: () => void;
-  onPick: (base: Base, player: { id: string; name: string }, position: Game["firstLineup"][0]["position"]) => void;
+  onPick: (
+    base: Base,
+    player: { id: string; name: string; number?: string },
+    position: Game["firstLineup"][0]["position"],
+  ) => void;
 }) {
   const firstOccupied = ([1, 2, 3] as Base[]).find((b) => stateBases[b - 1]) ?? 1;
   const [base, setBase] = useState<Base>(firstOccupied);
@@ -780,6 +873,7 @@ function PinchSheet({
           disabled={!runner}
           onClick={() => onPick(base, p, position)}
         >
+          {p.number ? `${p.number} ` : ""}
           {p.name} を代走に
         </button>
       ))}
@@ -817,9 +911,9 @@ function PinchHitterSheet({
   batter: LineupSlot;
   battingLineup: Game["firstLineup"];
   myTeamBatting: boolean;
-  players: { id: string; name: string }[];
+  players: { id: string; name: string; number?: string }[];
   onClose: () => void;
-  onPick: (player: { id: string; name: string }) => void;
+  onPick: (player: { id: string; name: string; number?: string }) => void;
 }) {
   const [name, setName] = useState("");
   const activeIds = new Set(battingLineup.map((s) => s.playerId));
@@ -837,6 +931,7 @@ function PinchHitterSheet({
           className="tap tap-result tap-accent w-full mb-2"
           onClick={() => onPick(p)}
         >
+          {p.number ? `${p.number} ` : ""}
           {p.name} を代打に
         </button>
       ))}

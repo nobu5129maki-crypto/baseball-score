@@ -1,6 +1,7 @@
 import { playLabel } from "./labels";
-import { battingSide, getBatter, otherSide, reduceGame, totalRuns } from "./engine";
-import type { Game, GameEvent, Half, PlayEvent, PlayResult, Side } from "./types";
+import { battingSide, fieldingSide, getBatter, getLineup, otherSide, playAddsPitch, reduceGame, totalRuns } from "./engine";
+import { playAwardsRbi, playHitValue, playIsAtBat } from "./rules";
+import type { Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
   playerId: string;
@@ -9,6 +10,8 @@ export type PlayerSlash = {
   side: Side;
   ab: number;
   h: number;
+  hr: number;
+  rbi: number;
   bb: number;
   hbp: number;
   sf: number;
@@ -61,6 +64,10 @@ export function batterLine(p: PlayerSlash): string {
   return extra.length ? `${line} ${extra.join(" ")}` : line;
 }
 
+export function batterAtBatLine(p: Pick<PlayerSlash, "ab" | "h" | "hr" | "rbi">): string {
+  return `打率${formatAvg(p.h, p.ab)}（${p.ab}-${p.h}）本塁打${p.hr}打点${p.rbi}`;
+}
+
 export type AtBatNote = {
   inning: number;
   half: Half;
@@ -105,6 +112,8 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
     side,
     ab: 0,
     h: 0,
+    hr: 0,
+    rbi: 0,
     bb: 0,
     hbp: 0,
     sf: 0,
@@ -117,29 +126,16 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
 }
 
 function isAb(result: PlayResult): boolean {
-  return (
-    result === "single" ||
-    result === "double" ||
-    result === "triple" ||
-    result === "homerun" ||
-    result === "strikeout" ||
-    result === "dropped_third" ||
-    result === "groundout" ||
-    result === "flyout" ||
-    result === "lineout" ||
-    result === "gidp" ||
-    result === "error" ||
-    result === "fielders_choice" ||
-    result === "runner_hit"
-  );
+  return playIsAtBat(result);
+}
+
+function playRbi(result: PlayResult, moves: PlayEvent["moves"]): number {
+  if (!playAwardsRbi(result)) return 0;
+  return moves.filter((m) => m.to === 4).length;
 }
 
 function hitValue(result: PlayResult): number {
-  if (result === "single") return 1;
-  if (result === "double") return 2;
-  if (result === "triple") return 3;
-  if (result === "homerun") return 4;
-  return 0;
+  return playHitValue(result);
 }
 
 export function gameSlashes(game: Game): PlayerSlash[] {
@@ -182,6 +178,8 @@ function applyEventToStats(
       row.h += 1;
       row.tb += hv;
     }
+    if (play.result === "homerun") row.hr += 1;
+    row.rbi += playRbi(play.result, play.moves);
     map.set(batter.playerId, row);
     for (const move of play.moves) {
       if (move.to === 4) {
@@ -207,11 +205,76 @@ export function slashFor(game: Game, playerId: string): PlayerSlash | undefined 
   return gameSlashes(game).find((p) => p.playerId === playerId);
 }
 
+export function careerGames(games: Game[], teamId: string, current?: Game): Game[] {
+  const pool = games.filter(
+    (g) => g.myTeamId === teamId && (g.status === "ended" || g.status === "in_progress"),
+  );
+  if (current && !pool.some((g) => g.id === current.id)) pool.push(current);
+  return pool;
+}
+
+export function slashAcrossGames(games: Game[], playerId: string): PlayerSlash | undefined {
+  return mergeSlashes(games).find((p) => p.playerId === playerId);
+}
+
+export type PitcherLine = {
+  playerId: string;
+  name: string;
+  pitches: number;
+};
+
+export function teamPitchers(game: Game, side: Side): PitcherLine[] {
+  const rows: PitcherLine[] = [];
+  const index = new Map<string, number>();
+
+  const ensure = (slot: LineupSlot) => {
+    const existing = index.get(slot.playerId);
+    if (existing === undefined) {
+      index.set(slot.playerId, rows.length);
+      rows.push({ playerId: slot.playerId, name: slot.playerName, pitches: 0 });
+      return;
+    }
+    rows[existing].name = slot.playerName;
+  };
+
+  let cursor: Game = { ...game, events: [] };
+  const starter = pitcherOnSide(reduceGame(cursor), side);
+  if (starter) ensure(starter);
+
+  for (const event of game.events) {
+    const before = reduceGame(cursor);
+    if (
+      ((event.t === "pitch" && fieldingSide(before.half) === side) ||
+        (event.t === "play" && playAddsPitch(event.result, before) && fieldingSide(before.half) === side))
+    ) {
+      const pitcher = pitcherOnSide(before, side);
+      if (pitcher) {
+        ensure(pitcher);
+        rows[index.get(pitcher.playerId)!].pitches += 1;
+      }
+    }
+    cursor = { ...cursor, events: [...cursor.events, event] };
+    const after = pitcherOnSide(reduceGame(cursor), side);
+    if (after) ensure(after);
+  }
+  return rows;
+}
+
+export function myTeamPitchers(game: Game): PitcherLine[] {
+  return teamPitchers(game, game.mySide);
+}
+
+function pitcherOnSide(state: ReturnType<typeof reduceGame>, side: Side): LineupSlot | undefined {
+  return getLineup(state, side).find((slot) => slot.position === "P");
+}
+
 function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {
   const prev = map.get(row.playerId) ?? emptySlash(row.playerId, row.name, row.order, row.side);
   prev.name = row.name;
   prev.ab += row.ab;
   prev.h += row.h;
+  prev.hr += row.hr;
+  prev.rbi += row.rbi;
   prev.bb += row.bb;
   prev.hbp += row.hbp;
   prev.sf += row.sf;
@@ -253,6 +316,8 @@ export function sumSlashes(rows: PlayerSlash[], name = "チーム計"): PlayerSl
   for (const row of rows) {
     acc.ab += row.ab;
     acc.h += row.h;
+    acc.hr += row.hr;
+    acc.rbi += row.rbi;
     acc.bb += row.bb;
     acc.hbp += row.hbp;
     acc.sf += row.sf;

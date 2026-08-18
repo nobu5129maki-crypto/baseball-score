@@ -80,6 +80,7 @@ export default function StatsPage() {
                       </span>
                     </th>
                     <th className="p-2 font-medium whitespace-nowrap">安打</th>
+                    <th className="p-2 font-medium whitespace-nowrap">四球</th>
                     <th className="p-2 font-medium whitespace-nowrap">打率</th>
                     <th className="p-2 font-medium whitespace-nowrap">出塁率</th>
                     <th className="p-2 font-medium whitespace-nowrap">盗塁</th>
@@ -157,6 +158,7 @@ function SlashRow({ p, total }: { p: PlayerSlash; total?: boolean }) {
       <td className="p-2">{plateAppearances(p)}</td>
       <td className="p-2">{p.ab}</td>
       <td className="p-2">{p.h}</td>
+      <td className="p-2">{p.bb}</td>
       <td className="p-2">{formatAvg(p.h, p.ab)}</td>
       <td className="p-2">{formatObp(p)}</td>
       <td className="p-2">{p.sb}</td>
