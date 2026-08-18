@@ -62,6 +62,10 @@ export function needsField(result: PlayResult): boolean {
   return FIELD_RESULTS.includes(result);
 }
 
+export function isHitResult(result: PlayResult): boolean {
+  return HIT_RESULTS.includes(result);
+}
+
 export function playLabel(result: PlayResult, field?: Position): string {
   if (!field) return PLAY_LABELS[result];
   return `${POSITION_SHORT[field]}${PLAY_SHORT[result]}`;

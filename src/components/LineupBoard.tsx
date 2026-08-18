@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { playerProfileLabel } from "@/lib/player-profile";
 import { POSITION_LABELS, POSITIONS } from "@/lib/types";
 import type { LineupSlot, Player, Position } from "@/lib/types";
 import { Sheet } from "./Sheet";
@@ -96,6 +97,7 @@ export function LineupBoard({
         <ol className="flex flex-col gap-2 mt-3">
           {lineup.map((slot, index) => {
             const selected = swapFrom === slot.order;
+            const profile = playerProfileLabel(slot);
             return (
               <li
                 key={slot.order}
@@ -123,7 +125,9 @@ export function LineupBoard({
                       className="mt-1 text-left text-sm text-[#9aa894] px-1"
                       onClick={() => setPosOrder(slot.order)}
                     >
-                      {POSITION_LABELS[slot.position]} · 守備を変更
+                      {POSITION_LABELS[slot.position]}
+                      {profile ? ` · ${profile}` : ""}
+                      {" · 守備を変更"}
                     </button>
                   </div>
                   <div className="flex flex-col gap-1 w-12 shrink-0">

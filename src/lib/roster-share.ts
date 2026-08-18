@@ -1,4 +1,7 @@
-export type SharedPlayer = { name: string; number: string; kana?: string };
+import { pickPlayerProfile } from "./player-profile";
+import type { PlayerProfile } from "./types";
+
+export type SharedPlayer = { name: string; number: string; kana?: string } & PlayerProfile;
 
 export type SharedRoster = {
   v: 1;
@@ -9,7 +12,16 @@ export type SharedRoster = {
 const PREFIX = "RAKUSCORE1:";
 
 export function encodeRoster(name: string, players: SharedPlayer[]): string {
-  const pack: SharedRoster = { v: 1, name, players };
+  const pack: SharedRoster = {
+    v: 1,
+    name,
+    players: players.map((p) => ({
+      name: p.name,
+      number: p.number,
+      ...(p.kana ? { kana: p.kana } : {}),
+      ...pickPlayerProfile(p),
+    })),
+  };
   const json = JSON.stringify(pack);
   return PREFIX + btoa(unescape(encodeURIComponent(json)));
 }

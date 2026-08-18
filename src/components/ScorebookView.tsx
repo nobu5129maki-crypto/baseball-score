@@ -51,7 +51,7 @@ export function ScorebookView({
                       <span className="scorebook-empty">　</span>
                     ) : (
                       cell.map((m, i) => (
-                        <div key={`${m.label}-${i}`} className="leading-tight">
+                        <div key={`${m.label}-${i}`} className={`leading-tight ${m.hit ? "scorebook-hit" : ""}`}>
                           {m.label}
                         </div>
                       ))

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { newId } from "./ids";
+import { pickPlayerProfile } from "./player-profile";
 import { POSITIONS } from "./types";
 import type { LineupSlot, Player, Side } from "./types";
 
@@ -53,7 +54,9 @@ export function lineupFromPlayers(players: Player[]): LineupSlot[] {
       order: i + 1,
       playerId: player?.id ?? `vacant-${i + 1}`,
       playerName: player?.name ?? `選手${i + 1}`,
+      number: player?.number,
       position,
+      ...pickPlayerProfile(player),
     };
   });
 }

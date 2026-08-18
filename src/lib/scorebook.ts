@@ -1,9 +1,10 @@
-import { PLAY_SHORT, playLabel } from "./labels";
+import { PLAY_SHORT, isHitResult, playLabel } from "./labels";
 import { battingSide, getBatter, getLineup, reduceGame } from "./engine";
 import type { Game, LineupSlot, PlayResult, Position, Side } from "./types";
 
 export type ScorebookMark = {
   label: string;
+  hit?: boolean;
 };
 
 export type ScorebookPlayer = {
@@ -78,12 +79,18 @@ function sideOf(book: Scorebook, side: Side): ScorebookSide {
   return side === "first" ? book.first : book.second;
 }
 
-function pushMark(side: ScorebookSide, battingOrder: number, inning: number, label: string) {
+function pushMark(
+  side: ScorebookSide,
+  battingOrder: number,
+  inning: number,
+  label: string,
+  hit = false,
+) {
   const row = side.orders.find((o) => o.order === battingOrder);
   if (!row) return;
   const col = inning - 1;
   if (col < 0 || col >= row.innings.length) return;
-  row.innings[col].push({ label });
+  row.innings[col].push(hit ? { label, hit: true } : { label });
 }
 
 function applyPlayerChange(
@@ -122,7 +129,13 @@ export function buildScorebook(game: Game): Scorebook {
 
     if (event.t === "play") {
       const batter = getBatter(before);
-      pushMark(battingBook, batter.order, before.inning, bookPlayLabel(event.result, event.field));
+      pushMark(
+        battingBook,
+        batter.order,
+        before.inning,
+        bookPlayLabel(event.result, event.field),
+        isHitResult(event.result),
+      );
       const scored = event.moves.filter((m) => m.to === 4).length;
       if (scored > 0 && event.result !== "homerun") {
         pushMark(battingBook, batter.order, before.inning, `${scored}点`);

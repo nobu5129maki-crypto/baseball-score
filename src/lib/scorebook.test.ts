@@ -36,6 +36,7 @@ describe("buildScorebook", () => {
     const book = buildScorebook(game);
     const marks = book.first.orders[0].innings[0].map((m) => m.label);
     expect(marks).toContain("左安");
+    expect(book.first.orders[0].innings[0].find((m) => m.label === "左安")?.hit).toBe(true);
     expect(book.innings).toBe(9);
   });
 
@@ -60,6 +61,7 @@ describe("buildScorebook", () => {
     game = commitEnd(game);
     const book = buildScorebook(game);
     expect(book.first.orders[0].innings[0].map((m) => m.label)).toContain("三振");
+    expect(book.first.orders[0].innings[0].find((m) => m.label === "三振")?.hit).toBeUndefined();
   });
 
   it("同じ選手の守備位置変更は名前を増やさない", () => {

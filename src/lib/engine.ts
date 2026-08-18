@@ -479,7 +479,9 @@ function applySub(
 ): GameState {
   const current = getLineup(state, side);
   const nextLineup = current.map((slot) =>
-    slot.order === order ? { ...slot, playerId, playerName, position } : slot,
+    slot.order === order
+      ? { order: slot.order, playerId, playerName, position, number: slot.number }
+      : slot,
   );
   const oldPitcher = current.find((slot) => slot.position === "P")?.playerId;
   const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId;

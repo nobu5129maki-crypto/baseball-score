@@ -142,6 +142,11 @@ select {
     box-shadow: none !important;
   }
 
+  .print-root .scorebook-hit,
+  .print-root .hit-mark {
+    color: #c41e3a !important;
+  }
+
   .print\:hidden {
     display: none !important;
   }
@@ -219,4 +224,10 @@ select {
 
 .scorebook-empty {
   opacity: 0.2;
+}
+
+.scorebook-hit,
+.hit-mark {
+  color: #ff5a5a;
+  font-weight: 700;
 }

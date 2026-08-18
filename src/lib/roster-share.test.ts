@@ -11,4 +11,18 @@ describe("roster share", () => {
     expect(pack?.name).toBe("ひまわり");
     expect(pack?.players[1]).toEqual({ name: "鈴木", number: "8" });
   });
+
+  it("投打と学年もコードに残る", () => {
+    const code = encodeRoster("ひまわり", [
+      { name: "佐藤", number: "1", throws: "right", bats: "left", ageKind: "grade", grade: "小6" },
+    ]);
+    const pack = decodeRoster(code);
+    expect(pack?.players[0]).toMatchObject({
+      name: "佐藤",
+      throws: "right",
+      bats: "left",
+      ageKind: "grade",
+      grade: "小6",
+    });
+  });
 });

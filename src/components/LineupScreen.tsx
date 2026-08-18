@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { LineupBoard } from "@/components/LineupBoard";
 import { commitSub, reduceGame } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
+import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
 import { newId } from "@/lib/ids";
 import type { LineupSlot, Player, Position, Side } from "@/lib/types";
@@ -174,6 +175,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
               playerId: player.id,
               playerName: player.name,
               number: player.number,
+              ...pickPlayerProfile(player),
             })
           }
           onMoveOrder={(from, to) => void moveOrder(from, to)}
@@ -198,6 +200,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
                           playerId: `imp-${newId().slice(0, 8)}-${i + 1}`,
                           playerName: p.name,
                           number: p.number,
+                          ...pickPlayerProfile(p),
                         };
                       });
                       void saveGame({
@@ -233,6 +236,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
                     playerId: `imp-${newId().slice(0, 8)}-${i + 1}`,
                     playerName: p.name,
                     number: p.number,
+                    ...pickPlayerProfile(p),
                   };
                 });
                 void saveGame({

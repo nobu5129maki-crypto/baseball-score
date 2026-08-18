@@ -147,13 +147,25 @@ export type GameEvent =
   | PinchRunnerEvent
   | EndEvent;
 
+export type ThrowsHand = "right" | "left";
+export type BatsSide = "right" | "left" | "switch";
+export type AgeKind = "grade" | "age";
+
+export type PlayerProfile = {
+  throws?: ThrowsHand;
+  bats?: BatsSide;
+  ageKind?: AgeKind;
+  grade?: string;
+  age?: number;
+};
+
 export type LineupSlot = {
   order: number;
   playerId: string;
   playerName: string;
   position: Position;
   number?: string;
-};
+} & PlayerProfile;
 
 export type GameStatus = "lineup" | "in_progress" | "ended";
 
@@ -186,12 +198,12 @@ export type Player = {
   number: string;
   kana?: string;
   createdAt: number;
-};
+} & PlayerProfile;
 
 export type RosterPack = {
   id: string;
   name: string;
-  players: Array<{ name: string; number: string; kana?: string }>;
+  players: Array<{ name: string; number: string; kana?: string } & PlayerProfile>;
   createdAt: number;
 };
 

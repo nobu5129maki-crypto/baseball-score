@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
+import { PlayerProfileFields } from "@/components/PlayerProfileFields";
 import { db, saveTeamName } from "@/lib/db";
 import { newId } from "@/lib/ids";
+import { compactPlayer, pickPlayerProfile, playerProfileLabel } from "@/lib/player-profile";
 import { decodeRoster, encodeRoster } from "@/lib/roster-share";
-import type { Player } from "@/lib/types";
+import type { Player, PlayerProfile } from "@/lib/types";
 
 export default function TeamsPage() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export default function TeamsPage() {
     ]) ?? [];
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
+  const [draft, setDraft] = useState<PlayerProfile>({});
   const [teamName, setTeamName] = useState("");
   const [editing, setEditing] = useState<Player | null>(null);
   const [importText, setImportText] = useState("");
@@ -39,7 +42,7 @@ export default function TeamsPage() {
     const next = teamName.trim();
     if (next) await saveTeamName(team.id, next);
     if (editing) {
-      await db.players.update(editing.id, { name: editing.name, number: editing.number });
+      await db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
       setEditing(null);
     }
   }
@@ -101,18 +104,22 @@ export default function TeamsPage() {
                     value={editing.name}
                     onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="tap tap-accent flex-1"
-                      onClick={() => {
-                        void db.players.update(p.id, { name: editing.name, number: editing.number });
-                        setEditing(null);
-                        setSaved("選手を保存しました");
-                      }}
-                    >
-                      この選手を保存
-                    </button>
+                    <PlayerProfileFields
+                      value={editing}
+                      onChange={(next) => setEditing({ ...editing, ...next })}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="tap tap-accent flex-1"
+                        onClick={() => {
+                          void db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
+                          setEditing(null);
+                          setSaved("選手を保存しました");
+                        }}
+                      >
+                        この選手を保存
+                      </button>
                     <button type="button" className="tap flex-1" onClick={() => setEditing(null)}>
                       キャンセル
                     </button>
@@ -121,7 +128,12 @@ export default function TeamsPage() {
               ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-[#9aa894] w-8">{p.number}</span>
-                  <span className="flex-1 font-bold">{p.name}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="font-bold">{p.name}</span>
+                    {playerProfileLabel(p) ? (
+                      <span className="block text-xs text-[#9aa894]">{playerProfileLabel(p)}</span>
+                    ) : null}
+                  </span>
                   <button type="button" className="text-sm" onClick={() => setEditing(p)}>
                     修正
                   </button>
@@ -155,6 +167,7 @@ export default function TeamsPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+          <PlayerProfileFields value={draft} onChange={setDraft} />
           <button
             type="button"
             className="tap tap-accent"
@@ -165,10 +178,12 @@ export default function TeamsPage() {
                 teamId: team.id,
                 name: name.trim(),
                 number: number.trim(),
+                ...pickPlayerProfile(draft),
                 createdAt: Date.now(),
               });
               setName("");
               setNumber("");
+              setDraft({});
               setSaved("選手を追加しました");
             }}
           >
@@ -186,7 +201,12 @@ export default function TeamsPage() {
               if (!team) return;
               const code = encodeRoster(
                 teamName.trim() || team.name,
-                players.map((p) => ({ name: p.name, number: p.number, kana: p.kana })),
+                players.map((p) => ({
+                  name: p.name,
+                  number: p.number,
+                  kana: p.kana,
+                  ...pickPlayerProfile(p),
+                })),
               );
               setShare(code);
               try {

@@ -1,20 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { InningScoreTable } from "@/components/InningScoreTable";
 import { ScorebookView } from "@/components/ScorebookView";
+import { backupFileName, backupSummary, collectBackup, stringifyBackup } from "@/lib/backup";
+import { deliverBackupFile } from "@/lib/backup-export";
 import { db } from "@/lib/db";
 import { reduceGame, totalRuns } from "@/lib/engine";
 import { buildScorebook } from "@/lib/scorebook";
-import { batterLine, formatObp, gameSlashes } from "@/lib/stats";
+import { formatObp, gameSlashes, type PlayerSlash } from "@/lib/stats";
 
 export default function SummaryPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const game = useLiveQuery(() => (id ? db.games.get(id) : undefined), [id]);
+  const [busy, setBusy] = useState(false);
+  const [backupMessage, setBackupMessage] = useState("");
+  const [backupError, setBackupError] = useState("");
 
   if (!id || !game) {
     return <p className="p-6 text-[#9aa894]">読み込み中…</p>;
@@ -28,6 +34,28 @@ export default function SummaryPage() {
   const winner = fr === sr ? "引き分け" : fr > sr ? `${first}の勝ち` : `${second}の勝ち`;
   const book = buildScorebook(game);
   const slashes = gameSlashes(game);
+
+  async function exportThisGame() {
+    if (busy) return;
+    setBusy(true);
+    setBackupMessage("");
+    setBackupError("");
+    try {
+      const backup = await collectBackup();
+      const text = stringifyBackup(backup);
+      const name = backupFileName(backup.exportedAt);
+      const file = new File([text], name, { type: "application/json" });
+      const delivered = await deliverBackupFile(file);
+      if (delivered === "cancelled") return;
+      setBackupMessage(
+        `${backupSummary(backup)}を書き出しました。ファイルに残すと、履歴を消しても戻せます。`,
+      );
+    } catch {
+      setBackupError("書き出せませんでした。もう一度試してください。");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <main className="print-root max-w-lg mx-auto w-full min-h-dvh print:max-w-none">
@@ -55,9 +83,7 @@ export default function SummaryPage() {
               <span>
                 {p.order} {p.name}
               </span>
-              <span>
-                {batterLine(p)} 出塁{formatObp(p)} 盗{p.sb}
-              </span>
+              <BatterLine p={p} />
             </li>
           ))}
         </ul>
@@ -70,10 +96,28 @@ export default function SummaryPage() {
             記録を見直す
           </Link>
         </div>
+        <div className="print:hidden flex flex-col gap-2">
+          <button type="button" className="tap w-full" disabled={busy} onClick={() => void exportThisGame()}>
+            この試合データをバックアップする
+          </button>
+          {backupMessage ? <p className="text-sm text-[#3ddc84]">{backupMessage}</p> : null}
+          {backupError ? <p className="text-sm text-[#ff5a5a]">{backupError}</p> : null}
+        </div>
         <p className="text-xs text-[#9aa894] print:hidden">
-          印刷するとスコアブックが用紙に出ます。ダイアログで「PDFに保存」も選べます。
+          印刷するとスコアブックが用紙に出ます。ダイアログで「PDFに保存」も選べます。試合データはファイルに残すと、端末の履歴を消しても戻せます。
         </p>
       </div>
     </main>
+  );
+}
+
+function BatterLine({ p }: { p: PlayerSlash }) {
+  const extra = [p.bb ? `四球${p.bb}` : "", p.sb ? `盗塁${p.sb}` : ""].filter(Boolean);
+  return (
+    <span>
+      {p.ab}打数
+      <span className={p.h > 0 ? "hit-mark" : ""}>{p.h}安打</span>
+      {extra.length ? ` ${extra.join(" ")}` : ""} 出塁{formatObp(p)} 盗{p.sb}
+    </span>
   );
 }

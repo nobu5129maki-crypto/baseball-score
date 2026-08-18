@@ -19,23 +19,21 @@ import {
   getBatter,
   getLineup,
   getPitcher,
-  inningLabel,
   needsFieldPosition,
   needsRunnerConfirm,
   previewAfterMoves,
   proposeMoves,
   proposeRunnerHit,
   reduceGame,
-  totalRuns,
   undoAtBat,
   undoLast,
 } from "@/lib/engine";
 import { db, getSettings, saveGame } from "@/lib/db";
-import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS } from "@/lib/labels";
+import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult } from "@/lib/labels";
+import { playerProfileLabel } from "@/lib/player-profile";
 import { batterLine, slashFor, atBatsThisGame } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
-import { BsopBar } from "./BsopBar";
 import { DefenseSheet } from "./DefenseSheet";
 import { DiamondMap } from "./DiamondMap";
 import { GlossarySheet } from "./GlossarySheet";
@@ -113,6 +111,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const occupiedCount = state.bases.filter(Boolean).length;
   const slash = slashFor(game, batter.playerId);
   const atBats = atBatsThisGame(game, batter, state.half);
+  const batterProfile = playerProfileLabel(players?.find((p) => p.id === batter.playerId) ?? batter);
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
   const preview = confirm
     ? previewAfterMoves(state, confirm.moves, batter)
@@ -205,15 +204,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           ←
         </Link>
         <div className="flex-1 text-center">
-          <p className="font-bold">{inningLabel(state.inning, state.half)}</p>
-          <p className="text-sm">
-            <span className={state.half === "top" ? "text-[#f5c518] font-bold" : "text-[#9aa894]"}>
+          <p className="text-sm font-bold">
+            <span className={state.half === "top" ? "text-[#f5c518]" : "text-[#9aa894]"}>
               {state.half === "top" ? "攻 " : ""}
-              {firstName} {totalRuns(state.scores.first)}
+              {firstName}
             </span>
-            <span> — </span>
-            <span className={state.half === "bottom" ? "text-[#f5c518] font-bold" : "text-[#9aa894]"}>
-              {totalRuns(state.scores.second)} {secondName}
+            <span className="text-[#9aa894]"> vs </span>
+            <span className={state.half === "bottom" ? "text-[#f5c518]" : "text-[#9aa894]"}>
+              {secondName}
               {state.half === "bottom" ? " 攻" : ""}
             </span>
           </p>
@@ -223,8 +221,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </button>
       </header>
 
-      <BsopBar state={state} pitcherName={pitcher?.playerName} />
-
       <div className="mx-3 my-2 rounded-2xl border-2 border-[#f5c518] bg-[#1a281c] px-3 py-3">
         <p className="text-[11px] text-[#f5c518] font-bold tracking-wide">
           {state.half === "top" ? firstName : secondName} の攻撃
@@ -233,12 +229,15 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           {batter.order}番 {batter.playerName}
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
+        {batterProfile ? <p className="text-sm text-[#9aa894]">{batterProfile}</p> : null}
         {atBats.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {atBats.map((ab, i) => (
               <span
                 key={`${ab.inning}-${ab.result}-${i}`}
-                className="rounded-lg bg-[#070a08] border border-[#2c3c30] px-2 py-1 text-sm font-bold"
+                className={`rounded-lg bg-[#070a08] border border-[#2c3c30] px-2 py-1 text-sm font-bold ${
+                  isHitResult(ab.result) ? "text-[#ff5a5a]" : ""
+                }`}
               >
                 {ab.inning}回 {ab.label}
               </span>
@@ -257,6 +256,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         selectedId={confirm?.selectedId ?? null}
         edit={Boolean(confirm)}
         showOutButton={Boolean(confirm)}
+        pitcherName={pitcher?.playerName}
         onSelectRunner={onSelectRunner}
         onSelectDest={onSelectDest}
       />
