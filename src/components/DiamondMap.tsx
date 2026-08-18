@@ -6,6 +6,8 @@ import { CountDots } from "./CountDots";
 
 type Props = {
   state: GameState;
+  firstName: string;
+  secondName: string;
   selectedId: string | null;
   edit: boolean;
   showOutButton?: boolean;
@@ -17,6 +19,8 @@ type Props = {
 
 export function DiamondMap({
   state,
+  firstName,
+  secondName,
   selectedId,
   edit,
   showOutButton,
@@ -44,11 +48,12 @@ export function DiamondMap({
 
   return (
     <div className="px-2 py-1">
-      <div className="flex items-end justify-between px-1 mb-1">
-        <p className="text-xl font-bold leading-none">{inningLabel(state.inning, state.half)}</p>
-        <p className="text-xl font-bold leading-none tabular-nums">
-          {firstRuns} − {secondRuns}
-        </p>
+      <div className="flex items-start justify-between px-1 mb-1 gap-3">
+        <p className="text-xl font-bold leading-none pt-0.5">{inningLabel(state.inning, state.half)}</p>
+        <div className="min-w-0 text-right">
+          <ScoreLine name={firstName} runs={firstRuns} active={!state.ended && state.half === "top"} />
+          <ScoreLine name={secondName} runs={secondRuns} active={!state.ended && state.half === "bottom"} />
+        </div>
       </div>
       <svg viewBox="-12 0 364 252" className="w-full max-h-56">
         <polygon
@@ -99,6 +104,15 @@ export function DiamondMap({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ScoreLine({ name, runs, active }: { name: string; runs: number; active: boolean }) {
+  return (
+    <p className={`flex items-baseline justify-end gap-2 font-bold leading-tight ${active ? "text-[#f5c518]" : ""}`}>
+      <span className="truncate max-w-[9.5rem]">{name}</span>
+      <span className="tabular-nums w-6 text-right shrink-0">{runs}</span>
+    </p>
   );
 }
 

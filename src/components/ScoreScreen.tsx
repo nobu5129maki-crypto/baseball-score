@@ -274,6 +274,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
 
       <DiamondMap
         state={state}
+        firstName={firstName}
+        secondName={secondName}
         selectedId={confirm?.selectedId ?? null}
         edit={Boolean(confirm)}
         showOutButton={Boolean(confirm)}
