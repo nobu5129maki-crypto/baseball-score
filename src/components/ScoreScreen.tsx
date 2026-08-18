@@ -30,6 +30,7 @@ import {
   proposeMoves,
   proposeRunnerHit,
   reduceGame,
+  totalRuns,
   undoAtBat,
   undoLast,
 } from "@/lib/engine";
