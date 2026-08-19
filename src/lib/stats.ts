@@ -48,6 +48,50 @@ export function formatSlg(tb: number, ab: number): string {
   return n.toFixed(3).replace(/^0/, "");
 }
 
+export type SlashSortKey = "name" | "pa" | "ab" | "h" | "bb" | "rbi" | "avg" | "obp" | "slg" | "sb" | "ops";
+export type SortDir = "asc" | "desc";
+
+function obpValue(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf">): number | null {
+  const den = p.ab + p.bb + p.hbp + p.sf;
+  if (den === 0) return null;
+  return (p.h + p.bb + p.hbp) / den;
+}
+
+function slgValue(p: Pick<PlayerSlash, "tb" | "ab">): number | null {
+  if (p.ab === 0) return null;
+  return p.tb / p.ab;
+}
+
+export function slashSortValue(p: PlayerSlash, key: SlashSortKey): number | string | null {
+  if (key === "name") return p.name;
+  if (key === "pa") return plateAppearances(p);
+  if (key === "ab") return p.ab;
+  if (key === "h") return p.h;
+  if (key === "bb") return p.bb;
+  if (key === "rbi") return p.rbi;
+  if (key === "avg") return p.ab === 0 ? null : p.h / p.ab;
+  if (key === "obp") return obpValue(p);
+  if (key === "slg") return slgValue(p);
+  if (key === "sb") return p.sb;
+  const obp = obpValue(p);
+  const slg = slgValue(p);
+  if (obp == null && slg == null) return null;
+  return (obp ?? 0) + (slg ?? 0);
+}
+
+export function compareSlashes(a: PlayerSlash, b: PlayerSlash, key: SlashSortKey, dir: SortDir): number {
+  const av = slashSortValue(a, key);
+  const bv = slashSortValue(b, key);
+  if (av == null && bv == null) return a.name.localeCompare(b.name, "ja");
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  let cmp = 0;
+  if (typeof av === "string" && typeof bv === "string") cmp = av.localeCompare(bv, "ja");
+  else cmp = (av as number) - (bv as number);
+  if (cmp === 0) cmp = a.name.localeCompare(b.name, "ja");
+  return dir === "asc" ? cmp : -cmp;
+}
+
 export function formatOps(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" | "tb">): string {
   const den = p.ab + p.bb + p.hbp + p.sf;
   if (den === 0) return "-";

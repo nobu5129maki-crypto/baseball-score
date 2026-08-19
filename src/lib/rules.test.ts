@@ -61,7 +61,7 @@ describe("PLAY_RULES", () => {
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {
-    for (const id of ["fc", "sh", "sf", "ks", "rh", "bk"]) {
+    for (const id of ["fc", "sh", "sf", "ks", "rh", "bk", "rbi", "slg", "ops", "ab"]) {
       expect(GLOSSARY.some((term) => term.id === id)).toBe(true);
     }
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPinchHitter, commitPlay, commitPitch, commitSteal, commitSub } from "./engine";
-import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, formatObp, formatOps, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, slashAcrossGames, slashFor, sumSlashes, teamPitchers } from "./stats";
+import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, compareSlashes, formatObp, formatOps, formatSlg, myTeamPitchers, myTeamSeason, myTeamSlashes, plateAppearances, slashAcrossGames, slashFor, sumSlashes, teamPitchers } from "./stats";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -113,6 +113,29 @@ describe("formatOps / myTeamSlashes", () => {
 
   it("OPSは出塁率と長打率の合計", () => {
     expect(formatOps({ ab: 3, h: 1, bb: 0, hbp: 0, sf: 0, tb: 1 })).toBe(".667");
+  });
+
+  it("長打率は塁打÷打数で、四球や犠飛は打数に入れない", () => {
+    expect(formatSlg(0, 0)).toBe("-");
+    expect(formatSlg(1, 4)).toBe(".250");
+    expect(formatSlg(2, 4)).toBe(".500");
+    expect(formatSlg(4, 1)).toBe("4.000");
+    const single = slashFor(commitPlay(mine(), "single"), "A1");
+    expect(formatSlg(single!.tb, single!.ab)).toBe("1.000");
+    const extra = slashFor(commitPlay(mine(), "double", undefined, "LF"), "A1");
+    expect(extra).toMatchObject({ ab: 1, h: 1, tb: 2 });
+    expect(formatSlg(extra!.tb, extra!.ab)).toBe("2.000");
+    const walked = slashFor(commitPlay(mine(), "walk"), "A1");
+    expect(walked).toMatchObject({ ab: 0, tb: 0, bb: 1 });
+    expect(formatSlg(walked!.tb, walked!.ab)).toBe("-");
+  });
+
+  it("個人成績の並べ替えは打数なしを末尾に置く", () => {
+    const withHit = { ...slashFor(commitPlay(mine(), "single"), "A1")!, name: "安打" };
+    const walked = { ...slashFor(commitPlay(mine(), "walk"), "A1")!, name: "四球", playerId: "W" };
+    expect(compareSlashes(withHit, walked, "slg", "desc")).toBeLessThan(0);
+    const withRbi = { ...slashFor(commitPlay(mine(), "homerun"), "A1")!, name: "本塁" };
+    expect(compareSlashes(withRbi, walked, "rbi", "desc")).toBeLessThan(0);
   });
 
   it("自チームだけ累積し相手は入れない", () => {

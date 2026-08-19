@@ -1,21 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
 import { db } from "@/lib/db";
 import {
+  compareSlashes,
   formatAvg,
   formatObp,
   formatOps,
+  formatSlg,
   myTeamSeason,
   myTeamSlashes,
   plateAppearances,
   sumSlashes,
   type PlayerSlash,
+  type SlashSortKey,
+  type SortDir,
 } from "@/lib/stats";
+
+const COLUMNS: Array<{
+  key: SlashSortKey;
+  label: string;
+  help?: string;
+  align?: "left";
+}> = [
+  { key: "name", label: "選手", align: "left" },
+  { key: "pa", label: "打席" },
+  { key: "ab", label: "打数", help: "ab" },
+  { key: "h", label: "安打" },
+  { key: "rbi", label: "打点", help: "rbi" },
+  { key: "bb", label: "四球" },
+  { key: "avg", label: "打率" },
+  { key: "obp", label: "出塁率" },
+  { key: "slg", label: "長打率", help: "slg" },
+  { key: "sb", label: "盗塁" },
+  { key: "ops", label: "OPS", help: "ops" },
+];
 
 export default function StatsPage() {
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
@@ -31,6 +54,22 @@ export default function StatsPage() {
   const total = sumSlashes(rows);
   const teamName = team?.name ?? "自チーム";
   const [help, setHelp] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SlashSortKey>("avg");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => compareSlashes(a, b, sortKey, sortDir)),
+    [rows, sortKey, sortDir],
+  );
+
+  function tapSort(key: SlashSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "name" ? "asc" : "desc");
+  }
 
   return (
     <main className="print-root max-w-lg mx-auto w-full min-h-dvh print:max-w-none">
@@ -53,10 +92,16 @@ export default function StatsPage() {
               <Stat label="得点" value={String(season.runsFor)} />
               <Stat label="失点" value={String(season.runsAgainst)} />
               <Stat label="安打" value={String(season.batting.h)} />
+              <Stat label="打点" value={String(season.batting.rbi)} onHelp={() => setHelp("rbi")} />
               <Stat label="盗塁" value={String(season.batting.sb)} />
               <Stat label="失策" value={String(season.errors)} />
               <Stat label="打率" value={formatAvg(season.batting.h, season.batting.ab)} />
               <Stat label="出塁率" value={formatObp(season.batting)} />
+              <Stat
+                label="長打率"
+                value={formatSlg(season.batting.tb, season.batting.ab)}
+                onHelp={() => setHelp("slg")}
+              />
               <Stat label="OPS" value={formatOps(season.batting)} onHelp={() => setHelp("ops")} />
             </dl>
           </div>
@@ -71,29 +116,38 @@ export default function StatsPage() {
               <table className="w-full text-sm stats-table">
                 <thead>
                   <tr className="text-[#9aa894] text-right bg-[#121a14]">
-                    <th className="p-2 text-left font-medium sticky left-0 bg-[#121a14]">選手</th>
-                    <th className="p-2 font-medium whitespace-nowrap">打席</th>
-                    <th className="p-2 font-medium whitespace-nowrap">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        打数
-                        <HelpMark label="打数の説明" onClick={() => setHelp("ab")} />
-                      </span>
-                    </th>
-                    <th className="p-2 font-medium whitespace-nowrap">安打</th>
-                    <th className="p-2 font-medium whitespace-nowrap">四球</th>
-                    <th className="p-2 font-medium whitespace-nowrap">打率</th>
-                    <th className="p-2 font-medium whitespace-nowrap">出塁率</th>
-                    <th className="p-2 font-medium whitespace-nowrap">盗塁</th>
-                    <th className="p-2 font-medium whitespace-nowrap">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        OPS
-                        <HelpMark label="OPSの説明" onClick={() => setHelp("ops")} />
-                      </span>
-                    </th>
+                    {COLUMNS.map((col) => (
+                      <th
+                        key={col.key}
+                        className={`p-2 font-medium whitespace-nowrap ${
+                          col.align === "left" ? "text-left sticky left-0 bg-[#121a14]" : ""
+                        }`}
+                        aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                      >
+                        <span
+                          className={`inline-flex items-center gap-1 ${
+                            col.align === "left" ? "justify-start" : "justify-end w-full"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            className="print:hidden inline-flex items-center gap-0.5 font-medium"
+                            onClick={() => tapSort(col.key)}
+                          >
+                            {col.label}
+                            {sortKey === col.key ? (sortDir === "desc" ? "▼" : "▲") : ""}
+                          </button>
+                          <span className="hidden print:inline">{col.label}</span>
+                          {col.help ? (
+                            <HelpMark label={`${col.label}の説明`} onClick={() => setHelp(col.help!)} />
+                          ) : null}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((p) => (
+                  {sorted.map((p) => (
                     <SlashRow key={p.playerId} p={p} />
                   ))}
                   <SlashRow p={total} total />
@@ -101,6 +155,9 @@ export default function StatsPage() {
               </table>
             </div>
           )}
+          {rows.length > 0 ? (
+            <p className="text-xs text-[#9aa894] mt-2 print:hidden">見出しをタップすると並べ替えます。</p>
+          ) : null}
         </section>
 
         <div className="flex gap-2 print:hidden">
@@ -158,9 +215,11 @@ function SlashRow({ p, total }: { p: PlayerSlash; total?: boolean }) {
       <td className="p-2">{plateAppearances(p)}</td>
       <td className="p-2">{p.ab}</td>
       <td className="p-2">{p.h}</td>
+      <td className="p-2">{p.rbi}</td>
       <td className="p-2">{p.bb}</td>
       <td className="p-2">{formatAvg(p.h, p.ab)}</td>
       <td className="p-2">{formatObp(p)}</td>
+      <td className="p-2">{formatSlg(p.tb, p.ab)}</td>
       <td className="p-2">{p.sb}</td>
       <td className="p-2">{formatOps(p)}</td>
     </tr>
