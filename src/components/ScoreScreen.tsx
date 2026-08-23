@@ -35,6 +35,7 @@ import {
   undoLast,
 } from "@/lib/engine";
 import { db, getSettings, saveGame } from "@/lib/db";
+import { applyGameTimes } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD } from "@/lib/rules";
@@ -43,6 +44,7 @@ import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { DefenseSheet } from "./DefenseSheet";
 import { DiamondMap } from "./DiamondMap";
+import { GameTimeFields } from "./GameTimeFields";
 import { GlossarySheet } from "./GlossarySheet";
 import { InningScoreTable } from "./InningScoreTable";
 import { PositionPicker } from "./PositionPicker";
@@ -582,6 +584,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <Link href={`/games/${gameId}/lineup`} className="tap w-full flex items-center justify-center">
               メンバーを修正
             </Link>
+            <GameTimeFields
+              startTime={game.startTime}
+              endTime={game.endTime}
+              onChange={(next) => {
+                void patch((g) => applyGameTimes(g, next));
+              }}
+            />
             <button
               type="button"
               className="tap tap-accent w-full"

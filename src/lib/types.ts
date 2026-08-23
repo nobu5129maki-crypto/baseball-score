@@ -181,6 +181,8 @@ export type Game = {
   mySide: Side;
   scheduledInnings: number;
   date: string;
+  startTime?: string;
+  endTime?: string;
   status: GameStatus;
   firstLineup: LineupSlot[];
   secondLineup: LineupSlot[];

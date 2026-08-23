@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
+import { GameTimeFields } from "@/components/GameTimeFields";
 import { LineupBoard } from "@/components/LineupBoard";
 import { commitSub, reduceGame } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
+import { applyGameTimes, stampStartTime } from "@/lib/game-time";
 import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
 import { newId } from "@/lib/ids";
@@ -261,18 +263,27 @@ export function LineupScreen({ gameId }: { gameId: string }) {
         ) : null}
 
         {game.status === "lineup" ? (
-          <button
-            type="button"
-            className="tap tap-accent"
-            disabled={dup}
-            onClick={() => {
-              void saveGame({ ...game, status: "in_progress" }).then(() =>
-                router.push(`/games/${gameId}/score`),
-              );
-            }}
-          >
-            試合を始める
-          </button>
+          <>
+            <GameTimeFields
+              startTime={game.startTime}
+              endTime={game.endTime}
+              onChange={(next) => {
+                void saveGame(applyGameTimes(game, next));
+              }}
+            />
+            <button
+              type="button"
+              className="tap tap-accent"
+              disabled={dup}
+              onClick={() => {
+                void saveGame({ ...stampStartTime(game), status: "in_progress" }).then(() =>
+                  router.push(`/games/${gameId}/score`),
+                );
+              }}
+            >
+              試合を始める
+            </button>
+          </>
         ) : (
           <button
             type="button"

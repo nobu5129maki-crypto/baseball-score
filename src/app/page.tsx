@@ -5,6 +5,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { db } from "@/lib/db";
 import { inningLabel, reduceGame, totalRuns } from "@/lib/engine";
+import { gameTimeLabel } from "@/lib/game-time";
 import type { Game } from "@/lib/types";
 
 export default function HomePage() {
@@ -78,12 +79,16 @@ function GameCard({
   const state = reduceGame(game);
   const first = game.mySide === "first" ? game.myTeamName : game.opponentName;
   const second = game.mySide === "second" ? game.myTeamName : game.opponentName;
+  const times = gameTimeLabel(game);
   return (
     <Link
       href={href}
       className={`block rounded-2xl border p-4 ${highlight ? "border-[#f5c518] bg-[#1a281c]" : "border-[#2c3c30] bg-[#121a14]"}`}
     >
-      <p className="text-xs text-[#9aa894]">{game.date}</p>
+      <p className="text-xs text-[#9aa894]">
+        {game.date}
+        {times ? `　${times}` : ""}
+      </p>
       <p className="font-bold text-lg mt-1">
         {first} {totalRuns(state.scores.first)} — {totalRuns(state.scores.second)} {second}
       </p>

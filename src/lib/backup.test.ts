@@ -21,6 +21,8 @@ function sample(): ReturnType<typeof makeBackup> {
     mySide: "second",
     scheduledInnings: 7,
     date: "2026-08-15",
+    startTime: "13:00",
+    endTime: "15:20",
     status: "ended",
     firstLineup: [],
     secondLineup: [],
@@ -48,6 +50,8 @@ describe("backup", () => {
     if (!parsed.ok) return;
     expect(parsed.backup.kind).toBe(BACKUP_KIND);
     expect(parsed.backup.games[0].id).toBe("g1");
+    expect(parsed.backup.games[0].startTime).toBe("13:00");
+    expect(parsed.backup.games[0].endTime).toBe("15:20");
     expect(parsed.backup.games[0].events[0].t).toBe("end_game");
     expect(parsed.backup.players[0].name).toBe("佐藤");
     expect(parsed.backup.settings[0].leftHanded).toBe(true);

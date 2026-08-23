@@ -26,6 +26,7 @@ body {
   color: var(--ink);
   min-height: 100%;
   font-family: var(--font-noto), "Hiragino Sans", sans-serif;
+  color-scheme: dark;
 }
 
 body {
@@ -133,6 +134,7 @@ select {
     background: #fff !important;
     color: #111 !important;
     padding: 0;
+    color-scheme: light;
   }
 
   .print-root,

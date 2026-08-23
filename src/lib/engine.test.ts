@@ -343,6 +343,16 @@ describe("らくスコア engine", () => {
     expect(reduceGame(game).ended).toBe(true);
   });
 
+  it("試合終了時に終了時間が空なら入れる", () => {
+    const game = commitEnd(makeGame(), new Date(2026, 7, 23, 15, 20));
+    expect(game.endTime).toBe("15:20");
+  });
+
+  it("終了時間が既にあるときは上書きしない", () => {
+    const game = commitEnd({ ...makeGame(), endTime: "16:00" }, new Date(2026, 7, 23, 15, 20));
+    expect(game.endTime).toBe("16:00");
+  });
+
   it("満塁四球の提案は押し出しを含む", () => {
     let game = makeGame();
     game = commitPlay(game, "single");

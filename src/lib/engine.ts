@@ -14,6 +14,7 @@ import type {
   RunnerOnBase,
   Side,
 } from "./types";
+import { stampEndTime } from "./game-time";
 import { droppedThirdAllowed, needsField } from "./rules";
 import { SCOREBOARD_INNINGS } from "./types";
 
@@ -729,6 +730,6 @@ export function commitPositionSwap(game: Game, side: Side, orderA: number, order
   return next;
 }
 
-export function commitEnd(game: Game): Game {
-  return { ...append(game, { t: "end_game" }), status: "ended" };
+export function commitEnd(game: Game, at = new Date()): Game {
+  return { ...stampEndTime(append(game, { t: "end_game" }), at), status: "ended" };
 }

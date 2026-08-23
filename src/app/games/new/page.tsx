@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
+import { GameTimeFields } from "@/components/GameTimeFields";
 import { db, saveGame } from "@/lib/db";
+import { applyGameTimes } from "@/lib/game-time";
 import { newId } from "@/lib/ids";
 import { lineupFromPlayers, opponentLineup, sidesFor } from "@/lib/seed";
 import type { Side } from "@/lib/types";
@@ -22,6 +24,8 @@ export default function NewGamePage() {
   const today = new Date().toISOString().slice(0, 10);
   const [opponent, setOpponent] = useState("相手チーム");
   const [date, setDate] = useState(today);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [mySide, setMySide] = useState<Side>("second");
   const [innings, setInnings] = useState(7);
   const [busy, setBusy] = useState(false);
@@ -36,21 +40,26 @@ export default function NewGamePage() {
       const opp = opponentLineup();
       const sides = sidesFor(mySide, mine, opp);
       const id = newId();
-      await saveGame({
-        id,
-        myTeamId: team.id,
-        myTeamName: team.name,
-        opponentName: opponent.trim() || "相手",
-        mySide,
-        scheduledInnings: innings,
-        date,
-        status: "lineup",
-        firstLineup: sides.firstLineup,
-        secondLineup: sides.secondLineup,
-        events: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
+      await saveGame(
+        applyGameTimes(
+          {
+            id,
+            myTeamId: team.id,
+            myTeamName: team.name,
+            opponentName: opponent.trim() || "相手",
+            mySide,
+            scheduledInnings: innings,
+            date,
+            status: "lineup",
+            firstLineup: sides.firstLineup,
+            secondLineup: sides.secondLineup,
+            events: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          { startTime, endTime },
+        ),
+      );
       router.push(`/games/${id}/lineup`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "試合を作れませんでした");
@@ -89,6 +98,14 @@ export default function NewGamePage() {
             onChange={(e) => setDate(e.target.value)}
           />
         </label>
+        <GameTimeFields
+          startTime={startTime}
+          endTime={endTime}
+          onChange={(next) => {
+            setStartTime(next.startTime ?? "");
+            setEndTime(next.endTime ?? "");
+          }}
+        />
         <fieldset>
           <legend className="text-sm text-[#9aa894] mb-2">自分たちは</legend>
           <div className="grid grid-cols-2 gap-2">
