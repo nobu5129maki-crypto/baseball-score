@@ -16,6 +16,24 @@ export function clockTime(at = new Date()): string {
   return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
+export function timeToParts(raw: string | undefined): { hour: string; minute: string } {
+  const time = normalizeTime(raw);
+  if (!time) return { hour: "", minute: "" };
+  const [hour, minute] = time.split(":");
+  return { hour, minute };
+}
+
+export function partsToTime(hourRaw: string, minuteRaw: string): string | undefined {
+  const hour = hourRaw.trim();
+  const minute = minuteRaw.trim();
+  if (!hour && !minute) return undefined;
+  if (!/^\d{1,2}$/.test(hour) || !/^\d{1,2}$/.test(minute)) return undefined;
+  const h = Number(hour);
+  const m = Number(minute);
+  if (h > 23 || m > 59) return undefined;
+  return `${pad(h)}:${pad(m)}`;
+}
+
 export function applyGameTimes(game: Game, times: GameTimes): Game {
   const next: Game = { ...game };
   const startTime = normalizeTime(times.startTime);

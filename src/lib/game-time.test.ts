@@ -6,8 +6,10 @@ import {
   gameTimeLabel,
   minutesBetween,
   normalizeTime,
+  partsToTime,
   stampEndTime,
   stampStartTime,
+  timeToParts,
 } from "./game-time";
 import type { Game } from "./types";
 
@@ -50,6 +52,29 @@ describe("clockTime", () => {
   it("現地時刻の時分になる", () => {
     expect(clockTime(new Date(2026, 7, 23, 9, 7))).toBe("09:07");
     expect(clockTime(new Date(2026, 7, 23, 15, 20))).toBe("15:20");
+  });
+});
+
+describe("timeToParts / partsToTime", () => {
+  it("時と分に分解する", () => {
+    expect(timeToParts("13:05")).toEqual({ hour: "13", minute: "05" });
+    expect(timeToParts("")).toEqual({ hour: "", minute: "" });
+    expect(timeToParts("99:99")).toEqual({ hour: "", minute: "" });
+  });
+
+  it("数字の時分をHH:MMにする", () => {
+    expect(partsToTime("9", "7")).toBe("09:07");
+    expect(partsToTime("13", "05")).toBe("13:05");
+    expect(partsToTime("0", "0")).toBe("00:00");
+    expect(partsToTime("", "")).toBeUndefined();
+  });
+
+  it("片方だけ・範囲外は捨てる", () => {
+    expect(partsToTime("13", "")).toBeUndefined();
+    expect(partsToTime("", "05")).toBeUndefined();
+    expect(partsToTime("24", "00")).toBeUndefined();
+    expect(partsToTime("10", "60")).toBeUndefined();
+    expect(partsToTime("1a", "00")).toBeUndefined();
   });
 });
 
