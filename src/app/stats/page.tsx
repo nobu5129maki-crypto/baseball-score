@@ -7,6 +7,15 @@ import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
 import { db } from "@/lib/db";
 import {
+  comparePitchers,
+  formatEra,
+  formatInnings,
+  formatRate,
+  myTeamPitcherStats,
+  type PitcherGameStats,
+  type PitcherSortKey,
+} from "@/lib/pitcher-stats";
+import {
   compareSlashes,
   formatAvg,
   formatObp,
@@ -40,6 +49,34 @@ const COLUMNS: Array<{
   { key: "ops", label: "OPS", help: "ops" },
 ];
 
+type PitchCol = { key: PitcherSortKey; label: string; help?: string; align?: "left" };
+
+const PITCH_COLS_A: PitchCol[] = [
+  { key: "name", label: "名前", align: "left" },
+  { key: "year", label: "西暦" },
+  { key: "games", label: "登板" },
+  { key: "wins", label: "勝利" },
+  { key: "losses", label: "敗戦" },
+  { key: "saves", label: "セーブ", help: "sv" },
+  { key: "ip", label: "回数", help: "ip" },
+  { key: "bb", label: "四球" },
+  { key: "so", label: "三振" },
+  { key: "er", label: "自責" },
+  { key: "era", label: "防御率", help: "era" },
+];
+
+const PITCH_COLS_B: PitchCol[] = [
+  { key: "name", label: "名前", align: "left" },
+  { key: "year", label: "西暦" },
+  { key: "pitches", label: "投球数" },
+  { key: "strikeRate", label: "ストライク率" },
+  { key: "whiffRate", label: "奪空振り率", help: "whiff" },
+  { key: "hits", label: "被安打" },
+  { key: "hr", label: "被本塁打" },
+  { key: "gbRate", label: "ゴロ率" },
+  { key: "fbRate", label: "フライ率" },
+];
+
 export default function StatsPage() {
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
   const games =
@@ -53,13 +90,26 @@ export default function StatsPage() {
   const season = myTeamSeason(mine);
   const total = sumSlashes(rows);
   const teamName = team?.name ?? "自チーム";
+  const pitchers = myTeamPitcherStats(mine);
   const [help, setHelp] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SlashSortKey>("avg");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [pitchSortA, setPitchSortA] = useState<PitcherSortKey>("era");
+  const [pitchDirA, setPitchDirA] = useState<SortDir>("asc");
+  const [pitchSortB, setPitchSortB] = useState<PitcherSortKey>("strikeRate");
+  const [pitchDirB, setPitchDirB] = useState<SortDir>("desc");
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => compareSlashes(a, b, sortKey, sortDir)),
     [rows, sortKey, sortDir],
+  );
+  const sortedPitchA = useMemo(
+    () => [...pitchers].sort((a, b) => comparePitchers(a, b, pitchSortA, pitchDirA)),
+    [pitchers, pitchSortA, pitchDirA],
+  );
+  const sortedPitchB = useMemo(
+    () => [...pitchers].sort((a, b) => comparePitchers(a, b, pitchSortB, pitchDirB)),
+    [pitchers, pitchSortB, pitchDirB],
   );
 
   function tapSort(key: SlashSortKey) {
@@ -69,6 +119,20 @@ export default function StatsPage() {
     }
     setSortKey(key);
     setSortDir(key === "name" ? "asc" : "desc");
+  }
+
+  function tapPitchSort(
+    key: PitcherSortKey,
+    current: PitcherSortKey,
+    setKey: (k: PitcherSortKey) => void,
+    setDir: (d: SortDir | ((x: SortDir) => SortDir)) => void,
+  ) {
+    if (current === key) {
+      setDir((d) => (d === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setKey(key);
+    setDir(key === "name" || key === "era" ? "asc" : "desc");
   }
 
   return (
@@ -160,6 +224,73 @@ export default function StatsPage() {
           ) : null}
         </section>
 
+        <section>
+          <h3 className="font-bold mb-2">投手成績（基本）</h3>
+          {pitchers.length === 0 ? (
+            <p className="text-sm text-[#9aa894]">投手が登板すると、勝利・防御率などがここに集まります。</p>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-[#2c3c30]">
+              <table className="w-full text-sm stats-table">
+                <thead>
+                  <tr className="text-[#9aa894] text-right bg-[#121a14]">
+                    {PITCH_COLS_A.map((col) => (
+                      <PitchTh
+                        key={col.key}
+                        col={col}
+                        sortKey={pitchSortA}
+                        sortDir={pitchDirA}
+                        onSort={() => tapPitchSort(col.key, pitchSortA, setPitchSortA, setPitchDirA)}
+                        onHelp={col.help ? () => setHelp(col.help!) : undefined}
+                      />
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPitchA.map((p) => (
+                    <PitchRowA key={`${p.year}-${p.playerId}`} p={p} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h3 className="font-bold mb-2">投手成績（詳細）</h3>
+          {pitchers.length === 0 ? (
+            <p className="text-sm text-[#9aa894]">投球内容の割合や被安打は、登板記録から集計されます。</p>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-[#2c3c30]">
+              <table className="w-full text-sm stats-table">
+                <thead>
+                  <tr className="text-[#9aa894] text-right bg-[#121a14]">
+                    {PITCH_COLS_B.map((col) => (
+                      <PitchTh
+                        key={col.key}
+                        col={col}
+                        sortKey={pitchSortB}
+                        sortDir={pitchDirB}
+                        onSort={() => tapPitchSort(col.key, pitchSortB, setPitchSortB, setPitchDirB)}
+                        onHelp={col.help ? () => setHelp(col.help!) : undefined}
+                      />
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPitchB.map((p) => (
+                    <PitchRowB key={`${p.year}-${p.playerId}`} p={p} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pitchers.length > 0 ? (
+            <p className="text-xs text-[#9aa894] mt-2 print:hidden">
+              見出しをタップすると並べ替えます。奪空振り率はストライク投球の割合です。
+            </p>
+          ) : null}
+        </section>
+
         <div className="flex gap-2 print:hidden">
           <button type="button" className="tap tap-accent flex-1" onClick={() => window.print()}>
             印刷 / PDF
@@ -222,6 +353,77 @@ function SlashRow({ p, total }: { p: PlayerSlash; total?: boolean }) {
       <td className="p-2">{formatSlg(p.tb, p.ab)}</td>
       <td className="p-2">{p.sb}</td>
       <td className="p-2">{formatOps(p)}</td>
+    </tr>
+  );
+}
+
+function PitchTh({
+  col,
+  sortKey,
+  sortDir,
+  onSort,
+  onHelp,
+}: {
+  col: PitchCol;
+  sortKey: PitcherSortKey;
+  sortDir: SortDir;
+  onSort: () => void;
+  onHelp?: () => void;
+}) {
+  return (
+    <th
+      className={`p-2 font-medium whitespace-nowrap ${
+        col.align === "left" ? "text-left sticky left-0 bg-[#121a14]" : ""
+      }`}
+      aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <span
+        className={`inline-flex items-center gap-1 ${
+          col.align === "left" ? "justify-start" : "justify-end w-full"
+        }`}
+      >
+        <button type="button" className="print:hidden inline-flex items-center gap-0.5 font-medium" onClick={onSort}>
+          {col.label}
+          {sortKey === col.key ? (sortDir === "desc" ? "▼" : "▲") : ""}
+        </button>
+        <span className="hidden print:inline">{col.label}</span>
+        {onHelp ? <HelpMark label={`${col.label}の説明`} onClick={onHelp} /> : null}
+      </span>
+    </th>
+  );
+}
+
+function PitchRowA({ p }: { p: PitcherGameStats }) {
+  return (
+    <tr className="border-t border-[#2c3c30] text-right">
+      <td className="p-2 text-left sticky left-0 whitespace-nowrap bg-[#070a08] font-bold">{p.name}</td>
+      <td className="p-2">{p.year}</td>
+      <td className="p-2">{p.games}</td>
+      <td className="p-2">{p.wins}</td>
+      <td className="p-2">{p.losses}</td>
+      <td className="p-2">{p.saves}</td>
+      <td className="p-2">{formatInnings(p.outs)}</td>
+      <td className="p-2">{p.bb}</td>
+      <td className="p-2">{p.so}</td>
+      <td className="p-2">{p.er}</td>
+      <td className="p-2">{formatEra(p.er, p.outs)}</td>
+    </tr>
+  );
+}
+
+function PitchRowB({ p }: { p: PitcherGameStats }) {
+  const bip = p.groundBalls + p.flyBalls + p.lineBalls;
+  return (
+    <tr className="border-t border-[#2c3c30] text-right">
+      <td className="p-2 text-left sticky left-0 whitespace-nowrap bg-[#070a08] font-bold">{p.name}</td>
+      <td className="p-2">{p.year}</td>
+      <td className="p-2">{p.pitches}</td>
+      <td className="p-2">{formatRate(p.strikes, p.pitches)}</td>
+      <td className="p-2">{formatRate(p.whiffs, p.pitches)}</td>
+      <td className="p-2">{p.hits}</td>
+      <td className="p-2">{p.hr}</td>
+      <td className="p-2">{formatRate(p.groundBalls, bip)}</td>
+      <td className="p-2">{formatRate(p.flyBalls, bip)}</td>
     </tr>
   );
 }
