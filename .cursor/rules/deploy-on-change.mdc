@@ -1,0 +1,20 @@
+---
+description: 修正のたびに GitHub・Vercel・Origin へアップロードする
+alwaysApply: true
+---
+
+# 修正後のアップロード
+
+コードを修正して検証が通ったら、ユーザーに改めて聞かず次を都度実行する。
+
+1. **コミット**（日本語メッセージ）
+2. **GitHub へ push**（このリポジトリの `origin` = GitHub）
+3. **Vercel 本番デプロイ**
+   - GitHub 連携で自動デプロイされる場合は、コミット status / `vercel ls` で Ready を確認する
+   - CLI で上げる場合は `npx vercel --prod --yes`
+   - `Not authorized` なら `npx vercel login` を案内してから再実行する
+4. **Origin（Cursor）**
+   - この環境は Windows のため Origin CLI（origin.cursor.com）は未対応
+   - リモート名 `origin`（GitHub）への push までを完了とし、Cursor Origin が必要な場合はユーザーに伝える
+
+デプロイ完了時は本番 URL（https://baseball-score-blush.vercel.app）を返す。
