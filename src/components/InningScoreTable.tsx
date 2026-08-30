@@ -87,12 +87,9 @@ function ScoreRow({
 }) {
   return (
     <tr className={active ? "bg-[#1a281c]" : ""}>
-      <td className={`p-1 text-left font-bold ${active ? "text-[#f5c518]" : ""}`}>
-        <span className="inline-flex items-baseline gap-1.5 max-w-[9rem]">
-          {active ? <span className="shrink-0">攻</span> : null}
-          <span className="truncate">{name}</span>
-          <span className="tabular-nums shrink-0">{r}</span>
-        </span>
+      <td className={`p-1 text-left font-bold truncate max-w-24 ${active ? "text-[#f5c518]" : ""}`}>
+        {active ? "攻 " : ""}
+        {name}
       </td>
       {innings.map((v, i) => (
         <td key={`${name}-${i}`} className="p-1">

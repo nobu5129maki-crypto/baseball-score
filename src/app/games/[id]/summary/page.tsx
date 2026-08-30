@@ -104,7 +104,7 @@ export default function SummaryPage() {
             {times ? `　${times}` : ""}
           </p>
           <h2 className="text-2xl font-bold text-center mt-1">
-            {first} {fr} — {sr} {second}
+            {first} vs {second}
           </h2>
           <p className="text-center text-[#f5c518] font-bold print:text-black">{winner}</p>
         </header>
