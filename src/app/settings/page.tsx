@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import {
@@ -8,24 +8,16 @@ import {
   backupSummary,
   collectBackup,
   parseBackup,
-  restoreBackup,
   stringifyBackup,
 } from "@/lib/backup";
 import { mergeBackup, mergeSummary } from "@/lib/backup-merge";
 import { deliverBackupFile } from "@/lib/backup-export";
-import { db, getSettings } from "@/lib/db";
 
 export default function SettingsPage() {
-  const [leftHanded, setLeftHanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const mergeRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    void getSettings().then((s) => setLeftHanded(s.leftHanded));
-  }, []);
 
   async function exportBackup() {
     if (busy) return;
@@ -40,36 +32,10 @@ export default function SettingsPage() {
       const delivered = await deliverBackupFile(file, { title: "らくスコア 記録" });
       if (delivered === "cancelled") return;
       setMessage(
-        `${backupSummary(backup)}を書き出しました。LINEやメールで集計係に送るか、ファイルアプリに残してください。`,
+        `${backupSummary(backup)}を書き出しました。ほかの人に送るか、ファイルアプリに残してください。`,
       );
     } catch {
       setError("書き出せませんでした。もう一度試してください。");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onPickMerge(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || busy) return;
-    setBusy(true);
-    setMessage("");
-    setError("");
-    try {
-      const parsed = parseBackup(await file.text());
-      if (!parsed.ok) {
-        setError(parsed.message);
-        return;
-      }
-      const ok = window.confirm(
-        `受け取った記録を、今の成績に足します。今ある試合は消えません。\n${backupSummary(parsed.backup)}を取り込みますか？`,
-      );
-      if (!ok) return;
-      const result = await mergeBackup(parsed.backup);
-      setMessage(mergeSummary(result));
-    } catch {
-      setError("足し合わせできませんでした。らくスコアの記録ファイルか確認してください。");
     } finally {
       setBusy(false);
     }
@@ -89,14 +55,13 @@ export default function SettingsPage() {
         return;
       }
       const ok = window.confirm(
-        `今の試合データは、ファイルの内容に置き換わります。\n${backupSummary(parsed.backup)}を読み込みますか？`,
+        `受け取った記録を、今の成績に足します。今ある試合は消えません。\n${backupSummary(parsed.backup)}を取り込みますか？`,
       );
       if (!ok) return;
-      await restoreBackup(parsed.backup);
-      setMessage(`${backupSummary(parsed.backup)}を読み込みました。`);
-      window.location.assign("/");
+      const result = await mergeBackup(parsed.backup);
+      setMessage(mergeSummary(result));
     } catch {
-      setError("読み込めませんでした。らくスコアのバックアップファイルか確認してください。");
+      setError("読み込めませんでした。らくスコアの記録ファイルか確認してください。");
     } finally {
       setBusy(false);
     }
@@ -107,66 +72,24 @@ export default function SettingsPage() {
       <AppHeader title="設定" backHref="/" />
       <div className="p-4 flex flex-col gap-4">
         <InstallPrompt />
-        <label className="flex items-center justify-between rounded-2xl border border-[#2c3c30] p-4">
-          <span>
-            <span className="block font-bold">左利きレイアウト</span>
-            <span className="text-sm text-[#9aa894]">カウントボタンを下に、結果ボタンを上にします</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={leftHanded}
-            className="w-6 h-6"
-            onChange={(e) => {
-              const v = e.target.checked;
-              setLeftHanded(v);
-              void db.settings.put({ id: "app", leftHanded: v });
-            }}
-          />
-        </label>
 
         <section className="rounded-2xl border border-[#2c3c30] p-4 flex flex-col gap-3">
-          <h2 className="font-bold">ほかの人の記録を足す</h2>
+          <h2 className="font-bold">記録の書き出し・読み込み</h2>
           <p className="text-sm text-[#9aa894] leading-relaxed">
-            集計係が休んで、別の人が記録したとき。記録した人がファイルを送り、集計係がここで足し合わせます。同じ選手は名前と背番号で結びます。今ある試合は消えません。
+            試合・チーム・選手をファイルに残したり、ほかの人の記録を今の成績に足したりできます。同じ選手は名前と背番号で結びます。読み込んでも、今ある試合は消えません。
           </p>
           <button type="button" className="tap tap-accent" disabled={busy} onClick={() => void exportBackup()}>
-            この端末の記録を送る
+            {busy ? "処理中…" : "記録を書き出す"}
           </button>
-          <button type="button" className="tap" disabled={busy} onClick={() => mergeRef.current?.click()}>
-            受け取った記録を足し合わせる
-          </button>
-          <input
-            ref={mergeRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(e) => void onPickMerge(e)}
-          />
-          {message ? <p className="text-sm text-[#3ddc84]">{message}</p> : null}
-          {error ? <p className="text-sm text-[#ff5a5a]">{error}</p> : null}
-        </section>
-
-        <section className="rounded-2xl border border-[#2c3c30] p-4 flex flex-col gap-3">
-          <h2 className="font-bold">データのバックアップ</h2>
-          <p className="text-sm text-[#9aa894] leading-relaxed">
-            試合・チーム・選手をファイルに残します。スマホの閲覧データを消す前に書き出してください。読み込むと、今のデータをファイルの内容に入れ替えます。
-          </p>
-          <button type="button" className="tap" disabled={busy} onClick={() => void exportBackup()}>
-            バックアップを書き出す
-          </button>
-          <button
-            type="button"
-            className="tap"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-          >
-            バックアップを読み込む（入れ替え）
+          <button type="button" className="tap" disabled={busy} onClick={() => fileRef.current?.click()}>
+            記録を読み込む
           </button>
           <input
             ref={fileRef}
             type="file"
             accept="application/json,.json"
             className="hidden"
+            aria-label="記録ファイルを選ぶ"
             onChange={(e) => void onPickFile(e)}
           />
           {message ? <p className="text-sm text-[#3ddc84]">{message}</p> : null}
@@ -174,7 +97,7 @@ export default function SettingsPage() {
         </section>
 
         <p className="text-sm text-[#9aa894]">
-          試合データはこの端末に保存されます。電波がなくても記録できます。
+          試合データはこの端末に保存されます。電波がなくても記録できます。端末のデータを消す前に、記録を書き出しておくと安心です。
         </p>
       </div>
     </main>

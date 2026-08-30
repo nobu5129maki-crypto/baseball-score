@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -34,7 +34,7 @@ import {
   undoAtBat,
   undoLast,
 } from "@/lib/engine";
-import { db, getSettings, saveGame } from "@/lib/db";
+import { db, saveGame } from "@/lib/db";
 import { applyGameTimes } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
@@ -92,12 +92,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     field?: Position;
     selectedId: string | null;
   } | null>(null);
-  const [leftHanded, setLeftHanded] = useState(false);
-
-  useEffect(() => {
-    void getSettings().then((s) => setLeftHanded(s.leftHanded));
-  }, []);
-
   const state = useMemo(() => (game ? reduceGame(game) : null), [game]);
 
   if (game === undefined) {
@@ -421,7 +415,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               }}
             />
           </div>
-          <div className={`px-2 pb-2 ${leftHanded ? "flex flex-col-reverse" : ""}`}>
+          <div className="px-2 pb-2">
             {chooseK ? (
               <div className="mb-2">
                 {allowDroppedThird ? (
