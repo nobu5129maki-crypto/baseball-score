@@ -160,7 +160,7 @@ function EndedGameCard({
       </Link>
       <button
         type="button"
-        className="tap tap-danger w-full text-sm"
+        className="tap tap-danger tap-sm w-full"
         disabled={busy}
         aria-label={`${game.date}の試合を削除`}
         onClick={onDelete}

@@ -92,7 +92,7 @@ export function DiamondMap({
         <CountDots balls={state.balls} strikes={state.strikes} outs={state.outs} />
       </div>
       {pitcherName ? (
-        <p className="text-center text-xs text-[#9aa894] mt-1">
+        <p className="text-center text-sm font-medium text-[#c5d0bf] mt-1">
           今の投手 {pitcherName} {pitchTotal}球 · この打席 {state.pitchCountAtBat}球
         </p>
       ) : null}

@@ -155,7 +155,7 @@ export default function SummaryPage() {
           {game.status === "ended" ? (
             <button
               type="button"
-              className="tap tap-danger w-full"
+              className="tap tap-danger tap-sm w-full"
               disabled={deleteBusy}
               onClick={() => void removeGame()}
             >

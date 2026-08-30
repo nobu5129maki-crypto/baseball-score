@@ -102,6 +102,12 @@ select {
   border-color: #5a2020;
 }
 
+.tap-sm {
+  min-height: 40px;
+  font-size: 0.875rem;
+  border-radius: 10px;
+}
+
 .tap-ghost {
   background: transparent;
 }
