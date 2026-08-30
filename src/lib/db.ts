@@ -1,5 +1,8 @@
 import Dexie, { type EntityTable } from "dexie";
+import { isEndedGameDeletable, type DeleteEndedGameResult } from "./game-delete";
 import type { Game, Player, RosterPack, Settings, Team } from "./types";
+
+export type { DeleteEndedGameResult } from "./game-delete";
 
 export class RakuScoreDB extends Dexie {
   teams!: EntityTable<Team, "id">;
@@ -37,6 +40,15 @@ export const db = new RakuScoreDB();
 
 export async function saveGame(game: Game): Promise<void> {
   await db.games.put({ ...game, updatedAt: Date.now() });
+}
+
+/** 終了した試合だけ削除できる。進行中・打順準備中は消さない。 */
+export async function deleteEndedGame(gameId: string): Promise<DeleteEndedGameResult> {
+  const game = await db.games.get(gameId);
+  if (!game) return "not_found";
+  if (!isEndedGameDeletable(game.status)) return "not_ended";
+  await db.games.delete(gameId);
+  return "deleted";
 }
 
 export async function saveTeamName(teamId: string, name: string): Promise<void> {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameTimeFields } from "@/components/GameTimeFields";
@@ -10,7 +10,7 @@ import { InningScoreTable } from "@/components/InningScoreTable";
 import { ScorebookView } from "@/components/ScorebookView";
 import { collectGameBackup, gameBackupFileName, stringifyBackup } from "@/lib/backup";
 import { deliverBackupFile } from "@/lib/backup-export";
-import { db, saveGame } from "@/lib/db";
+import { db, deleteEndedGame, saveGame } from "@/lib/db";
 import { otherSide, reduceGame, totalRuns } from "@/lib/engine";
 import { applyGameTimes, gameTimeLabel } from "@/lib/game-time";
 import { buildScorebook } from "@/lib/scorebook";
@@ -18,11 +18,14 @@ import { formatObp, gameSlashes, teamPitchers, type PitcherLine, type PlayerSlas
 
 export default function SummaryPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params.id;
   const game = useLiveQuery(() => (id ? db.games.get(id) : undefined), [id]);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [shareError, setShareError] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   async function shareGame() {
     if (!id || shareBusy) return;
@@ -45,6 +48,33 @@ export default function SummaryPage() {
       setShareError("書き出せませんでした。もう一度試してください。");
     } finally {
       setShareBusy(false);
+    }
+  }
+
+  async function removeGame() {
+    if (!id || !game || deleteBusy) return;
+    if (game.status !== "ended") {
+      setDeleteError("終了していない試合は削除できません。");
+      return;
+    }
+    const ok = window.confirm(
+      `この試合データを削除しますか？\n${game.date}　${game.myTeamName} vs ${game.opponentName}\n成績の集計からも消えます。戻すことはできません。`,
+    );
+    if (!ok) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      const result = await deleteEndedGame(id);
+      if (result === "deleted") {
+        router.replace("/");
+        return;
+      }
+      if (result === "not_ended") setDeleteError("終了していない試合は削除できません。");
+      else setDeleteError("試合が見つかりませんでした。");
+    } catch {
+      setDeleteError("削除できませんでした。もう一度試してください。");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -122,9 +152,20 @@ export default function SummaryPage() {
               記録を見直す
             </Link>
           </div>
+          {game.status === "ended" ? (
+            <button
+              type="button"
+              className="tap tap-danger w-full"
+              disabled={deleteBusy}
+              onClick={() => void removeGame()}
+            >
+              {deleteBusy ? "削除中…" : "この試合データを削除"}
+            </button>
+          ) : null}
+          {deleteError ? <p className="text-sm text-[#ff5a5a]">{deleteError}</p> : null}
         </div>
         <p className="text-xs text-[#9aa894] print:hidden">
-          印刷するとスコアブックが用紙に出ます。試合データはファイルに残すと、端末の履歴を消しても戻せます。
+          印刷するとスコアブックが用紙に出ます。試合データはファイルに残すと、端末の履歴を消しても戻せます。削除すると成績からも消えます。
         </p>
       </div>
     </main>
