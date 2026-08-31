@@ -35,7 +35,7 @@ import {
   undoLast,
 } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
-import { applyGameTimes } from "@/lib/game-time";
+import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD } from "@/lib/rules";
@@ -45,7 +45,7 @@ import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, Ru
 import { DefenseSheet } from "./DefenseSheet";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { DiamondMap } from "./DiamondMap";
-import { GameTimeFields } from "./GameTimeFields";
+import { StartTimePrompt } from "./GameTimeFields";
 import { GlossarySheet } from "./GlossarySheet";
 import { InningScoreTable } from "./InningScoreTable";
 import { PositionPicker } from "./PositionPicker";
@@ -236,6 +236,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </button>
       </header>
 
+      {game.status === "in_progress" && !normalizeTime(game.startTime) ? (
+        <StartTimePrompt
+          onSave={(time) => {
+            void patch((g) => applyGameTimes(g, { startTime: time, endTime: g.endTime }));
+          }}
+        />
+      ) : null}
+
       <div className="mx-3 my-2 rounded-2xl border-2 border-[#f5c518] bg-[#1a281c] px-3 py-3">
         <p className="text-[11px] text-[#f5c518] font-bold tracking-wide">
           {state.half === "top" ? firstName : secondName} の攻撃
@@ -290,9 +298,15 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                 ? "サヨナラで試合終了です。"
                 : "試合終了です。"}
           </p>
-          <Link href={`/games/${gameId}/summary`} className="tap tap-accent flex items-center justify-center">
+          <button
+            type="button"
+            className="tap tap-accent w-full"
+            onClick={() => {
+              void patch(commitEnd).then(() => router.push(`/games/${gameId}/summary`));
+            }}
+          >
             詳細を見る
-          </Link>
+          </button>
           <div className="flex gap-2">
             <button
               type="button"
@@ -579,13 +593,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <Link href={`/games/${gameId}/lineup`} className="tap w-full flex items-center justify-center">
               メンバーを修正
             </Link>
-            <GameTimeFields
-              startTime={game.startTime}
-              endTime={game.endTime}
-              onChange={(next) => {
-                void patch((g) => applyGameTimes(g, next));
-              }}
-            />
             <button
               type="button"
               className="tap tap-accent w-full"

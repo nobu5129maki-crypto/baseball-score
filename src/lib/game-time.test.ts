@@ -4,6 +4,7 @@ import {
   clockTime,
   formatDuration,
   gameTimeLabel,
+  gameTimeReadout,
   minutesBetween,
   normalizeTime,
   partsToTime,
@@ -130,5 +131,14 @@ describe("minutesBetween / formatDuration / gameTimeLabel", () => {
     expect(gameTimeLabel({ startTime: "13:00" })).toBe("13:00開始");
     expect(gameTimeLabel({ endTime: "15:20" })).toBe("15:20終了");
     expect(gameTimeLabel({ startTime: "13:00", endTime: "15:20" })).toBe("13:00〜15:20（2時間20分）");
+  });
+
+  it("試合結果向けの読み取り表示を組み立てる", () => {
+    expect(gameTimeReadout({})).toBe("");
+    expect(gameTimeReadout({ startTime: "13:00" })).toBe("開始 13:00");
+    expect(gameTimeReadout({ endTime: "15:20" })).toBe("終了 15:20");
+    expect(gameTimeReadout({ startTime: "13:00", endTime: "15:20" })).toBe(
+      "開始 13:00　終了 15:20　試合時間 2時間20分",
+    );
   });
 });

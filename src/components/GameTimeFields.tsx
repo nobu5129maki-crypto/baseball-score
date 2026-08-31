@@ -1,32 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { clockTime, gameTimeLabel, partsToTime, timeToParts } from "@/lib/game-time";
+import { clockTime, partsToTime, timeToParts } from "@/lib/game-time";
 
-export function GameTimeFields({
-  startTime,
-  endTime,
-  onChange,
-}: {
-  startTime?: string;
-  endTime?: string;
-  onChange: (next: { startTime?: string; endTime?: string }) => void;
-}) {
-  const label = gameTimeLabel({ startTime, endTime });
+/** 試合開始後に一度だけ出す。時刻を入れると親側で消える */
+export function StartTimePrompt({ onSave }: { onSave: (time: string) => void }) {
+  const [value, setValue] = useState("");
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="mx-3 my-2 rounded-2xl border-2 border-[#f5c518] bg-[#1a281c] px-3 py-3">
+      <p className="text-sm font-bold text-[#f5c518]">開始時間</p>
+      <p className="text-xs text-[#9aa894] mt-1 mb-2 leading-relaxed">
+        試合の開始時刻を入れてください。入れるとこの欄は消えます。
+      </p>
       <TimeField
         label="開始時間"
-        value={startTime ?? ""}
-        onChange={(value) => onChange({ startTime: value, endTime })}
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          if (next) onSave(next);
+        }}
       />
-      <TimeField
-        label="終了時間"
-        value={endTime ?? ""}
-        onChange={(value) => onChange({ startTime, endTime: value })}
-      />
-      {label ? <p className="text-sm text-[#9aa894]">{label}</p> : null}
     </div>
   );
 }

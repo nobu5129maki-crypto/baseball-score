@@ -178,6 +178,7 @@ export type Game = {
   myTeamId: string;
   myTeamName: string;
   opponentName: string;
+  venue?: string;
   mySide: Side;
   scheduledInnings: number;
   date: string;

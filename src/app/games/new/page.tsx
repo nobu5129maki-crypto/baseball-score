@@ -1,15 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
-import { GameTimeFields } from "@/components/GameTimeFields";
 import { db, saveGame } from "@/lib/db";
-import { applyGameTimes } from "@/lib/game-time";
 import { newId } from "@/lib/ids";
+import { recentOpponentNames } from "@/lib/opponents";
 import { lineupFromPlayers, opponentLineup, sidesFor } from "@/lib/seed";
 import type { Side } from "@/lib/types";
 
@@ -20,16 +19,24 @@ export default function NewGamePage() {
     useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
       team?.id,
     ]) ?? [];
+  const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
+  const recentOpponents = recentOpponentNames(games);
 
   const today = new Date().toISOString().slice(0, 10);
-  const [opponent, setOpponent] = useState("相手チーム");
+  const [opponent, setOpponent] = useState("");
+  const [venue, setVenue] = useState("");
   const [date, setDate] = useState(today);
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
   const [mySide, setMySide] = useState<Side>("second");
   const [innings, setInnings] = useState(7);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const seededOpponent = useRef(false);
+
+  useEffect(() => {
+    if (seededOpponent.current || !recentOpponents[0]) return;
+    seededOpponent.current = true;
+    setOpponent(recentOpponents[0]);
+  }, [recentOpponents]);
 
   async function create() {
     if (!team || busy) return;
@@ -40,26 +47,23 @@ export default function NewGamePage() {
       const opp = opponentLineup();
       const sides = sidesFor(mySide, mine, opp);
       const id = newId();
-      await saveGame(
-        applyGameTimes(
-          {
-            id,
-            myTeamId: team.id,
-            myTeamName: team.name,
-            opponentName: opponent.trim() || "相手",
-            mySide,
-            scheduledInnings: innings,
-            date,
-            status: "lineup",
-            firstLineup: sides.firstLineup,
-            secondLineup: sides.secondLineup,
-            events: [],
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-          { startTime, endTime },
-        ),
-      );
+      const place = venue.trim();
+      await saveGame({
+        id,
+        myTeamId: team.id,
+        myTeamName: team.name,
+        opponentName: opponent.trim() || "相手",
+        ...(place ? { venue: place } : {}),
+        mySide,
+        scheduledInnings: innings,
+        date,
+        status: "lineup",
+        firstLineup: sides.firstLineup,
+        secondLineup: sides.secondLineup,
+        events: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
       router.push(`/games/${id}/lineup`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "試合を作れませんでした");
@@ -86,7 +90,41 @@ export default function NewGamePage() {
           <input
             className="tap px-3 bg-[#121a14]"
             value={opponent}
+            placeholder="相手のチーム名"
             onChange={(e) => setOpponent(e.target.value)}
+            list="recent-opponents"
+          />
+          <datalist id="recent-opponents">
+            {recentOpponents.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </label>
+        {recentOpponents.length > 0 ? (
+          <div className="flex flex-wrap gap-2 -mt-2">
+            {recentOpponents.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`rounded-full border px-3 py-1.5 text-sm font-bold ${
+                  opponent === name
+                    ? "border-[#f5c518] bg-[#f5c518] text-[#14180c]"
+                    : "border-[#2c3c30] bg-[#121a14] text-[#d5dccf]"
+                }`}
+                onClick={() => setOpponent(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-[#9aa894]">場所</span>
+          <input
+            className="tap px-3 bg-[#121a14]"
+            value={venue}
+            placeholder="例: ○○球場"
+            onChange={(e) => setVenue(e.target.value)}
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -98,14 +136,6 @@ export default function NewGamePage() {
             onChange={(e) => setDate(e.target.value)}
           />
         </label>
-        <GameTimeFields
-          startTime={startTime}
-          endTime={endTime}
-          onChange={(next) => {
-            setStartTime(next.startTime ?? "");
-            setEndTime(next.endTime ?? "");
-          }}
-        />
         <fieldset>
           <legend className="text-sm text-[#9aa894] mb-2">自分たちは</legend>
           <div className="grid grid-cols-2 gap-2">

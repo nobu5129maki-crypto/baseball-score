@@ -5,16 +5,15 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
-import { GameTimeFields } from "@/components/GameTimeFields";
 import { GlossarySheet } from "@/components/GlossarySheet";
 import { InningScoreTable } from "@/components/InningScoreTable";
 import { PlayerIdentity } from "@/components/PlayerIdentity";
 import { ScorebookView } from "@/components/ScorebookView";
 import { collectGameBackup, gameBackupFileName, stringifyBackup } from "@/lib/backup";
 import { deliverBackupFile } from "@/lib/backup-export";
-import { db, deleteEndedGame, saveGame } from "@/lib/db";
+import { db, deleteEndedGame } from "@/lib/db";
 import { otherSide, reduceGame, totalRuns } from "@/lib/engine";
-import { applyGameTimes, gameTimeLabel } from "@/lib/game-time";
+import { gameTimeReadout } from "@/lib/game-time";
 import {
   formatInnings,
   pitcherDecisionMark,
@@ -99,7 +98,7 @@ export default function SummaryPage() {
   const winner = fr === sr ? "引き分け" : fr > sr ? `${first}の勝ち` : `${second}の勝ち`;
   const book = buildScorebook(game);
   const slashes = gameSlashes(game);
-  const times = gameTimeLabel(game);
+  const timeReadout = gameTimeReadout(game);
 
   return (
     <main className="print-root max-w-lg mx-auto w-full min-h-dvh print:max-w-none">
@@ -109,24 +108,18 @@ export default function SummaryPage() {
       <div className="p-4 flex flex-col gap-4 print:p-0">
         <header className="print-heading">
           <p className="text-sm text-[#9aa894] print:text-black">
-            {game.date}　スコアブック
-            {times ? `　${times}` : ""}
+            {game.date}
+            {game.venue ? `　${game.venue}` : ""}
+            　スコアブック
           </p>
           <h2 className="text-2xl font-bold text-center mt-1">
             {first} vs {second}
           </h2>
           <p className="text-center text-[#f5c518] font-bold print:text-black">{winner}</p>
+          {timeReadout ? (
+            <p className="text-sm text-center text-[#9aa894] print:text-black mt-2">{timeReadout}</p>
+          ) : null}
         </header>
-
-        <div className="print:hidden">
-          <GameTimeFields
-            startTime={game.startTime}
-            endTime={game.endTime}
-            onChange={(next) => {
-              void saveGame(applyGameTimes(game, next));
-            }}
-          />
-        </div>
 
         <InningScoreTable game={game} state={state} firstName={first} secondName={second} />
 

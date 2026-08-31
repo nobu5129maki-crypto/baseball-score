@@ -121,6 +121,7 @@ function GameCard({
     >
       <p className="text-xs text-[#9aa894]">
         {game.date}
+        {game.venue ? `　${game.venue}` : ""}
         {times ? `　${times}` : ""}
       </p>
       <p className="font-bold text-lg mt-1">
@@ -159,6 +160,7 @@ function EndedGameCard({
       </button>
       <p className="text-xs text-[#9aa894]">
         {game.date}
+        {game.venue ? `　${game.venue}` : ""}
         {times ? `　${times}` : ""}
       </p>
       <p className="font-bold text-lg mt-1">

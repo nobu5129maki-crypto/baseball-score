@@ -83,6 +83,20 @@ export function gameTimeLabel(game: GameTimes): string {
   return "";
 }
 
+/** 試合結果向け。開始・終了・所要時間を読み取り専用で並べる */
+export function gameTimeReadout(game: GameTimes): string {
+  const start = normalizeTime(game.startTime);
+  const end = normalizeTime(game.endTime);
+  const parts: string[] = [];
+  if (start) parts.push(`開始 ${start}`);
+  if (end) parts.push(`終了 ${end}`);
+  if (start && end) {
+    const duration = minutesBetween(start, end);
+    if (duration != null) parts.push(`試合時間 ${formatDuration(duration)}`);
+  }
+  return parts.join("　");
+}
+
 function toMinutes(raw: string): number | undefined {
   const time = normalizeTime(raw);
   if (!time) return undefined;
