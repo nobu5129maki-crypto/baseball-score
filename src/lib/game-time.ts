@@ -16,6 +16,14 @@ export function clockTime(at = new Date()): string {
   return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
+/** 表示用。「21時31分」「9時5分」 */
+export function formatClockJa(raw: string | undefined): string {
+  const time = normalizeTime(raw);
+  if (!time) return "";
+  const [hour, minute] = time.split(":").map(Number);
+  return `${hour}時${minute}分`;
+}
+
 export function timeToParts(raw: string | undefined): { hour: string; minute: string } {
   const time = normalizeTime(raw);
   if (!time) return { hour: "", minute: "" };

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyGameTimes,
   clockTime,
+  formatClockJa,
   formatDuration,
   gameTimeLabel,
   gameTimeReadout,
@@ -53,6 +54,14 @@ describe("clockTime", () => {
   it("現地時刻の時分になる", () => {
     expect(clockTime(new Date(2026, 7, 23, 9, 7))).toBe("09:07");
     expect(clockTime(new Date(2026, 7, 23, 15, 20))).toBe("15:20");
+  });
+});
+
+describe("formatClockJa", () => {
+  it("日本語の時分表記にする", () => {
+    expect(formatClockJa("21:31")).toBe("21時31分");
+    expect(formatClockJa("09:05")).toBe("9時5分");
+    expect(formatClockJa("")).toBe("");
   });
 });
 

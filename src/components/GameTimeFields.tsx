@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { clockTime, partsToTime, timeToParts } from "@/lib/game-time";
+import { clockTime, formatClockJa, partsToTime, timeToParts } from "@/lib/game-time";
 
-/** 試合開始後に一度だけ出す。時刻を入れると親側で消える */
+/** 試合開始後に一度だけ出す。時刻を入れると確認表示へ切り替わる */
 export function StartTimePrompt({ onSave }: { onSave: (time: string) => void }) {
   const [value, setValue] = useState("");
 
@@ -11,7 +11,7 @@ export function StartTimePrompt({ onSave }: { onSave: (time: string) => void }) 
     <div className="mx-3 my-2 rounded-2xl border-2 border-[#f5c518] bg-[#1a281c] px-3 py-3">
       <p className="text-sm font-bold text-[#f5c518]">開始時間</p>
       <p className="text-xs text-[#9aa894] mt-1 mb-2 leading-relaxed">
-        試合の開始時刻を入れてください。入れるとこの欄は消えます。
+        試合の開始時刻を入れてください。「今」でも好きな時刻でも大丈夫です。
       </p>
       <TimeField
         label="開始時間"
@@ -21,6 +21,49 @@ export function StartTimePrompt({ onSave }: { onSave: (time: string) => void }) 
           if (next) onSave(next);
         }}
       />
+    </div>
+  );
+}
+
+/** 設定完了のひとこと。少し見せてから静かに消える */
+export function StartTimeConfirmed({
+  time,
+  onDismiss,
+  onEdit,
+}: {
+  time: string;
+  onDismiss: () => void;
+  onEdit: () => void;
+}) {
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    const fade = window.setTimeout(() => setLeaving(true), 4200);
+    const gone = window.setTimeout(onDismiss, 5000);
+    return () => {
+      window.clearTimeout(fade);
+      window.clearTimeout(gone);
+    };
+  }, [onDismiss]);
+
+  return (
+    <div
+      className={`mx-3 my-2 rounded-2xl border border-[#3ddc84]/50 bg-[#122018] px-3 py-3 transition-opacity duration-700 ${leaving ? "opacity-0" : "opacity-100"}`}
+      role="status"
+      aria-live="polite"
+    >
+      <p className="text-sm font-bold text-[#3ddc84] leading-relaxed">
+        試合開始は、{formatClockJa(time)}と設定されました
+      </p>
+      <p className="text-xs text-[#9aa894] mt-1 leading-relaxed">このまま記録に進めます。</p>
+      <div className="flex gap-3 mt-2">
+        <button type="button" className="text-xs font-bold text-[#9aa894] underline" onClick={onEdit}>
+          時刻をなおす
+        </button>
+        <button type="button" className="text-xs font-bold text-[#9aa894] underline" onClick={onDismiss}>
+          閉じる
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -45,7 +45,7 @@ import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, Ru
 import { DefenseSheet } from "./DefenseSheet";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { DiamondMap } from "./DiamondMap";
-import { StartTimePrompt } from "./GameTimeFields";
+import { StartTimeConfirmed, StartTimePrompt } from "./GameTimeFields";
 import { GlossarySheet } from "./GlossarySheet";
 import { InningScoreTable } from "./InningScoreTable";
 import { PositionPicker } from "./PositionPicker";
@@ -93,6 +93,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     field?: Position;
     selectedId: string | null;
   } | null>(null);
+  const [startNotice, setStartNotice] = useState<string | null>(null);
+  const dismissStartNotice = useCallback(() => setStartNotice(null), []);
   const state = useMemo(() => (game ? reduceGame(game) : null), [game]);
 
   if (game === undefined) {
@@ -236,9 +238,23 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </button>
       </header>
 
-      {game.status === "in_progress" && !normalizeTime(game.startTime) ? (
+      {startNotice ? (
+        <StartTimeConfirmed
+          time={startNotice}
+          onDismiss={dismissStartNotice}
+          onEdit={() => {
+            setStartNotice(null);
+            void patch((g) => {
+              const next = { ...g };
+              delete next.startTime;
+              return next;
+            });
+          }}
+        />
+      ) : game.status === "in_progress" && !normalizeTime(game.startTime) ? (
         <StartTimePrompt
           onSave={(time) => {
+            setStartNotice(time);
             void patch((g) => applyGameTimes(g, { startTime: time, endTime: g.endTime }));
           }}
         />
