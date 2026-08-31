@@ -371,7 +371,8 @@ export function gamePitcherStats(game: Game): PitcherGameStats[] {
       const relievers = [...map.values()]
         .filter((p) => p.side === winSide && p.playerId !== winPitcherId && p.appeared && p.outs > 0)
         .sort((a, b) => b.outs - a.outs || a.name.localeCompare(b.name, "ja"));
-      winPitcherId = relievers[0]?.playerId ?? null;
+      // 救援がいれば最長登板者へ。いなければ先発に残す（短い試合・コールド）
+      if (relievers[0]) winPitcherId = relievers[0].playerId;
     }
   } else if (loseSide) {
     losePitcherId = record[loseSide];
@@ -417,6 +418,28 @@ export function gamePitcherStats(game: Game): PitcherGameStats[] {
     });
   }
   return rows;
+}
+
+export function pitcherDecisionMark(
+  p: Pick<PitcherGameStats, "wins" | "losses" | "saves">,
+): "勝" | "敗" | "S" | "" {
+  if (p.wins > 0) return "勝";
+  if (p.losses > 0) return "敗";
+  if (p.saves > 0) return "S";
+  return "";
+}
+
+/** 1試合の投手行。勝敗・セーブ・回数・投球数 */
+export function formatPitcherGameLine(
+  p: Pick<PitcherGameStats, "wins" | "losses" | "saves" | "outs" | "pitches">,
+): string {
+  const mark = pitcherDecisionMark(p);
+  const body = `${formatInnings(p.outs)}回 ${p.pitches}球`;
+  return mark ? `${mark} ${body}` : body;
+}
+
+export function teamPitcherStats(game: Game, side: Side): PitcherGameStats[] {
+  return gamePitcherStats(game).filter((p) => p.side === side);
 }
 
 export function formatInnings(outs: number): string {

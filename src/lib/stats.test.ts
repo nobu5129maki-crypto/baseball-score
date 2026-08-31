@@ -74,7 +74,7 @@ describe("batterLine", () => {
         cs: 0,
         r: 0,
       }),
-    ).toBe("3打数1安打");
+    ).toBe("3打数1安打 打点0");
     expect(
       batterLine({
         playerId: "1",
@@ -84,7 +84,7 @@ describe("batterLine", () => {
         ab: 4,
         h: 0,
         hr: 0,
-        rbi: 0,
+        rbi: 2,
         bb: 1,
         hbp: 0,
         sf: 0,
@@ -94,7 +94,7 @@ describe("batterLine", () => {
         cs: 0,
         r: 0,
       }),
-    ).toBe("4打数0安打 四球1");
+    ).toBe("4打数0安打 打点2 四球1");
   });
 });
 

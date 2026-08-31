@@ -103,9 +103,8 @@ export function formatOps(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" 
 }
 
 export function batterLine(p: PlayerSlash): string {
-  const extra = [p.bb ? `四球${p.bb}` : "", p.sb ? `盗塁${p.sb}` : ""].filter(Boolean);
-  const line = `${p.ab}打数${p.h}安打`;
-  return extra.length ? `${line} ${extra.join(" ")}` : line;
+  const extra = [`打点${p.rbi}`, p.bb ? `四球${p.bb}` : "", p.sb ? `盗塁${p.sb}` : ""].filter(Boolean);
+  return `${p.ab}打数${p.h}安打 ${extra.join(" ")}`;
 }
 
 export function batterAtBatLine(p: Pick<PlayerSlash, "ab" | "h" | "hr" | "rbi">): string {

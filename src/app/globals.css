@@ -199,9 +199,18 @@ select {
     margin-bottom: 10px;
   }
 
+  .scorebook-order {
+    width: 2.2em;
+    min-width: 2.2em;
+  }
+
   .scorebook-name {
     width: 8.5em;
     white-space: nowrap;
+  }
+
+  .scorebook-jersey {
+    color: #111;
   }
 
   .scorebook-cell {
@@ -221,9 +230,22 @@ select {
   padding: 4px 5px;
 }
 
+.scorebook-order {
+  width: 2.4em;
+  min-width: 2.4em;
+  font-variant-numeric: tabular-nums;
+}
+
 .scorebook-name {
   min-width: 7.5rem;
-  max-width: 10rem;
+  max-width: 11rem;
+}
+
+.scorebook-jersey {
+  color: var(--muted);
+  font-weight: 600;
+  margin-left: 0.35em;
+  font-variant-numeric: tabular-nums;
 }
 
 .scorebook-inning {

@@ -8,9 +8,11 @@ import {
 import {
   formatEra,
   formatInnings,
+  formatPitcherGameLine,
   formatRate,
   gamePitcherStats,
   myTeamPitcherStats,
+  pitcherDecisionMark,
   starterWinOuts,
 } from "./pitcher-stats";
 import type { Game, LineupSlot, Position } from "./types";
@@ -68,6 +70,19 @@ describe("formatInnings / formatEra / formatRate", () => {
   it("割合は百分率", () => {
     expect(formatRate(1, 2)).toBe("50.0%");
     expect(formatRate(0, 0)).toBe("-");
+  });
+});
+
+describe("pitcherDecisionMark / formatPitcherGameLine", () => {
+  it("勝敗・セーブと回数・投球数を書く", () => {
+    expect(pitcherDecisionMark({ wins: 1, losses: 0, saves: 0 })).toBe("勝");
+    expect(pitcherDecisionMark({ wins: 0, losses: 1, saves: 0 })).toBe("敗");
+    expect(pitcherDecisionMark({ wins: 0, losses: 0, saves: 1 })).toBe("S");
+    expect(pitcherDecisionMark({ wins: 0, losses: 0, saves: 0 })).toBe("");
+    expect(formatPitcherGameLine({ wins: 1, losses: 0, saves: 0, outs: 12, pitches: 58 })).toBe("勝 4回 58球");
+    expect(formatPitcherGameLine({ wins: 0, losses: 1, saves: 0, outs: 6, pitches: 30 })).toBe("敗 2回 30球");
+    expect(formatPitcherGameLine({ wins: 0, losses: 0, saves: 1, outs: 3, pitches: 12 })).toBe("S 1回 12球");
+    expect(formatPitcherGameLine({ wins: 0, losses: 0, saves: 0, outs: 1, pitches: 8 })).toBe("0.1回 8球");
   });
 });
 
@@ -138,26 +153,34 @@ describe("gamePitcherStats", () => {
   });
 
   it("先発が規定回を投げてリードを保てば勝利", () => {
-    // 後攻B。表を抑えて裏に本塁打、以後相手を抑え続ける
     let game = makeGame({ scheduledInnings: 7 });
-    // 1回表 3アウト
     game = retireSide(game);
-    // 1回裏 本塁打 → 1-0、続けて2アウトでイニング終了
     game = commitPlay(game, "homerun", undefined, "LF");
     game = commitPlay(game, "groundout");
     game = commitPlay(game, "groundout");
-    // 2〜4回表を抑える（先発B1が合計4回＝12アウト）
+    game = commitPlay(game, "groundout");
     for (let inn = 0; inn < 3; inn++) {
       game = retireSide(game);
-      // 裏も3アウト（打順を進める）
       game = retireSide(game);
     }
-    // いま B1 は表4回分＝12アウト。試合終了へ
     game = commitEnd(game);
     const b1 = gamePitcherStats(game).find((p) => p.playerId === "B1");
     expect(b1!.outs).toBeGreaterThanOrEqual(12);
     expect(b1!.wins).toBe(1);
     expect(b1!.losses).toBe(0);
+  });
+
+  it("規定回未満でも救援がいなければ先発に勝利が残る", () => {
+    let game = makeGame({ scheduledInnings: 7 });
+    game = retireSide(game);
+    game = commitPlay(game, "homerun", undefined, "LF");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitEnd(game);
+    const b1 = gamePitcherStats(game).find((p) => p.playerId === "B1");
+    expect(b1!.outs).toBeLessThan(starterWinOuts(7));
+    expect(b1!.wins).toBe(1);
   });
 
   it("リードを許した投手が敗戦になる", () => {
@@ -179,32 +202,30 @@ describe("gamePitcherStats", () => {
     expect(b1!.wins).toBe(0);
   });
 
-  it("救援が締めくくり条件を満たせばセーブ", () => {
-    // 先発がリードを作り、途中交代。救援が1点差で残りのアウトを取って終了
+  it("救援が3回以上投げて締めくくればセーブ", () => {
     let game = makeGame({ scheduledInnings: 7 });
-    game = retireSide(game); // 1表
+    game = retireSide(game);
     game = commitPlay(game, "homerun", undefined, "LF");
     game = commitPlay(game, "groundout");
-    game = commitPlay(game, "groundout"); // 1裏 1-0
-    game = retireSide(game); // 2表
-    game = retireSide(game); // 2裏
-    game = retireSide(game); // 3表
-    // 救援に交代（まだリード1）
-    game = commitSub(game, "second", 1, "PX", "救援", "P");
-    game = retireSide(game); // 3裏（打席）— 実際は表の次
-    // 状態を確認しつつ、救援が相手を抑えて終了
-    // 交代後の次の守備イニングで3アウト
-    // いま half を確認するのは難しいので、retire を繰り返して終了
-    for (let i = 0; i < 20 && game.status !== "ended"; i++) {
-      const before = game.events.length;
-      game = commitPlay(game, "groundout");
-      if (game.events.length === before) break;
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    for (let inn = 0; inn < 3; inn++) {
+      game = retireSide(game);
+      game = retireSide(game);
     }
+    game = commitSub(game, "second", 1, "PX", "救援", "P");
+    game = retireSide(game);
+    game = retireSide(game);
+    game = retireSide(game);
+    game = retireSide(game);
+    game = retireSide(game);
     game = commitEnd(game);
+    const b1 = gamePitcherStats(game).find((p) => p.playerId === "B1");
     const px = gamePitcherStats(game).find((p) => p.playerId === "PX");
-    expect(px).toBeTruthy();
-    expect(px!.games).toBe(1);
-    expect(px!.pitches + px!.outs).toBeGreaterThan(0);
+    expect(b1).toMatchObject({ wins: 1, saves: 0 });
+    expect(px).toMatchObject({ wins: 0, saves: 1 });
+    expect(px!.outs).toBeGreaterThanOrEqual(9);
+    expect(formatPitcherGameLine(px!)).toMatch(/^S /);
   });
 
   it("投手交代後は成績が分かれる", () => {

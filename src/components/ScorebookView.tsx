@@ -1,6 +1,7 @@
 "use client";
 
 import { POSITION_SHORT } from "@/lib/types";
+import { jerseyLabel } from "@/lib/labels";
 import type { Scorebook, ScorebookOrder, ScorebookPlayer } from "@/lib/scorebook";
 
 const VIA: Record<ScorebookPlayer["via"], string> = {
@@ -31,7 +32,8 @@ export function ScorebookView({
         <table className="scorebook-table w-full text-center border-collapse">
           <thead>
             <tr>
-              <th className="scorebook-name">打順 / 選手</th>
+              <th className="scorebook-order">打順</th>
+              <th className="scorebook-name">選手</th>
               {Array.from({ length: innings }, (_, i) => (
                 <th key={i} className="scorebook-inning">
                   {i + 1}
@@ -42,6 +44,7 @@ export function ScorebookView({
           <tbody>
             {side.orders.map((row) => (
               <tr key={row.order}>
+                <td className="scorebook-order font-bold tabular-nums align-top">{row.order}</td>
                 <td className="scorebook-name text-left align-top">
                   <OrderNames row={row} />
                 </td>
@@ -68,13 +71,11 @@ export function ScorebookView({
 }
 
 function playerLine(p: ScorebookPlayer) {
-  const num = p.number ? `${p.number} ` : "";
+  const jersey = jerseyLabel(p.number);
   return (
     <>
-      <span className="font-bold">
-        {num}
-        {p.name}
-      </span>{" "}
+      <span className="font-bold">{p.name}</span>
+      {jersey ? <span className="scorebook-jersey">{jersey}</span> : null}{" "}
       <span className="text-[#9aa894]">{POSITION_SHORT[p.position]}</span>
     </>
   );
@@ -88,9 +89,7 @@ function OrderNames({ row }: { row: ScorebookOrder }) {
         return (
           <div key={`${p.playerId}-${i}`} className="leading-tight">
             {i === 0 ? (
-              <>
-                <span className="font-bold">{row.order}</span> {playerLine(p)}
-              </>
+              playerLine(p)
             ) : (
               <>
                 {via ? <span className="text-[#9aa894]">{via} </span> : null}

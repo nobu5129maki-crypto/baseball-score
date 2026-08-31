@@ -56,3 +56,13 @@ export function playLabel(result: PlayResult, field?: Position): string {
   if (!field) return short;
   return `${POSITION_SHORT[field]}${short}`;
 }
+
+/** 打順と区別するため、背番号は #18 と書く */
+export function jerseyLabel(number?: string): string {
+  const n = number?.trim();
+  return n ? `#${n}` : "";
+}
+
+export function orderLabel(order: number): string {
+  return `${order}番`;
+}

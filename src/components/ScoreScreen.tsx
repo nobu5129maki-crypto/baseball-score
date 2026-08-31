@@ -36,13 +36,14 @@ import {
 } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
 import { applyGameTimes } from "@/lib/game-time";
-import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult } from "@/lib/labels";
+import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD } from "@/lib/rules";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { DefenseSheet } from "./DefenseSheet";
+import { PlayerIdentity } from "./PlayerIdentity";
 import { DiamondMap } from "./DiamondMap";
 import { GameTimeFields } from "./GameTimeFields";
 import { GlossarySheet } from "./GlossarySheet";
@@ -239,8 +240,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         <p className="text-[11px] text-[#f5c518] font-bold tracking-wide">
           {state.half === "top" ? firstName : secondName} の攻撃
         </p>
-        <p className="text-2xl font-bold leading-tight mt-0.5 break-words">
-          {batter.order}番{batter.number ? ` ${batter.number}` : ""} {batter.playerName}
+        <p className="leading-tight mt-0.5 break-words">
+          <PlayerIdentity order={batter.order} name={batter.playerName} number={batter.number} size="lg" />
         </p>
         <p className="text-sm text-[#d5dccf]">{POSITION_LABELS[batter.position]}</p>
         {batterProfile ? <p className="text-sm text-[#9aa894]">{batterProfile}</p> : null}
@@ -879,7 +880,7 @@ function PinchSheet({
           disabled={!runner}
           onClick={() => onPick(base, p, position)}
         >
-          {p.number ? `${p.number} ` : ""}
+          {p.number ? `${jerseyLabel(p.number)} ` : ""}
           {p.name} を代走に
         </button>
       ))}
@@ -928,7 +929,8 @@ function PinchHitterSheet({
   return (
     <Sheet title="代打" onClose={onClose}>
       <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-        今の打者 {batter.order}番 {batter.playerName} を代打にします。ボール・ストライクはそのままです。守備位置を変えたいときは「守備位置・交代」から直せます。
+        今の打者 {batter.order}番 {batter.playerName}
+        {batter.number ? ` ${jerseyLabel(batter.number)}` : ""} を代打にします。ボール・ストライクはそのままです。守備位置を変えたいときは「守備位置・交代」から直せます。
       </p>
       {bench.map((p) => (
         <button
@@ -937,7 +939,7 @@ function PinchHitterSheet({
           className="tap tap-result tap-accent w-full mb-2"
           onClick={() => onPick(p)}
         >
-          {p.number ? `${p.number} ` : ""}
+          {p.number ? `${jerseyLabel(p.number)} ` : ""}
           {p.name} を代打に
         </button>
       ))}

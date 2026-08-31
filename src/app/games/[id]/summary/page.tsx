@@ -7,14 +7,21 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameTimeFields } from "@/components/GameTimeFields";
 import { InningScoreTable } from "@/components/InningScoreTable";
+import { PlayerIdentity } from "@/components/PlayerIdentity";
 import { ScorebookView } from "@/components/ScorebookView";
 import { collectGameBackup, gameBackupFileName, stringifyBackup } from "@/lib/backup";
 import { deliverBackupFile } from "@/lib/backup-export";
 import { db, deleteEndedGame, saveGame } from "@/lib/db";
 import { otherSide, reduceGame, totalRuns } from "@/lib/engine";
 import { applyGameTimes, gameTimeLabel } from "@/lib/game-time";
+import {
+  formatInnings,
+  pitcherDecisionMark,
+  teamPitcherStats,
+  type PitcherGameStats,
+} from "@/lib/pitcher-stats";
 import { buildScorebook } from "@/lib/scorebook";
-import { formatObp, gameSlashes, teamPitchers, type PitcherLine, type PlayerSlash } from "@/lib/stats";
+import { gameSlashes, type PlayerSlash } from "@/lib/stats";
 
 export default function SummaryPage() {
   const params = useParams<{ id: string }>();
@@ -124,8 +131,8 @@ export default function SummaryPage() {
         <PitcherStaff
           mineName={game.myTeamName}
           theirsName={game.opponentName}
-          mine={teamPitchers(game, game.mySide)}
-          theirs={teamPitchers(game, otherSide(game.mySide))}
+          mine={teamPitcherStats(game, game.mySide)}
+          theirs={teamPitcherStats(game, otherSide(game.mySide))}
         />
 
         <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
@@ -180,8 +187,8 @@ function PitcherStaff({
 }: {
   mineName: string;
   theirsName: string;
-  mine: PitcherLine[];
-  theirs: PitcherLine[];
+  mine: PitcherGameStats[];
+  theirs: PitcherGameStats[];
 }) {
   return (
     <section className="flex flex-col gap-4">
@@ -192,13 +199,33 @@ function PitcherStaff({
   );
 }
 
+function PitcherRecap({ pitchers }: { pitchers: PitcherGameStats[] }) {
+  const winner = pitchers.find((p) => p.wins > 0);
+  const loser = pitchers.find((p) => p.losses > 0);
+  const closer = pitchers.find((p) => p.saves > 0);
+  const bits = [
+    winner ? `勝利 ${winner.name}` : null,
+    loser ? `敗戦 ${loser.name}` : null,
+    closer ? `セーブ ${closer.name}` : null,
+  ].filter(Boolean);
+  if (bits.length === 0) return null;
+  return <p className="text-sm font-bold text-[#f5c518] print:text-black mb-3">{bits.join("　")}</p>;
+}
+
+function decisionClass(mark: string): string {
+  if (mark === "勝") return "text-[#3ddc84] print:text-black";
+  if (mark === "敗") return "text-[#ff5a5a] print:text-black";
+  if (mark === "S") return "text-[#4aa8ff] print:text-black";
+  return "text-[#9aa894]";
+}
+
 function PitcherTeam({
   title,
   pitchers,
   opponent,
 }: {
   title: string;
-  pitchers: PitcherLine[];
+  pitchers: PitcherGameStats[];
   opponent?: boolean;
 }) {
   return (
@@ -207,14 +234,38 @@ function PitcherTeam({
       {pitchers.length === 0 ? (
         <p className="text-sm text-[#9aa894]">投手の記録はありません。</p>
       ) : (
-        <ul className="text-sm flex flex-col gap-1">
-          {pitchers.map((p) => (
-            <li key={p.playerId} className="flex justify-between border-b border-[#2c3c30] py-2 last:border-b-0">
-              <span className="font-bold">{p.name}</span>
-              <span>{p.pitches}球</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <PitcherRecap pitchers={pitchers} />
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[#9aa894] text-right">
+                <th className="text-left font-medium pb-1">投手</th>
+                <th className="font-medium pb-1">勝敗</th>
+                <th className="font-medium pb-1">S</th>
+                <th className="font-medium pb-1">回数</th>
+                <th className="font-medium pb-1">投球</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pitchers.map((p) => {
+                const mark = pitcherDecisionMark(p);
+                return (
+                  <tr key={p.playerId} className="border-b border-[#2c3c30] last:border-b-0">
+                    <td className="py-2 font-bold text-left pr-2">{p.name}</td>
+                    <td className={`py-2 text-right tabular-nums font-bold ${decisionClass(mark === "S" ? "" : mark)}`}>
+                      {mark === "勝" || mark === "敗" ? mark : "—"}
+                    </td>
+                    <td className={`py-2 text-right tabular-nums font-bold ${decisionClass(mark === "S" ? "S" : "")}`}>
+                      {p.saves > 0 ? "S" : "—"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{formatInnings(p.outs)}</td>
+                    <td className="py-2 text-right tabular-nums">{p.pitches}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
   );
@@ -258,8 +309,8 @@ function BattingTeam({
         <ul className="text-sm flex flex-col gap-1">
           {rows.map((p) => (
             <li key={p.playerId} className="flex justify-between gap-3 border-b border-[#2c3c30] py-2 last:border-b-0">
-              <span className="shrink-0">
-                {p.order} {p.name}
+              <span className="shrink-0 min-w-0">
+                <PlayerIdentity order={p.order} name={p.name} size="sm" />
               </span>
               <BatterLine p={p} />
             </li>
@@ -273,10 +324,11 @@ function BattingTeam({
 function BatterLine({ p }: { p: PlayerSlash }) {
   const extra = [p.bb ? `四球${p.bb}` : "", p.sb ? `盗塁${p.sb}` : ""].filter(Boolean);
   return (
-    <span className="text-right">
+    <span className="text-right tabular-nums">
       {p.ab}打数
       <span className={p.h > 0 ? "hit-mark" : ""}>{p.h}安打</span>
-      {extra.length ? ` ${extra.join(" ")}` : ""} 出塁{formatObp(p)} 盗{p.sb}
+      {` 打点${p.rbi}`}
+      {extra.length ? ` ${extra.join(" ")}` : ""}
     </span>
   );
 }

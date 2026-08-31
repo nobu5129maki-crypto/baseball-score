@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { commitPositionSwap, commitSub } from "@/lib/engine";
+import { jerseyLabel } from "@/lib/labels";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Game, LineupSlot, Position, Side } from "@/lib/types";
 import { Sheet } from "./Sheet";
@@ -167,12 +168,13 @@ export function DefenseSheet({
                 onClick={() => slot && tapFielder(slot)}
               >
                 <span className="block text-[11px] opacity-80">{POSITION_LABELS[pos]}</span>
-                <span className="block font-bold text-sm leading-tight break-words">
+                <span className="block text-sm font-bold leading-tight break-words">
                   {slot?.playerName ?? "空き"}
                 </span>
                 {slot ? (
-                  <span className="block text-[10px] text-[#9aa894]">
-                    {slot.order}番{slot.number ? ` ${slot.number}` : ""}
+                  <span className="block text-[10px] text-[#9aa894] tabular-nums">
+                    {slot.order}番
+                    {slot.number ? `  ${jerseyLabel(slot.number)}` : ""}
                   </span>
                 ) : null}
               </button>
@@ -195,7 +197,7 @@ export function DefenseSheet({
               disabled={!picked}
               onClick={() => sendBench(p)}
             >
-              {p.number ? `${p.number} ` : ""}
+              {p.number ? `${jerseyLabel(p.number)} ` : ""}
               {p.name} を出す
             </button>
           ))}
