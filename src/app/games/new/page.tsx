@@ -8,7 +8,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { db, saveGame } from "@/lib/db";
 import { newId } from "@/lib/ids";
-import { recentOpponentNames } from "@/lib/opponents";
+import { recentOpponentNames, recentVenueNames } from "@/lib/opponents";
 import { lineupFromPlayers, opponentLineup, sidesFor } from "@/lib/seed";
 import type { Side } from "@/lib/types";
 
@@ -21,6 +21,7 @@ export default function NewGamePage() {
     ]) ?? [];
   const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
   const recentOpponents = recentOpponentNames(games);
+  const recentVenues = recentVenueNames(games);
 
   const today = new Date().toISOString().slice(0, 10);
   const [opponent, setOpponent] = useState("");
@@ -31,12 +32,19 @@ export default function NewGamePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const seededOpponent = useRef(false);
+  const seededVenue = useRef(false);
 
   useEffect(() => {
     if (seededOpponent.current || !recentOpponents[0]) return;
     seededOpponent.current = true;
     setOpponent(recentOpponents[0]);
   }, [recentOpponents]);
+
+  useEffect(() => {
+    if (seededVenue.current || !recentVenues[0]) return;
+    seededVenue.current = true;
+    setVenue(recentVenues[0]);
+  }, [recentVenues]);
 
   async function create() {
     if (!team || busy) return;
@@ -125,8 +133,32 @@ export default function NewGamePage() {
             value={venue}
             placeholder="例: ○○球場"
             onChange={(e) => setVenue(e.target.value)}
+            list="recent-venues"
           />
+          <datalist id="recent-venues">
+            {recentVenues.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </label>
+        {recentVenues.length > 0 ? (
+          <div className="flex flex-wrap gap-2 -mt-2">
+            {recentVenues.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`rounded-full border px-3 py-1.5 text-sm font-bold ${
+                  venue === name
+                    ? "border-[#f5c518] bg-[#f5c518] text-[#14180c]"
+                    : "border-[#2c3c30] bg-[#121a14] text-[#d5dccf]"
+                }`}
+                onClick={() => setVenue(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <label className="flex flex-col gap-1">
           <span className="text-sm text-[#9aa894]">日付</span>
           <input

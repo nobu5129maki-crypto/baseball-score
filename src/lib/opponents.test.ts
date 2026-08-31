@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recentOpponentNames } from "./opponents";
+import { recentOpponentNames, recentVenueNames } from "./opponents";
 import type { Game } from "./types";
 
 function game(over: Partial<Game> & Pick<Game, "id" | "opponentName" | "updatedAt">): Game {
@@ -34,5 +34,18 @@ describe("recentOpponentNames", () => {
       game({ id: String(i), opponentName: `相手${i}`, updatedAt: i }),
     );
     expect(recentOpponentNames(games, 3)).toEqual(["相手4", "相手3", "相手2"]);
+  });
+});
+
+describe("recentVenueNames", () => {
+  it("新しい試合の場所から順に、重複なく返す", () => {
+    const names = recentVenueNames([
+      game({ id: "a", opponentName: "A", venue: "市民球場", updatedAt: 1 }),
+      game({ id: "b", opponentName: "B", venue: "中央公園", updatedAt: 3 }),
+      game({ id: "c", opponentName: "C", venue: "市民球場", updatedAt: 2 }),
+      game({ id: "d", opponentName: "D", venue: " 中央公園 ", updatedAt: 4 }),
+      game({ id: "e", opponentName: "E", updatedAt: 5 }),
+    ]);
+    expect(names).toEqual(["中央公園", "市民球場"]);
   });
 });
