@@ -12,6 +12,9 @@ import { recentOpponentNames, recentVenueNames } from "@/lib/opponents";
 import { lineupFromPlayers, opponentLineup, sidesFor } from "@/lib/seed";
 import type { Side } from "@/lib/types";
 
+/** 作成〜遷移のあいだ、再マウントしてもフォームを出さない */
+let suppressForm = false;
+
 export default function NewGamePage() {
   const router = useRouter();
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
@@ -29,10 +32,17 @@ export default function NewGamePage() {
   const [date, setDate] = useState(today);
   const [mySide, setMySide] = useState<Side>("second");
   const [innings, setInnings] = useState(7);
-  const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState(() => suppressForm);
   const [error, setError] = useState("");
   const seededOpponent = useRef(false);
   const seededVenue = useRef(false);
+  const creating = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      suppressForm = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (seededOpponent.current || !recentOpponents[0]) return;
@@ -47,8 +57,10 @@ export default function NewGamePage() {
   }, [recentVenues]);
 
   async function create() {
-    if (!team || busy) return;
-    setBusy(true);
+    if (!team || creating.current || suppressForm) return;
+    creating.current = true;
+    suppressForm = true;
+    setLeaving(true);
     setError("");
     try {
       const mine = lineupFromPlayers(players);
@@ -72,11 +84,22 @@ export default function NewGamePage() {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
-      router.push(`/games/${id}/lineup`);
+      router.replace(`/games/${id}/lineup`);
     } catch (err) {
+      creating.current = false;
+      suppressForm = false;
+      setLeaving(false);
       setError(err instanceof Error ? err.message : "試合を作れませんでした");
-      setBusy(false);
     }
+  }
+
+  if (leaving) {
+    return (
+      <main className="max-w-lg mx-auto w-full min-h-dvh">
+        <AppHeader title="新しい試合" backHref="/" />
+        <p className="p-6 text-[#9aa894]">打順を開いています…</p>
+      </main>
+    );
   }
 
   return (
@@ -202,8 +225,8 @@ export default function NewGamePage() {
           </select>
         </label>
         {error ? <p className="text-sm text-[#ff5a5a]">{error}</p> : null}
-        <button type="submit" className="tap tap-accent mt-2" disabled={!team || busy}>
-          {busy ? "作成中…" : "打順へ進む"}
+        <button type="submit" className="tap tap-accent mt-2" disabled={!team}>
+          打順へ進む
         </button>
       </form>
     </main>
