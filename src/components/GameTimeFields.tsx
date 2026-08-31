@@ -38,8 +38,8 @@ export function StartTimeConfirmed({
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    const fade = window.setTimeout(() => setLeaving(true), 4200);
-    const gone = window.setTimeout(onDismiss, 5000);
+    const fade = window.setTimeout(() => setLeaving(true), 10_000);
+    const gone = window.setTimeout(onDismiss, 15_000);
     return () => {
       window.clearTimeout(fade);
       window.clearTimeout(gone);
@@ -48,7 +48,7 @@ export function StartTimeConfirmed({
 
   return (
     <div
-      className={`mx-3 my-2 rounded-2xl border border-[#3ddc84]/50 bg-[#122018] px-3 py-3 transition-opacity duration-700 ${leaving ? "opacity-0" : "opacity-100"}`}
+      className={`mx-3 my-2 rounded-2xl border border-[#3ddc84]/50 bg-[#122018] px-3 py-3 transition-opacity duration-[5000ms] ${leaving ? "opacity-0" : "opacity-100"}`}
       role="status"
       aria-live="polite"
     >
