@@ -55,8 +55,8 @@ const PITCH_COLS_A: PitchCol[] = [
   { key: "name", label: "名前", align: "left" },
   { key: "year", label: "西暦" },
   { key: "games", label: "登板" },
-  { key: "wins", label: "勝利" },
-  { key: "losses", label: "敗戦" },
+  { key: "wins", label: "勝利", help: "win" },
+  { key: "losses", label: "敗戦", help: "loss" },
   { key: "saves", label: "セーブ", help: "sv" },
   { key: "ip", label: "回数", help: "ip" },
   { key: "bb", label: "四球" },
@@ -226,6 +226,9 @@ export default function StatsPage() {
 
         <section>
           <h3 className="font-bold mb-2">投手成績（基本）</h3>
+          <p className="text-xs text-[#9aa894] leading-relaxed mb-2 print:hidden">
+            勝利はリードを奪ったまま勝ったときの責任投手に付きます。先発は規定回（7回制は4回、9回制は5回）が必要で、足りないときは最長の救援へ（救援がいなければ先発のまま）。見出しの「？」で詳しく見られます。
+          </p>
           {pitchers.length === 0 ? (
             <p className="text-sm text-[#9aa894]">投手が登板すると、勝利・防御率などがここに集まります。</p>
           ) : (

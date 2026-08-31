@@ -291,7 +291,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                 : "試合終了です。"}
           </p>
           <Link href={`/games/${gameId}/summary`} className="tap tap-accent flex items-center justify-center">
-            結果を見る
+            詳細を見る
           </Link>
           <div className="flex gap-2">
             <button

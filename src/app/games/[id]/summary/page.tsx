@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameTimeFields } from "@/components/GameTimeFields";
+import { GlossarySheet } from "@/components/GlossarySheet";
 import { InningScoreTable } from "@/components/InningScoreTable";
 import { PlayerIdentity } from "@/components/PlayerIdentity";
 import { ScorebookView } from "@/components/ScorebookView";
@@ -33,6 +34,7 @@ export default function SummaryPage() {
   const [shareError, setShareError] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [pitchHelp, setPitchHelp] = useState<string | null>(null);
 
   async function shareGame() {
     if (!id || shareBusy) return;
@@ -133,6 +135,7 @@ export default function SummaryPage() {
           theirsName={game.opponentName}
           mine={teamPitcherStats(game, game.mySide)}
           theirs={teamPitcherStats(game, otherSide(game.mySide))}
+          onHelpWin={() => setPitchHelp("win")}
         />
 
         <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
@@ -175,6 +178,7 @@ export default function SummaryPage() {
           印刷するとスコアブックが用紙に出ます。試合データはファイルに残すと、端末の履歴を消しても戻せます。削除すると成績からも消えます。
         </p>
       </div>
+      {pitchHelp ? <GlossarySheet termId={pitchHelp} onClose={() => setPitchHelp(null)} /> : null}
     </main>
   );
 }
@@ -184,15 +188,30 @@ function PitcherStaff({
   theirsName,
   mine,
   theirs,
+  onHelpWin,
 }: {
   mineName: string;
   theirsName: string;
   mine: PitcherGameStats[];
   theirs: PitcherGameStats[];
+  onHelpWin: () => void;
 }) {
   return (
     <section className="flex flex-col gap-4">
-      <h3 className="font-bold">投手成績</h3>
+      <div className="flex items-center gap-2">
+        <h3 className="font-bold">投手成績</h3>
+        <button
+          type="button"
+          className="print:hidden inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#2c3c30] bg-[#070a08] text-xs font-bold text-[#f5c518]"
+          aria-label="勝利投手の条件の説明"
+          onClick={onHelpWin}
+        >
+          ?
+        </button>
+      </div>
+      <p className="text-xs text-[#9aa894] leading-relaxed -mt-2 print:hidden">
+        勝利は、リードを奪ったまま勝ったときの責任投手に付きます。先発は規定回（7回制は4回、9回制は5回）が必要で、足りないときは最長の救援へ移ります（救援がいなければ先発のまま）。「？」で詳しく見られます。
+      </p>
       <PitcherTeam title={`${mineName}（自チーム）`} pitchers={mine} />
       <PitcherTeam title={`${theirsName}（相手）`} pitchers={theirs} opponent />
     </section>

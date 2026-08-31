@@ -92,7 +92,7 @@ export default function HomePage() {
           成績
         </Link>
         <Link href="/settings" className="tap flex-1 flex items-center justify-center text-sm">
-          設定
+          バックアップ
         </Link>
       </nav>
     </main>
@@ -147,26 +147,29 @@ function EndedGameCard({
   const second = game.mySide === "second" ? game.myTeamName : game.opponentName;
   const times = gameTimeLabel(game);
   return (
-    <div className="rounded-2xl border border-[#2c3c30] bg-[#121a14] p-4 flex flex-col gap-3">
-      <Link href={`/games/${game.id}/summary`} className="block">
-        <p className="text-xs text-[#9aa894]">
-          {game.date}
-          {times ? `　${times}` : ""}
-        </p>
-        <p className="font-bold text-lg mt-1">
-          {first} {totalRuns(state.scores.first)} — {totalRuns(state.scores.second)} {second}
-        </p>
-        <p className="text-sm text-[#9aa894] mt-1">終了 · 結果を見る</p>
-      </Link>
+    <div className="relative rounded-2xl border border-[#2c3c30] bg-[#121a14] p-4 pr-16">
       <button
         type="button"
-        className="tap tap-danger tap-sm w-full"
+        className="absolute top-2.5 right-2.5 tap tap-danger tap-sm px-2.5 min-h-8 text-xs"
         disabled={busy}
         aria-label={`${game.date}の試合を削除`}
         onClick={onDelete}
       >
-        {busy ? "削除中…" : "この試合を削除"}
+        {busy ? "…" : "削除"}
       </button>
+      <p className="text-xs text-[#9aa894]">
+        {game.date}
+        {times ? `　${times}` : ""}
+      </p>
+      <p className="font-bold text-lg mt-1">
+        {first} {totalRuns(state.scores.first)} — {totalRuns(state.scores.second)} {second}
+      </p>
+      <Link
+        href={`/games/${game.id}/summary`}
+        className="tap tap-sm mt-3 w-full flex items-center justify-center"
+      >
+        詳細を見る
+      </Link>
     </div>
   );
 }
