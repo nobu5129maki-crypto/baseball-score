@@ -8,7 +8,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { db, saveGame } from "@/lib/db";
 import { newId } from "@/lib/ids";
-import { recentOpponentNames, recentVenueNames } from "@/lib/opponents";
+import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
 import { lineupFromPlayers, opponentLineup, sidesFor } from "@/lib/seed";
 import type { Side } from "@/lib/types";
 
@@ -24,10 +24,12 @@ export default function NewGamePage() {
     ]) ?? [];
   const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
   const recentOpponents = recentOpponentNames(games);
+  const recentTournaments = recentTournamentNames(games);
   const recentVenues = recentVenueNames(games);
 
   const today = new Date().toISOString().slice(0, 10);
   const [opponent, setOpponent] = useState("");
+  const [tournament, setTournament] = useState("");
   const [venue, setVenue] = useState("");
   const [date, setDate] = useState(today);
   const [mySide, setMySide] = useState<Side>("second");
@@ -35,6 +37,7 @@ export default function NewGamePage() {
   const [leaving, setLeaving] = useState(() => suppressForm);
   const [error, setError] = useState("");
   const seededOpponent = useRef(false);
+  const seededTournament = useRef(false);
   const seededVenue = useRef(false);
   const creating = useRef(false);
 
@@ -49,6 +52,12 @@ export default function NewGamePage() {
     seededOpponent.current = true;
     setOpponent(recentOpponents[0]);
   }, [recentOpponents]);
+
+  useEffect(() => {
+    if (seededTournament.current || !recentTournaments[0]) return;
+    seededTournament.current = true;
+    setTournament(recentTournaments[0]);
+  }, [recentTournaments]);
 
   useEffect(() => {
     if (seededVenue.current || !recentVenues[0]) return;
@@ -67,12 +76,14 @@ export default function NewGamePage() {
       const opp = opponentLineup();
       const sides = sidesFor(mySide, mine, opp);
       const id = newId();
+      const meet = tournament.trim();
       const place = venue.trim();
       await saveGame({
         id,
         myTeamId: team.id,
         myTeamName: team.name,
         opponentName: opponent.trim() || "相手",
+        ...(meet ? { tournament: meet } : {}),
         ...(place ? { venue: place } : {}),
         mySide,
         scheduledInnings: innings,
@@ -143,6 +154,39 @@ export default function NewGamePage() {
                     : "border-[#2c3c30] bg-[#121a14] text-[#d5dccf]"
                 }`}
                 onClick={() => setOpponent(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-[#9aa894]">大会名</span>
+          <input
+            className="tap px-3 bg-[#121a14]"
+            value={tournament}
+            placeholder="例: 春季大会（任意）"
+            onChange={(e) => setTournament(e.target.value)}
+            list="recent-tournaments"
+          />
+          <datalist id="recent-tournaments">
+            {recentTournaments.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </label>
+        {recentTournaments.length > 0 ? (
+          <div className="flex flex-wrap gap-2 -mt-2">
+            {recentTournaments.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`rounded-full border px-3 py-1.5 text-sm font-bold ${
+                  tournament === name
+                    ? "border-[#f5c518] bg-[#f5c518] text-[#14180c]"
+                    : "border-[#2c3c30] bg-[#121a14] text-[#d5dccf]"
+                }`}
+                onClick={() => setTournament(name)}
               >
                 {name}
               </button>

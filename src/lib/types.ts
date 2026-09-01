@@ -178,6 +178,8 @@ export type Game = {
   myTeamId: string;
   myTeamName: string;
   opponentName: string;
+  /** 大会名・リーグ名など（任意） */
+  tournament?: string;
   venue?: string;
   mySide: Side;
   scheduledInnings: number;

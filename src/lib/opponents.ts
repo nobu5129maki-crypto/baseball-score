@@ -36,3 +36,13 @@ export function recentVenueNames(games: Game[], limit = 8): string[] {
     limit,
   );
 }
+
+/** 最近使った大会名（新しい順・重複なし） */
+export function recentTournamentNames(games: Game[], limit = 8): string[] {
+  return recentUniqueNames(
+    games
+      .filter((game) => game.tournament)
+      .map((game) => ({ value: game.tournament!, updatedAt: game.updatedAt })),
+    limit,
+  );
+}

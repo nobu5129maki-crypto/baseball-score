@@ -109,6 +109,7 @@ export default function SummaryPage() {
         <header className="print-heading">
           <p className="text-sm text-[#9aa894] print:text-black">
             {game.date}
+            {game.tournament ? `　${game.tournament}` : ""}
             {game.venue ? `　${game.venue}` : ""}
             　スコアブック
           </p>
