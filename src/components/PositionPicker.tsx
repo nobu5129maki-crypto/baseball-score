@@ -4,17 +4,17 @@ import { POSITION_LABELS, POSITION_SHORT } from "@/lib/types";
 import type { Position } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
-/** 本塁を下にした守備位置図（実際のグラウンド配置） */
+/** 本塁を下にした守備位置図。遊撃は三塁と投手の間、二塁は投手と一塁の間 */
 const FIELD: Array<{ pos: Position; className: string }> = [
-  { pos: "CF", className: "col-start-2 row-start-1" },
-  { pos: "LF", className: "col-start-1 row-start-2" },
-  { pos: "RF", className: "col-start-3 row-start-2" },
-  { pos: "SS", className: "col-start-1 row-start-3" },
-  { pos: "2B", className: "col-start-3 row-start-3" },
-  { pos: "3B", className: "col-start-1 row-start-4" },
-  { pos: "P", className: "col-start-2 row-start-4" },
-  { pos: "1B", className: "col-start-3 row-start-4" },
-  { pos: "C", className: "col-start-2 row-start-5" },
+  { pos: "CF", className: "col-start-3 col-span-2 row-start-1" },
+  { pos: "LF", className: "col-start-1 col-span-2 row-start-2" },
+  { pos: "RF", className: "col-start-5 col-span-2 row-start-2" },
+  { pos: "SS", className: "col-start-2 col-span-2 row-start-3" },
+  { pos: "2B", className: "col-start-4 col-span-2 row-start-3" },
+  { pos: "3B", className: "col-start-1 col-span-2 row-start-4" },
+  { pos: "P", className: "col-start-3 col-span-2 row-start-4" },
+  { pos: "1B", className: "col-start-5 col-span-2 row-start-4" },
+  { pos: "C", className: "col-start-3 col-span-2 row-start-5" },
 ];
 
 export function PositionPicker({
@@ -54,7 +54,7 @@ export function PositionPicker({
 
         <div className="relative p-3 pt-4">
           <p className="text-center text-[11px] font-bold text-[#9aa894] tracking-widest mb-2">外野</p>
-          <div className="grid grid-cols-3 grid-rows-5 gap-2">
+          <div className="grid grid-cols-6 grid-rows-5 gap-2">
             {FIELD.map(({ pos, className }) => (
               <button
                 key={pos}
