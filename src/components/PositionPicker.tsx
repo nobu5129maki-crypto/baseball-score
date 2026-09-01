@@ -1,6 +1,6 @@
 "use client";
 
-import { POSITION_LABELS, POSITION_NUMBERS } from "@/lib/types";
+import { POSITION_LABELS, POSITION_NUMBERS, POSITION_SHORT } from "@/lib/types";
 import type { Position } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
@@ -29,7 +29,7 @@ export function PositionPicker({
   return (
     <Sheet title={title} onClose={onClose} tall>
       <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-        本塁から見て、打球が飛んだ場所をタップしてください。数字は守備番号です。図の上側が外野です。
+        本塁から見て、打球が飛んだ場所をタップしてください。数字は守備番号、漢字は略称です。図の上側が外野です。
       </p>
 
       <div className="relative rounded-2xl border border-[#2c3c30] bg-[#0d140f] overflow-hidden mb-2">
@@ -64,8 +64,9 @@ export function PositionPicker({
                 }`}
                 onClick={() => onPick(pos)}
               >
-                <span className="text-xl font-bold leading-none tabular-nums text-[#f5c518]">
-                  {POSITION_NUMBERS[pos]}
+                <span className="flex items-baseline justify-center gap-1 leading-none text-[#f5c518]">
+                  <span className="text-xl font-bold tabular-nums">{POSITION_NUMBERS[pos]}</span>
+                  <span className="text-base font-bold">{POSITION_SHORT[pos]}</span>
                 </span>
                 <span className="text-xs font-bold leading-tight text-center">{POSITION_LABELS[pos]}</span>
               </button>

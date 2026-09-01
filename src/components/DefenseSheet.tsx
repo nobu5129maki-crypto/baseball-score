@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { commitPositionSwap, commitSub } from "@/lib/engine";
 import { jerseyLabel } from "@/lib/labels";
-import { POSITION_LABELS, POSITION_NUMBERS } from "@/lib/types";
+import { POSITION_LABELS, POSITION_NUMBERS, POSITION_SHORT } from "@/lib/types";
 import type { Game, LineupSlot, Position, Side } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
@@ -169,6 +169,7 @@ export function DefenseSheet({
               >
                 <span className="block text-[11px] opacity-80">
                   <span className="font-bold tabular-nums text-[#f5c518]">{POSITION_NUMBERS[pos]}</span>
+                  <span className="font-bold text-[#f5c518]">{POSITION_SHORT[pos]}</span>
                   {" "}
                   {POSITION_LABELS[pos]}
                 </span>
