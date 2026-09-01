@@ -1,5 +1,15 @@
 import { playLabel } from "./labels";
-import { battingSide, fieldingSide, getBatter, getLineup, otherSide, playAddsPitch, reduceGame, totalRuns } from "./engine";
+import {
+  battingSide,
+  fieldingSide,
+  getBatter,
+  getLineup,
+  getPitcherOnSide,
+  otherSide,
+  playAddsPitch,
+  reduceGame,
+  totalRuns,
+} from "./engine";
 import { playAwardsRbi, playHitValue, playIsAtBat } from "./rules";
 import type { Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
@@ -308,7 +318,7 @@ export function myTeamPitchers(game: Game): PitcherLine[] {
 }
 
 function pitcherOnSide(state: ReturnType<typeof reduceGame>, side: Side): LineupSlot | undefined {
-  return getLineup(state, side).find((slot) => slot.position === "P");
+  return getPitcherOnSide(state, side);
 }
 
 function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {

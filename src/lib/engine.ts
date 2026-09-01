@@ -7,6 +7,7 @@ import type {
   GameState,
   Half,
   LineupSlot,
+  PitcherOnly,
   PitchKind,
   PlayResult,
   Position,
@@ -16,7 +17,7 @@ import type {
 } from "./types";
 import { stampEndTime } from "./game-time";
 import { droppedThirdAllowed, needsField } from "./rules";
-import { SCOREBOARD_INNINGS } from "./types";
+import { PITCHER_ORDER, SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
   return half === "top" ? "first" : "second";
@@ -31,7 +32,15 @@ export function otherSide(side: Side): Side {
 }
 
 export function emptyState(
-  game: Pick<Game, "scheduledInnings" | "firstLineup" | "secondLineup">,
+  game: Pick<
+    Game,
+    | "scheduledInnings"
+    | "firstLineup"
+    | "secondLineup"
+    | "useDh"
+    | "firstPitcher"
+    | "secondPitcher"
+  >,
 ): GameState {
   const innings = Math.max(SCOREBOARD_INNINGS, game.scheduledInnings);
   return {
@@ -50,8 +59,11 @@ export function emptyState(
     errors: { first: 0, second: 0 },
     pitchCountAtBat: 0,
     pitchesThrown: { first: 0, second: 0 },
+    useDh: Boolean(game.useDh),
     firstLineup: game.firstLineup.map((slot) => ({ ...slot })),
     secondLineup: game.secondLineup.map((slot) => ({ ...slot })),
+    firstPitcher: game.firstPitcher ? { ...game.firstPitcher } : undefined,
+    secondPitcher: game.secondPitcher ? { ...game.secondPitcher } : undefined,
     ended: false,
     regulationComplete: false,
     bottomUnplayed: false,
@@ -88,9 +100,22 @@ export function totalRuns(scores: number[]): number {
   return scores.reduce((sum, n) => sum + n, 0);
 }
 
-export function getPitcher(state: GameState): LineupSlot | undefined {
-  const side = fieldingSide(state.half);
+export function getPitcherOnSide(state: GameState, side: Side): LineupSlot | undefined {
+  if (state.useDh) {
+    const pitcher = side === "first" ? state.firstPitcher : state.secondPitcher;
+    if (!pitcher) return undefined;
+    return { order: PITCHER_ORDER, position: "P", ...pitcher };
+  }
   return getLineup(state, side).find((slot) => slot.position === "P");
+}
+
+export function getPitcher(state: GameState): LineupSlot | undefined {
+  return getPitcherOnSide(state, fieldingSide(state.half));
+}
+
+export function getPitcherOnly(state: GameState, side: Side): PitcherOnly | undefined {
+  if (!state.useDh) return undefined;
+  return side === "first" ? state.firstPitcher : state.secondPitcher;
 }
 
 export function needsStrikeThreeChoice(state: GameState): boolean {
@@ -542,7 +567,21 @@ function applySub(
   position: Position,
   number?: string,
 ): GameState {
+  if (state.useDh && (order === PITCHER_ORDER || position === "P")) {
+    const oldPitcher = (side === "first" ? state.firstPitcher : state.secondPitcher)?.playerId;
+    const nextPitcher: PitcherOnly = { playerId, playerName, number };
+    const pitchesThrown =
+      oldPitcher !== playerId
+        ? { ...state.pitchesThrown, [side]: 0 }
+        : state.pitchesThrown;
+    if (side === "first") {
+      return { ...state, firstPitcher: nextPitcher, pitchesThrown };
+    }
+    return { ...state, secondPitcher: nextPitcher, pitchesThrown };
+  }
+
   const current = getLineup(state, side);
+  const nextPosition = state.useDh && position === "P" ? "DH" : position;
   const nextLineup = current.map((slot) => {
     if (slot.order !== order) return slot;
     const samePlayer = slot.playerId === playerId;
@@ -551,16 +590,16 @@ function applySub(
         ...slot,
         playerId,
         playerName,
-        position,
+        position: nextPosition,
         number: number ?? slot.number,
       };
     }
-    return { order: slot.order, playerId, playerName, position, number };
+    return { order: slot.order, playerId, playerName, position: nextPosition, number };
   });
-  const oldPitcher = current.find((slot) => slot.position === "P")?.playerId;
-  const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId;
+  const oldPitcher = getPitcherOnSide(state, side)?.playerId;
+  const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId ?? oldPitcher;
   const pitchesThrown =
-    oldPitcher !== newPitcher
+    !state.useDh && oldPitcher !== newPitcher
       ? { ...state.pitchesThrown, [side]: 0 }
       : state.pitchesThrown;
   if (side === "first") {

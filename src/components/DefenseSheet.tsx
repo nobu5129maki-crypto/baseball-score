@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { commitPositionSwap, commitSub } from "@/lib/engine";
 import { jerseyLabel } from "@/lib/labels";
-import { POSITION_LABELS, POSITION_NUMBERS, POSITION_SHORT } from "@/lib/types";
-import type { Game, LineupSlot, Position, Side } from "@/lib/types";
+import { PITCHER_ORDER, POSITION_LABELS, POSITION_NUMBERS, POSITION_SHORT } from "@/lib/types";
+import type { Game, LineupSlot, PitcherOnly, Position, Side } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
 const FIELD: Array<{ pos: Position; className: string }> = [
@@ -29,6 +29,9 @@ export function DefenseSheet({
   myTeamName,
   opponentName,
   players,
+  useDh = false,
+  myPitcher,
+  otherPitcher,
   onApply,
   onClose,
 }: {
@@ -39,6 +42,9 @@ export function DefenseSheet({
   myTeamName: string;
   opponentName: string;
   players: { id: string; name: string; number?: string }[];
+  useDh?: boolean;
+  myPitcher?: PitcherOnly;
+  otherPitcher?: PitcherOnly;
   onApply: (mut: (g: Game) => Game) => void;
   onClose: () => void;
 }) {
@@ -48,12 +54,25 @@ export function DefenseSheet({
   const [typedName, setTypedName] = useState("");
 
   const slots = side === mySide ? lineup : otherLineup;
+  const pitcher = side === mySide ? myPitcher : otherPitcher;
   const mine = side === mySide;
-  const activeIds = useMemo(() => new Set(slots.map((s) => s.playerId)), [slots]);
+  const activeIds = useMemo(() => {
+    const ids = new Set(slots.map((s) => s.playerId));
+    if (pitcher) ids.add(pitcher.playerId);
+    return ids;
+  }, [slots, pitcher]);
   const bench = mine ? players.filter((p) => !activeIds.has(p.id)) : [];
-  const picked = slots.find((s) => s.order === pickedOrder) ?? null;
+  const pitcherSlot: LineupSlot | null =
+    useDh && pitcher
+      ? { order: PITCHER_ORDER, position: "P", ...pitcher }
+      : null;
+  const picked =
+    pickedOrder === PITCHER_ORDER
+      ? pitcherSlot
+      : (slots.find((s) => s.order === pickedOrder) ?? null);
 
   function slotAt(pos: Position) {
+    if (useDh && pos === "P") return pitcherSlot ?? undefined;
     return slots.find((s) => s.position === pos);
   }
 
@@ -63,6 +82,15 @@ export function DefenseSheet({
   }
 
   function tapFielder(slot: LineupSlot) {
+    if (useDh && slot.order === PITCHER_ORDER) {
+      if (mode === "bench") {
+        setPickedOrder((cur) => (cur === PITCHER_ORDER ? null : PITCHER_ORDER));
+      } else {
+        setMode("bench");
+        setPickedOrder(PITCHER_ORDER);
+      }
+      return;
+    }
     if (mode === "bench") {
       setPickedOrder((cur) => (cur === slot.order ? null : slot.order));
       return;
@@ -73,6 +101,10 @@ export function DefenseSheet({
     }
     if (pickedOrder === slot.order) {
       setPickedOrder(null);
+      return;
+    }
+    if (useDh && pickedOrder === PITCHER_ORDER) {
+      clearPick();
       return;
     }
     const from = pickedOrder;
@@ -91,8 +123,12 @@ export function DefenseSheet({
   const hint =
     mode === "position"
       ? picked
-        ? `${POSITION_LABELS[picked.position]}の${picked.playerName} と入れ替える選手をタップ`
-        : "動かす選手をタップしてから、行き先の選手をタップします"
+        ? useDh && picked.order === PITCHER_ORDER
+          ? "投手の交代は「ベンチと交代」から行います"
+          : `${POSITION_LABELS[picked.position]}の${picked.playerName} と入れ替える選手をタップ`
+        : useDh
+          ? "動かす選手をタップしてから、行き先の選手をタップします（投手は交代タブで）"
+          : "動かす選手をタップしてから、行き先の選手をタップします"
       : picked
         ? `${POSITION_LABELS[picked.position]}の${picked.playerName} と交代する控えを選んでください`
         : "ベンチに下げる選手をタップしてください";
@@ -178,7 +214,7 @@ export function DefenseSheet({
                 </span>
                 {slot ? (
                   <span className="block text-[10px] text-[#9aa894] tabular-nums">
-                    {slot.order}番
+                    {slot.order === PITCHER_ORDER ? "打順外" : `${slot.order}番`}
                     {slot.number ? `  ${jerseyLabel(slot.number)}` : ""}
                   </span>
                 ) : null}
@@ -228,6 +264,7 @@ export function DefenseSheet({
       ) : (
         <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
           打順はそのまま、守備位置だけ入れ替わります。続けて何人でも変えられます。
+          {useDh ? " 指名打者は守備に就きません。" : ""}
         </p>
       )}
 

@@ -2,6 +2,7 @@ import {
   battingSide,
   fieldingSide,
   getLineup,
+  getPitcherOnSide,
   otherSide,
   playAddsPitch,
   reduceGame,
@@ -88,7 +89,7 @@ type Mutable = {
 };
 
 function pitcherOnSide(state: GameState, side: Side): LineupSlot | undefined {
-  return getLineup(state, side).find((slot) => slot.position === "P");
+  return getPitcherOnSide(state, side);
 }
 
 function gameYear(game: Game): number {

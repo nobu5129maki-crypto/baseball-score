@@ -1,8 +1,8 @@
 import { db } from "./db";
 import { newId } from "./ids";
 import { pickPlayerProfile } from "./player-profile";
-import { POSITIONS } from "./types";
-import type { LineupSlot, Player, Side } from "./types";
+import { DH_LINEUP_POSITIONS, FIELD_POSITIONS } from "./types";
+import type { LineupSlot, PitcherOnly, Player, Side } from "./types";
 
 const SEED_PLAYERS = [
   { name: "佐藤", number: "1" },
@@ -47,8 +47,9 @@ async function seedOnce(): Promise<void> {
   await db.settings.put({ id: "app", leftHanded: false });
 }
 
-export function lineupFromPlayers(players: Player[]): LineupSlot[] {
-  return POSITIONS.map((position, i) => {
+export function lineupFromPlayers(players: Player[], useDh = false): LineupSlot[] {
+  const positions = useDh ? DH_LINEUP_POSITIONS : FIELD_POSITIONS;
+  return positions.map((position, i) => {
     const player = players[i];
     return {
       order: i + 1,
@@ -61,8 +62,20 @@ export function lineupFromPlayers(players: Player[]): LineupSlot[] {
   });
 }
 
-export function opponentLineup(): LineupSlot[] {
-  return POSITIONS.map((position, i) => ({
+/** DH制の打順外投手。打順9人の次の選手を充てる */
+export function pitcherFromPlayers(players: Player[]): PitcherOnly {
+  const player = players[9] ?? players[0];
+  return {
+    playerId: player?.id ?? "vacant-pitcher",
+    playerName: player?.name ?? "投手",
+    number: player?.number,
+    ...pickPlayerProfile(player),
+  };
+}
+
+export function opponentLineup(useDh = false): LineupSlot[] {
+  const positions = useDh ? DH_LINEUP_POSITIONS : FIELD_POSITIONS;
+  return positions.map((position, i) => ({
     order: i + 1,
     playerId: `opp-${newId().slice(0, 8)}-${i + 1}`,
     playerName: `相手${i + 1}`,
@@ -70,8 +83,25 @@ export function opponentLineup(): LineupSlot[] {
   }));
 }
 
+export function opponentPitcher(): PitcherOnly {
+  return {
+    playerId: `opp-${newId().slice(0, 8)}-p`,
+    playerName: "相手投手",
+  };
+}
+
 export function sidesFor(mySide: Side, mine: LineupSlot[], opponent: LineupSlot[]) {
   return mySide === "first"
     ? { firstLineup: mine, secondLineup: opponent }
     : { firstLineup: opponent, secondLineup: mine };
+}
+
+export function pitchersFor(
+  mySide: Side,
+  mine: PitcherOnly,
+  opponent: PitcherOnly,
+): { firstPitcher: PitcherOnly; secondPitcher: PitcherOnly } {
+  return mySide === "first"
+    ? { firstPitcher: mine, secondPitcher: opponent }
+    : { firstPitcher: opponent, secondPitcher: mine };
 }

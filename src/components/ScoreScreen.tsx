@@ -630,6 +630,9 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           myTeamName={game.myTeamName}
           opponentName={game.opponentName}
           players={players ?? []}
+          useDh={Boolean(game.useDh)}
+          myPitcher={game.mySide === "first" ? state.firstPitcher : state.secondPitcher}
+          otherPitcher={game.mySide === "first" ? state.secondPitcher : state.firstPitcher}
           onApply={(mut) => void patch(mut)}
           onClose={() => setSheet(null)}
         />

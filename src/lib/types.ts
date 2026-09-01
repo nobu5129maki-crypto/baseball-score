@@ -12,9 +12,11 @@ export type Position =
   | "SS"
   | "LF"
   | "CF"
-  | "RF";
+  | "RF"
+  | "DH";
 
-export const POSITIONS: Position[] = [
+/** グラウンドに立つ守備位置（DH除く） */
+export const FIELD_POSITIONS: Position[] = [
   "P",
   "C",
   "1B",
@@ -26,6 +28,24 @@ export const POSITIONS: Position[] = [
   "RF",
 ];
 
+/** DH制の打順9枠（投手は打順外） */
+export const DH_LINEUP_POSITIONS: Position[] = [
+  "DH",
+  "C",
+  "1B",
+  "2B",
+  "3B",
+  "SS",
+  "LF",
+  "CF",
+  "RF",
+];
+
+export const POSITIONS: Position[] = [...FIELD_POSITIONS, "DH"];
+
+/** DH制で打順外投手を交代するときの order */
+export const PITCHER_ORDER = 0;
+
 export const POSITION_LABELS: Record<Position, string> = {
   P: "ピッチャー",
   C: "キャッチャー",
@@ -36,6 +56,7 @@ export const POSITION_LABELS: Record<Position, string> = {
   LF: "レフト",
   CF: "センター",
   RF: "ライト",
+  DH: "指名打者",
 };
 
 export const POSITION_SHORT: Record<Position, string> = {
@@ -48,9 +69,10 @@ export const POSITION_SHORT: Record<Position, string> = {
   LF: "左",
   CF: "中",
   RF: "右",
+  DH: "指",
 };
 
-/** スコアブック用の守備番号（1投〜9右） */
+/** スコアブック用の守備番号（1投〜9右）。DHは番号なしのため 0 */
 export const POSITION_NUMBERS: Record<Position, number> = {
   P: 1,
   C: 2,
@@ -61,6 +83,7 @@ export const POSITION_NUMBERS: Record<Position, number> = {
   LF: 7,
   CF: 8,
   RF: 9,
+  DH: 0,
 };
 
 export const SCOREBOARD_INNINGS = 12;
@@ -184,6 +207,13 @@ export type LineupSlot = {
   number?: string;
 } & PlayerProfile;
 
+/** DH制の打順外投手 */
+export type PitcherOnly = {
+  playerId: string;
+  playerName: string;
+  number?: string;
+} & PlayerProfile;
+
 export type GameStatus = "lineup" | "in_progress" | "ended";
 
 export type Game = {
@@ -195,6 +225,8 @@ export type Game = {
   tournament?: string;
   venue?: string;
   mySide: Side;
+  /** true のとき指名打者制（投手は打順外） */
+  useDh?: boolean;
   scheduledInnings: number;
   date: string;
   startTime?: string;
@@ -202,6 +234,10 @@ export type Game = {
   status: GameStatus;
   firstLineup: LineupSlot[];
   secondLineup: LineupSlot[];
+  /** useDh 時の先攻投手（打順外） */
+  firstPitcher?: PitcherOnly;
+  /** useDh 時の後攻投手（打順外） */
+  secondPitcher?: PitcherOnly;
   events: GameEvent[];
   createdAt: number;
   updatedAt: number;
@@ -253,8 +289,11 @@ export type GameState = {
   errors: { first: number; second: number };
   pitchCountAtBat: number;
   pitchesThrown: { first: number; second: number };
+  useDh: boolean;
   firstLineup: LineupSlot[];
   secondLineup: LineupSlot[];
+  firstPitcher?: PitcherOnly;
+  secondPitcher?: PitcherOnly;
   ended: boolean;
   regulationComplete: boolean;
   bottomUnplayed: boolean;

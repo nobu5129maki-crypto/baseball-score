@@ -9,7 +9,14 @@ import { AppHeader } from "@/components/AppHeader";
 import { db, saveGame } from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
-import { lineupFromPlayers, opponentLineup, sidesFor } from "@/lib/seed";
+import {
+  lineupFromPlayers,
+  opponentLineup,
+  opponentPitcher,
+  pitcherFromPlayers,
+  pitchersFor,
+  sidesFor,
+} from "@/lib/seed";
 import type { Side } from "@/lib/types";
 
 /** 作成〜遷移のあいだ、再マウントしてもフォームを出さない */
@@ -33,6 +40,7 @@ export default function NewGamePage() {
   const [venue, setVenue] = useState("");
   const [date, setDate] = useState(today);
   const [mySide, setMySide] = useState<Side>("second");
+  const [useDh, setUseDh] = useState(false);
   const [innings, setInnings] = useState(7);
   const [leaving, setLeaving] = useState(() => suppressForm);
   const [error, setError] = useState("");
@@ -72,9 +80,12 @@ export default function NewGamePage() {
     setLeaving(true);
     setError("");
     try {
-      const mine = lineupFromPlayers(players);
-      const opp = opponentLineup();
+      const mine = lineupFromPlayers(players, useDh);
+      const opp = opponentLineup(useDh);
       const sides = sidesFor(mySide, mine, opp);
+      const pitchers = useDh
+        ? pitchersFor(mySide, pitcherFromPlayers(players), opponentPitcher())
+        : null;
       const id = newId();
       const meet = tournament.trim();
       const place = venue.trim();
@@ -86,6 +97,7 @@ export default function NewGamePage() {
         ...(meet ? { tournament: meet } : {}),
         ...(place ? { venue: place } : {}),
         mySide,
+        ...(useDh ? { useDh: true, ...pitchers } : {}),
         scheduledInnings: innings,
         date,
         status: "lineup",
@@ -253,6 +265,28 @@ export default function NewGamePage() {
               後攻
             </button>
           </div>
+        </fieldset>
+        <fieldset>
+          <legend className="text-sm text-[#9aa894] mb-2">指名打者（DH）</legend>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={`tap ${!useDh ? "tap-accent" : ""}`}
+              onClick={() => setUseDh(false)}
+            >
+              使わない
+            </button>
+            <button
+              type="button"
+              className={`tap ${useDh ? "tap-accent" : ""}`}
+              onClick={() => setUseDh(true)}
+            >
+              DH制
+            </button>
+          </div>
+          <p className="text-xs text-[#9aa894] mt-2 leading-relaxed">
+            DH制では投手が打席に立たず、指名打者が代わりに打ちます。
+          </p>
         </fieldset>
         <label className="flex flex-col gap-1">
           <span className="text-sm text-[#9aa894]">イニング</span>

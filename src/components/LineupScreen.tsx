@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { LineupBoard } from "@/components/LineupBoard";
-import { commitSub, reduceGame } from "@/lib/engine";
+import { commitSub, getPitcherOnly, reduceGame } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
 import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
 import { newId } from "@/lib/ids";
-import type { LineupSlot, Player, Position, Side } from "@/lib/types";
+import { PITCHER_ORDER } from "@/lib/types";
+import type { LineupSlot, PitcherOnly, Player, Position, Side } from "@/lib/types";
 
 export function LineupScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -46,6 +47,12 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     tab === "first"
       ? (state?.firstLineup ?? game?.firstLineup)
       : (state?.secondLineup ?? game?.secondLineup);
+  const pitcher =
+    state && game?.useDh
+      ? getPitcherOnly(state, tab)
+      : tab === "first"
+        ? game?.firstPitcher
+        : game?.secondPitcher;
 
   if (game === undefined) {
     return <p className="p-6 text-[#9aa894]">読み込み中…</p>;
@@ -64,6 +71,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
   const slots: LineupSlot[] = lineup;
   const isMine = tab === game.mySide;
   const activeIds = new Set(slots.map((s) => s.playerId));
+  if (pitcher) activeIds.add(pitcher.playerId);
   const bench = isMine ? players.filter((p) => !activeIds.has(p.id)) : [];
   const ids = slots.map((s) => s.playerId);
   const dup = ids.some((pid, i) => ids.indexOf(pid) !== i);
@@ -72,6 +80,19 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     const latest = await db.games.get(gameId);
     if (!latest) return;
     const key = tab === "first" ? "firstLineup" : "secondLineup";
+    await saveGame({ ...latest, [key]: next });
+  }
+
+  async function patchPitcher(next: PitcherOnly) {
+    const latest = await db.games.get(gameId);
+    if (!latest) return;
+    if (latest.status === "in_progress") {
+      await saveGame(
+        commitSub(latest, tab, PITCHER_ORDER, next.playerId, next.playerName, "P", next.number),
+      );
+      return;
+    }
+    const key = tab === "first" ? "firstPitcher" : "secondPitcher";
     await saveGame({ ...latest, [key]: next });
   }
 
@@ -171,11 +192,14 @@ export function LineupScreen({ gameId }: { gameId: string }) {
           {isMine
             ? "打順は各選手の右にある ▲▼ で入れ替えます。"
             : "相手の名前を直して、打順は ▲▼ で入れ替えます。"}
+          {game.useDh ? " この試合はDH制です。" : ""}
         </p>
 
         <LineupBoard
           lineup={slots}
           bench={bench as Player[]}
+          useDh={Boolean(game.useDh)}
+          pitcher={pitcher}
           onRename={(order, name) => void applySlot(order, { playerName: name })}
           onPosition={(order, position) => void assignPosition(order, position)}
           onReplace={(order, player) =>
@@ -187,6 +211,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
             })
           }
           onMoveOrder={(from, to) => void moveOrder(from, to)}
+          onPitcherChange={game.useDh ? (next) => void patchPitcher(next) : undefined}
         />
 
         {!isMine ? (

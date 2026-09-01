@@ -2,8 +2,14 @@
 
 import { useState } from "react";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { POSITION_LABELS, POSITION_NUMBERS, POSITION_SHORT, POSITIONS } from "@/lib/types";
-import type { LineupSlot, Player, Position } from "@/lib/types";
+import {
+  FIELD_POSITIONS,
+  PITCHER_ORDER,
+  POSITION_LABELS,
+  POSITION_NUMBERS,
+  POSITION_SHORT,
+} from "@/lib/types";
+import type { LineupSlot, PitcherOnly, Player, Position } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
 const FIELD: Array<{ pos: Position; className: string }> = [
@@ -18,27 +24,55 @@ const FIELD: Array<{ pos: Position; className: string }> = [
   { pos: "C", className: "col-start-3 col-span-2 row-start-5" },
 ];
 
+function positionChoices(useDh: boolean): Position[] {
+  if (!useDh) return FIELD_POSITIONS;
+  return ["DH", ...FIELD_POSITIONS.filter((p) => p !== "P")];
+}
+
+function positionBadge(pos: Position) {
+  const num = POSITION_NUMBERS[pos];
+  return (
+    <>
+      {num > 0 ? <span className="font-bold tabular-nums text-[#f5c518]">{num}</span> : null}
+      <span className="font-bold text-[#f5c518]">{POSITION_SHORT[pos]}</span>
+      {" "}
+      {POSITION_LABELS[pos]}
+    </>
+  );
+}
+
 export function LineupBoard({
   lineup,
   bench,
+  useDh = false,
+  pitcher,
   onReplace,
   onMoveOrder,
   onPosition,
   onRename,
+  onPitcherChange,
 }: {
   lineup: LineupSlot[];
   bench: Player[];
+  useDh?: boolean;
+  pitcher?: PitcherOnly;
   onReplace: (order: number, player: Player) => void;
   onMoveOrder: (fromOrder: number, toOrder: number) => void;
   onPosition: (order: number, position: Position) => void;
   onRename: (order: number, name: string) => void;
+  onPitcherChange?: (pitcher: PitcherOnly) => void;
 }) {
   const [swapFrom, setSwapFrom] = useState<number | null>(null);
   const [benchId, setBenchId] = useState<string | null>(null);
   const [posOrder, setPosOrder] = useState<number | null>(null);
+  const [editPitcher, setEditPitcher] = useState(false);
   const posSlot = lineup.find((s) => s.order === posOrder) ?? null;
+  const choices = positionChoices(useDh);
 
-  function slotAt(pos: Position) {
+  function slotAt(pos: Position): LineupSlot | undefined {
+    if (useDh && pos === "P" && pitcher) {
+      return { order: PITCHER_ORDER, position: "P", ...pitcher };
+    }
     return lineup.find((s) => s.position === pos);
   }
 
@@ -80,6 +114,12 @@ export function LineupBoard({
 
   return (
     <div className="flex flex-col gap-4">
+      {useDh ? (
+        <p className="rounded-xl border border-[#f5c518]/40 bg-[#1a281c] px-3 py-2 text-sm text-[#f5c518] font-bold">
+          DH制：投手は打席に立たず、指名打者が打ちます
+        </p>
+      ) : null}
+
       <section>
         <h3 className="font-bold text-lg">打順</h3>
         <p className="text-sm text-[#9aa894] mt-1 leading-relaxed">
@@ -126,7 +166,7 @@ export function LineupBoard({
                       onClick={() => setPosOrder(slot.order)}
                     >
                       {slot.number ? `背番号 ${slot.number} · ` : ""}
-                      {POSITION_LABELS[slot.position]}
+                      {POSITION_SHORT[slot.position]} {POSITION_LABELS[slot.position]}
                       {profile ? ` · ${profile}` : ""}
                       {" · 守備を変更"}
                     </button>
@@ -158,6 +198,49 @@ export function LineupBoard({
         </ol>
       </section>
 
+      {useDh && pitcher && onPitcherChange ? (
+        <section>
+          <h3 className="font-bold text-lg">投手（打順外）</h3>
+          <p className="text-sm text-[#9aa894] mt-1">DH制では投手は守備のみです。</p>
+          <div className="mt-2 rounded-2xl border border-[#f5c518]/50 bg-[#121a14] p-3 flex flex-col gap-2">
+            <input
+              className="tap w-full px-3 bg-[#070a08] min-h-12"
+              lang="ja"
+              value={pitcher.playerName}
+              onChange={(e) => onPitcherChange({ ...pitcher, playerName: e.target.value })}
+              aria-label="投手の名前"
+            />
+            <div className="flex flex-wrap gap-2">
+              {bench.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="tap px-3 text-sm"
+                  onClick={() =>
+                    onPitcherChange({
+                      playerId: p.id,
+                      playerName: p.name,
+                      number: p.number,
+                      throws: p.throws,
+                      bats: p.bats,
+                      ageKind: p.ageKind,
+                      grade: p.grade,
+                      age: p.age,
+                    })
+                  }
+                >
+                  {p.number ? `${p.number} ` : ""}
+                  {p.name} を投手に
+                </button>
+              ))}
+              <button type="button" className="tap px-3 text-sm" onClick={() => setEditPitcher(true)}>
+                詳細
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section>
         <h3 className="font-bold text-lg">ベンチ</h3>
         <p className="text-sm text-[#9aa894] mt-1">控えをタップしてから、出す打順をタップします。</p>
@@ -185,7 +268,11 @@ export function LineupBoard({
 
       <section>
         <h3 className="font-bold text-lg">守備位置</h3>
-        <p className="text-sm text-[#9aa894] mt-1">選手をタップすると守備位置を変えられます。</p>
+        <p className="text-sm text-[#9aa894] mt-1">
+          {useDh
+            ? "選手をタップすると守備位置を変えられます。投手は上の「投手（打順外）」から変更します。"
+            : "選手をタップすると守備位置を変えられます。"}
+        </p>
         <div className="rounded-2xl border border-[#2c3c30] bg-[#0d140f] p-3 mt-2">
           <div className="grid grid-cols-6 grid-rows-5 gap-2">
             {FIELD.map(({ pos, className }) => {
@@ -196,28 +283,34 @@ export function LineupBoard({
                   type="button"
                   className={`tap min-h-14 px-1 text-xs ${className}`}
                   onClick={() => {
-                    if (slot) setPosOrder(slot.order);
+                    if (useDh && pos === "P") {
+                      setEditPitcher(true);
+                      return;
+                    }
+                    if (slot && slot.order !== PITCHER_ORDER) setPosOrder(slot.order);
                   }}
                 >
-                  <span className="block text-[10px] opacity-70">
-                    <span className="font-bold tabular-nums text-[#f5c518]">{POSITION_NUMBERS[pos]}</span>
-                    <span className="font-bold text-[#f5c518]">{POSITION_SHORT[pos]}</span>
-                    {" "}
-                    {POSITION_LABELS[pos]}
-                  </span>
+                  <span className="block text-[10px] opacity-70">{positionBadge(pos)}</span>
                   <span className="font-bold">{slot?.playerName ?? "空き"}</span>
                 </button>
               );
             })}
           </div>
         </div>
+        {useDh ? (
+          <p className="text-sm text-[#9aa894] mt-2">
+            指名打者（
+            {lineup.find((s) => s.position === "DH")?.playerName ?? "未設定"}
+            ）は守備に就きません。
+          </p>
+        ) : null}
       </section>
 
       {posSlot ? (
         <Sheet title={`${posSlot.order}番 ${posSlot.playerName} の守備`} onClose={() => setPosOrder(null)}>
           <p className="text-sm text-[#9aa894] mb-3">守備位置を選ぶと、その位置の選手と入れ替わります。</p>
           <div className="grid grid-cols-3 gap-2">
-            {POSITIONS.map((pos) => (
+            {choices.map((pos) => (
               <button
                 key={pos}
                 type="button"
@@ -227,13 +320,51 @@ export function LineupBoard({
                   setPosOrder(null);
                 }}
               >
-                <span className="font-bold tabular-nums text-[#f5c518]">{POSITION_NUMBERS[pos]}</span>
-                <span className="font-bold text-[#f5c518]">{POSITION_SHORT[pos]}</span>
-                {" "}
-                {POSITION_LABELS[pos]}
+                {positionBadge(pos)}
               </button>
             ))}
           </div>
+        </Sheet>
+      ) : null}
+
+      {editPitcher && pitcher && onPitcherChange ? (
+        <Sheet title="投手（打順外）" onClose={() => setEditPitcher(false)}>
+          <p className="text-sm text-[#9aa894] mb-3">DH制の投手は打席に立ちません。</p>
+          <input
+            className="tap w-full px-3 bg-[#070a08] min-h-12 mb-3"
+            lang="ja"
+            value={pitcher.playerName}
+            onChange={(e) => onPitcherChange({ ...pitcher, playerName: e.target.value })}
+            aria-label="投手の名前"
+          />
+          <div className="flex flex-col gap-2">
+            {bench.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="tap tap-result w-full"
+                onClick={() => {
+                  onPitcherChange({
+                    playerId: p.id,
+                    playerName: p.name,
+                    number: p.number,
+                    throws: p.throws,
+                    bats: p.bats,
+                    ageKind: p.ageKind,
+                    grade: p.grade,
+                    age: p.age,
+                  });
+                  setEditPitcher(false);
+                }}
+              >
+                {p.number ? `${p.number} ` : ""}
+                {p.name}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="tap tap-accent w-full mt-3" onClick={() => setEditPitcher(false)}>
+            完了
+          </button>
         </Sheet>
       ) : null}
     </div>

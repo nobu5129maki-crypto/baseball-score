@@ -123,6 +123,7 @@ function GameCard({
         {game.date}
         {game.tournament ? `　${game.tournament}` : ""}
         {game.venue ? `　${game.venue}` : ""}
+        {game.useDh ? "　DH制" : ""}
         {times ? `　${times}` : ""}
       </p>
       <p className="font-bold text-lg mt-1">
@@ -163,6 +164,7 @@ function EndedGameCard({
         {game.date}
         {game.tournament ? `　${game.tournament}` : ""}
         {game.venue ? `　${game.venue}` : ""}
+        {game.useDh ? "　DH制" : ""}
         {times ? `　${times}` : ""}
       </p>
       <p className="font-bold text-lg mt-1">
