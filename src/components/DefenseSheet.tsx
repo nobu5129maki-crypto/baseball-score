@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { commitPositionSwap, commitSub } from "@/lib/engine";
 import { jerseyLabel } from "@/lib/labels";
-import { POSITION_LABELS } from "@/lib/types";
+import { POSITION_LABELS, POSITION_NUMBERS } from "@/lib/types";
 import type { Game, LineupSlot, Position, Side } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
@@ -167,7 +167,11 @@ export function DefenseSheet({
                 className={`tap min-h-16 px-1 text-xs ${className} ${selected ? "tap-accent" : pos === "P" ? "border-[#f5c518]" : ""}`}
                 onClick={() => slot && tapFielder(slot)}
               >
-                <span className="block text-[11px] opacity-80">{POSITION_LABELS[pos]}</span>
+                <span className="block text-[11px] opacity-80">
+                  <span className="font-bold tabular-nums text-[#f5c518]">{POSITION_NUMBERS[pos]}</span>
+                  {" "}
+                  {POSITION_LABELS[pos]}
+                </span>
                 <span className="block text-sm font-bold leading-tight break-words">
                   {slot?.playerName ?? "空き"}
                 </span>

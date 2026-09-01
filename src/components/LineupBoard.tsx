@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { POSITION_LABELS, POSITIONS } from "@/lib/types";
+import { POSITION_LABELS, POSITION_NUMBERS, POSITIONS } from "@/lib/types";
 import type { LineupSlot, Player, Position } from "@/lib/types";
 import { Sheet } from "./Sheet";
 
@@ -199,7 +199,11 @@ export function LineupBoard({
                     if (slot) setPosOrder(slot.order);
                   }}
                 >
-                  <span className="block text-[10px] opacity-70">{POSITION_LABELS[pos]}</span>
+                  <span className="block text-[10px] opacity-70">
+                    <span className="font-bold tabular-nums text-[#f5c518]">{POSITION_NUMBERS[pos]}</span>
+                    {" "}
+                    {POSITION_LABELS[pos]}
+                  </span>
                   <span className="font-bold">{slot?.playerName ?? "空き"}</span>
                 </button>
               );
@@ -222,6 +226,8 @@ export function LineupBoard({
                   setPosOrder(null);
                 }}
               >
+                <span className="font-bold tabular-nums text-[#f5c518]">{POSITION_NUMBERS[pos]}</span>
+                {" "}
                 {POSITION_LABELS[pos]}
               </button>
             ))}

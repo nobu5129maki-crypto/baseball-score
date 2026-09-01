@@ -50,6 +50,19 @@ export const POSITION_SHORT: Record<Position, string> = {
   RF: "右",
 };
 
+/** スコアブック用の守備番号（1投〜9右） */
+export const POSITION_NUMBERS: Record<Position, number> = {
+  P: 1,
+  C: 2,
+  "1B": 3,
+  "2B": 4,
+  "3B": 5,
+  SS: 6,
+  LF: 7,
+  CF: 8,
+  RF: 9,
+};
+
 export const SCOREBOARD_INNINGS = 12;
 
 export type PitchKind = "ball" | "strike" | "foul";
