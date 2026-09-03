@@ -10,6 +10,7 @@ import {
   POSITION_SHORT,
 } from "@/lib/types";
 import type { LineupSlot, PitcherOnly, Player, Position } from "@/lib/types";
+import { ImeTextInput } from "./ImeTextInput";
 import { Sheet } from "./Sheet";
 
 const FIELD: Array<{ pos: Position; className: string }> = [
@@ -153,11 +154,14 @@ export function LineupBoard({
                     {slot.order}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <input
+                    <ImeTextInput
                       className="tap w-full px-3 bg-[#070a08] min-h-12"
                       lang="ja"
+                      autoCapitalize="off"
+                      autoComplete="off"
+                      enterKeyHint="done"
                       value={slot.playerName}
-                      onChange={(e) => onRename(slot.order, e.target.value)}
+                      onCommit={(name) => onRename(slot.order, name)}
                       aria-label={`${slot.order}番の名前`}
                     />
                     <button
@@ -203,11 +207,14 @@ export function LineupBoard({
           <h3 className="font-bold text-lg">投手（打順外）</h3>
           <p className="text-sm text-[#9aa894] mt-1">DH制では投手は守備のみです。</p>
           <div className="mt-2 rounded-2xl border border-[#f5c518]/50 bg-[#121a14] p-3 flex flex-col gap-2">
-            <input
+            <ImeTextInput
               className="tap w-full px-3 bg-[#070a08] min-h-12"
               lang="ja"
+              autoCapitalize="off"
+              autoComplete="off"
+              enterKeyHint="done"
               value={pitcher.playerName}
-              onChange={(e) => onPitcherChange({ ...pitcher, playerName: e.target.value })}
+              onCommit={(name) => onPitcherChange({ ...pitcher, playerName: name })}
               aria-label="投手の名前"
             />
             <div className="flex flex-wrap gap-2">
@@ -330,11 +337,14 @@ export function LineupBoard({
       {editPitcher && pitcher && onPitcherChange ? (
         <Sheet title="投手（打順外）" onClose={() => setEditPitcher(false)}>
           <p className="text-sm text-[#9aa894] mb-3">DH制の投手は打席に立ちません。</p>
-          <input
+          <ImeTextInput
             className="tap w-full px-3 bg-[#070a08] min-h-12 mb-3"
             lang="ja"
+            autoCapitalize="off"
+            autoComplete="off"
+            enterKeyHint="done"
             value={pitcher.playerName}
-            onChange={(e) => onPitcherChange({ ...pitcher, playerName: e.target.value })}
+            onCommit={(name) => onPitcherChange({ ...pitcher, playerName: name })}
             aria-label="投手の名前"
           />
           <div className="flex flex-col gap-2">
