@@ -238,6 +238,8 @@ export type Game = {
   firstPitcher?: PitcherOnly;
   /** useDh 時の後攻投手（打順外） */
   secondPitcher?: PitcherOnly;
+  /** 相手がアプリ未使用のとき、手入力した控え */
+  opponentBench?: PitcherOnly[];
   events: GameEvent[];
   createdAt: number;
   updatedAt: number;

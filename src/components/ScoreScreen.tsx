@@ -40,6 +40,7 @@ import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult, jers
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD } from "@/lib/rules";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
+import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { DefenseSheet } from "./DefenseSheet";
@@ -630,6 +631,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           myTeamName={game.myTeamName}
           opponentName={game.opponentName}
           players={players ?? []}
+          otherPlayers={opponentBenchPlayers(game)}
           useDh={Boolean(game.useDh)}
           myPitcher={game.mySide === "first" ? state.firstPitcher : state.secondPitcher}
           otherPitcher={game.mySide === "first" ? state.secondPitcher : state.firstPitcher}
@@ -699,10 +701,26 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           battingLineup={getLineup(state, battingSide(state.half))}
           myTeamBatting={battingSide(state.half) === game.mySide}
           stateBases={state.bases}
-          players={players ?? []}
+          players={
+            battingSide(state.half) === game.mySide ? (players ?? []) : opponentBenchPlayers(game)
+          }
           onClose={() => setSheet(null)}
           onPick={(base, player, position) => {
-            void patch((g) => commitPinchRunner(g, base, player.id, player.name, position, player.number));
+            const runner = state.bases[base - 1];
+            void patch((g) => {
+              let next = commitPinchRunner(g, base, player.id, player.name, position, player.number);
+              if (battingSide(state.half) !== game.mySide && runner) {
+                const slot = getLineup(state, battingSide(state.half)).find(
+                  (s) => s.order === runner.battingOrder,
+                );
+                next = rememberOpponentBench(next, {
+                  playerId: runner.playerId,
+                  playerName: runner.playerName,
+                  number: slot?.number,
+                });
+              }
+              return next;
+            });
             setSheet(null);
           }}
         />
@@ -712,10 +730,22 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           batter={batter}
           battingLineup={getLineup(state, battingSide(state.half))}
           myTeamBatting={battingSide(state.half) === game.mySide}
-          players={players ?? []}
+          players={
+            battingSide(state.half) === game.mySide ? (players ?? []) : opponentBenchPlayers(game)
+          }
           onClose={() => setSheet(null)}
           onPick={(player) => {
-            void patch((g) => commitPinchHitter(g, player.id, player.name, player.number));
+            void patch((g) => {
+              let next = commitPinchHitter(g, player.id, player.name, player.number);
+              if (battingSide(state.half) !== game.mySide) {
+                next = rememberOpponentBench(next, {
+                  playerId: batter.playerId,
+                  playerName: batter.playerName,
+                  number: batter.number,
+                });
+              }
+              return next;
+            });
             setSheet(null);
           }}
         />
@@ -871,7 +901,7 @@ function PinchSheet({
   const runner = stateBases[base - 1];
   const slot = battingLineup.find((s) => s.order === runner?.battingOrder);
   const activeIds = new Set(battingLineup.map((s) => s.playerId));
-  const bench = myTeamBatting ? players.filter((p) => !activeIds.has(p.id)) : [];
+  const bench = players.filter((p) => !activeIds.has(p.id));
   const position = slot?.position ?? "LF";
 
   return (
@@ -910,6 +940,13 @@ function PinchSheet({
           {p.name} を代走に
         </button>
       ))}
+      {bench.length === 0 ? (
+        <p className="text-sm text-[#9aa894] mb-2">
+          {myTeamBatting
+            ? "控えがいません。名前を入力しても出せます。"
+            : "打順画面で控えを追加するか、下に名前を入力してください。"}
+        </p>
+      ) : null}
       <div className="flex gap-2 mt-2">
         <input
           className="tap flex-1 px-3 bg-[#121a14]"
@@ -950,7 +987,7 @@ function PinchHitterSheet({
 }) {
   const [name, setName] = useState("");
   const activeIds = new Set(battingLineup.map((s) => s.playerId));
-  const bench = myTeamBatting ? players.filter((p) => !activeIds.has(p.id)) : [];
+  const bench = players.filter((p) => !activeIds.has(p.id));
 
   return (
     <Sheet title="代打" onClose={onClose}>
@@ -969,8 +1006,12 @@ function PinchHitterSheet({
           {p.name} を代打に
         </button>
       ))}
-      {myTeamBatting && bench.length === 0 ? (
-        <p className="text-sm text-[#9aa894] mb-2">控えがいません。名前を入力しても出せます。</p>
+      {bench.length === 0 ? (
+        <p className="text-sm text-[#9aa894] mb-2">
+          {myTeamBatting
+            ? "控えがいません。名前を入力しても出せます。"
+            : "打順画面で控えを追加するか、下に名前を入力してください。"}
+        </p>
       ) : null}
       <div className="flex gap-2 mt-2">
         <input

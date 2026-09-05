@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { commitPositionSwap, commitSub } from "@/lib/engine";
+import { rememberOpponentBench } from "@/lib/opponent-bench";
 import { jerseyLabel } from "@/lib/labels";
 import { PITCHER_ORDER, POSITION_LABELS, POSITION_NUMBERS, POSITION_SHORT } from "@/lib/types";
 import type { Game, LineupSlot, PitcherOnly, Position, Side } from "@/lib/types";
@@ -29,6 +30,7 @@ export function DefenseSheet({
   myTeamName,
   opponentName,
   players,
+  otherPlayers = [],
   useDh = false,
   myPitcher,
   otherPitcher,
@@ -42,6 +44,7 @@ export function DefenseSheet({
   myTeamName: string;
   opponentName: string;
   players: { id: string; name: string; number?: string }[];
+  otherPlayers?: { id: string; name: string; number?: string }[];
   useDh?: boolean;
   myPitcher?: PitcherOnly;
   otherPitcher?: PitcherOnly;
@@ -61,7 +64,7 @@ export function DefenseSheet({
     if (pitcher) ids.add(pitcher.playerId);
     return ids;
   }, [slots, pitcher]);
-  const bench = mine ? players.filter((p) => !activeIds.has(p.id)) : [];
+  const bench = (mine ? players : otherPlayers).filter((p) => !activeIds.has(p.id));
   const pitcherSlot: LineupSlot | null =
     useDh && pitcher
       ? { order: PITCHER_ORDER, position: "P", ...pitcher }
@@ -114,9 +117,26 @@ export function DefenseSheet({
 
   function sendBench(player: { id: string; name: string; number?: string }) {
     if (!picked) return;
-    onApply((g) =>
-      commitSub(g, side, picked.order, player.id, player.name, picked.position, player.number),
-    );
+    const outgoing = picked;
+    onApply((g) => {
+      let next = commitSub(
+        g,
+        side,
+        outgoing.order,
+        player.id,
+        player.name,
+        outgoing.position,
+        player.number,
+      );
+      if (!mine) {
+        next = rememberOpponentBench(next, {
+          playerId: outgoing.playerId,
+          playerName: outgoing.playerName,
+          number: outgoing.number,
+        });
+      }
+      return next;
+    });
     clearPick();
   }
 
@@ -227,8 +247,12 @@ export function DefenseSheet({
       {mode === "bench" ? (
         <div className="flex flex-col gap-2 mb-3">
           <p className="text-sm font-bold">控え</p>
-          {mine && bench.length === 0 ? (
-            <p className="text-sm text-[#9aa894]">控えがいません。名前を入力しても出せます。</p>
+          {bench.length === 0 ? (
+            <p className="text-sm text-[#9aa894]">
+              {mine
+                ? "控えがいません。名前を入力しても出せます。"
+                : "打順画面で控えを追加するか、下に名前を入力してください。"}
+            </p>
           ) : null}
           {bench.map((p) => (
             <button

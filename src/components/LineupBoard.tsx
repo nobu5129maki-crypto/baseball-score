@@ -52,6 +52,10 @@ export function LineupBoard({
   onPosition,
   onRename,
   onPitcherChange,
+  onNumber,
+  onAddBench,
+  onRemoveBench,
+  manualRoster = false,
 }: {
   lineup: LineupSlot[];
   bench: Player[];
@@ -62,11 +66,18 @@ export function LineupBoard({
   onPosition: (order: number, position: Position) => void;
   onRename: (order: number, name: string) => void;
   onPitcherChange?: (pitcher: PitcherOnly) => void;
+  onNumber?: (order: number, number: string) => void;
+  onAddBench?: (player: { name: string; number: string }) => void;
+  onRemoveBench?: (playerId: string) => void;
+  manualRoster?: boolean;
 }) {
   const [swapFrom, setSwapFrom] = useState<number | null>(null);
   const [benchId, setBenchId] = useState<string | null>(null);
   const [posOrder, setPosOrder] = useState<number | null>(null);
   const [editPitcher, setEditPitcher] = useState(false);
+  const [extraName, setExtraName] = useState("");
+  const [extraNumber, setExtraNumber] = useState("");
+  const [extraKey, setExtraKey] = useState(0);
   const posSlot = lineup.find((s) => s.order === posOrder) ?? null;
   const choices = positionChoices(useDh);
 
@@ -124,7 +135,9 @@ export function LineupBoard({
       <section>
         <h3 className="font-bold text-lg">打順</h3>
         <p className="text-sm text-[#9aa894] mt-1 leading-relaxed">
-          右の <span className="text-[#f5c518] font-bold">▲▼</span> で1つずつ入れ替え。選手のカードをタップしてから、入れ替えたい相手をタップしてもOKです。
+          {manualRoster
+            ? "名前と背番号を直接書いてください。相手がアプリを持っていなくても大丈夫です。"
+            : <>右の <span className="text-[#f5c518] font-bold">▲▼</span> で1つずつ入れ替え。選手のカードをタップしてから、入れ替えたい相手をタップしてもOKです。</>}
         </p>
         {hint() ? (
           <div className="mt-2 rounded-xl border border-[#f5c518] bg-[#1a281c] px-3 py-2 flex items-center gap-2">
@@ -163,13 +176,32 @@ export function LineupBoard({
                       value={slot.playerName}
                       onCommit={(name) => onRename(slot.order, name)}
                       aria-label={`${slot.order}番の名前`}
+                      placeholder={manualRoster ? "名前" : undefined}
                     />
+                    {onNumber ? (
+                      <label className="mt-1 flex items-center gap-2 px-1">
+                        <span className="text-xs text-[#9aa894] shrink-0">背番号</span>
+                        <input
+                          className="tap px-2 bg-[#070a08] w-20 min-h-10 text-center tabular-nums"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          autoComplete="off"
+                          maxLength={3}
+                          placeholder="#"
+                          aria-label={`${slot.order}番の背番号`}
+                          value={slot.number ?? ""}
+                          onChange={(e) =>
+                            onNumber(slot.order, e.target.value.replace(/\D/g, "").slice(0, 3))
+                          }
+                        />
+                      </label>
+                    ) : null}
                     <button
                       type="button"
                       className="mt-1 text-left text-sm text-[#9aa894] px-1"
                       onClick={() => setPosOrder(slot.order)}
                     >
-                      {slot.number ? `背番号 ${slot.number} · ` : ""}
+                      {!onNumber && slot.number ? `背番号 ${slot.number} · ` : ""}
                       {POSITION_SHORT[slot.position]} {POSITION_LABELS[slot.position]}
                       {profile ? ` · ${profile}` : ""}
                       {" · 守備を変更"}
@@ -216,7 +248,28 @@ export function LineupBoard({
               value={pitcher.playerName}
               onCommit={(name) => onPitcherChange({ ...pitcher, playerName: name })}
               aria-label="投手の名前"
+              placeholder="投手の名前"
             />
+            {manualRoster ? (
+              <label className="flex items-center gap-2">
+                <span className="text-xs text-[#9aa894] shrink-0">背番号</span>
+                <input
+                  className="tap px-2 bg-[#070a08] w-20 min-h-10 text-center tabular-nums"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={3}
+                  placeholder="#"
+                  aria-label="投手の背番号"
+                  value={pitcher.number ?? ""}
+                  onChange={(e) =>
+                    onPitcherChange({
+                      ...pitcher,
+                      number: e.target.value.replace(/\D/g, "").slice(0, 3) || undefined,
+                    })
+                  }
+                />
+              </label>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {bench.map((p) => (
                 <button
@@ -249,28 +302,81 @@ export function LineupBoard({
       ) : null}
 
       <section>
-        <h3 className="font-bold text-lg">ベンチ</h3>
-        <p className="text-sm text-[#9aa894] mt-1">控えをタップしてから、出す打順をタップします。</p>
-        {bench.length === 0 ? (
+        <h3 className="font-bold text-lg">{manualRoster ? "控え（代打・代走用）" : "ベンチ"}</h3>
+        <p className="text-sm text-[#9aa894] mt-1">
+          {manualRoster
+            ? "打順に入れていない相手選手を追加できます。タップすると打順と入れ替えます。"
+            : "控えをタップしてから、出す打順をタップします。"}
+        </p>
+        {bench.length === 0 && !onAddBench ? (
           <p className="text-sm text-[#9aa894] mt-2">控えはいません。相手側は下の名簿コードも使えます。</p>
-        ) : (
+        ) : null}
+        {bench.length > 0 ? (
           <div className="flex flex-wrap gap-2 mt-2">
             {bench.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`tap px-3 ${benchId === p.id ? "tap-accent" : ""}`}
-                onClick={() => {
-                  setSwapFrom(null);
-                  setBenchId((id) => (id === p.id ? null : p.id));
-                }}
-              >
-                {p.number ? `${p.number} ` : ""}
-                {p.name}
-              </button>
+              <div key={p.id} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className={`tap px-3 ${benchId === p.id ? "tap-accent" : ""}`}
+                  onClick={() => {
+                    setSwapFrom(null);
+                    setBenchId((id) => (id === p.id ? null : p.id));
+                  }}
+                >
+                  {p.number ? `${p.number} ` : ""}
+                  {p.name}
+                </button>
+                {onRemoveBench ? (
+                  <button
+                    type="button"
+                    className="text-xs text-[#9aa894] underline px-1"
+                    onClick={() => onRemoveBench(p.id)}
+                  >
+                    削除
+                  </button>
+                ) : null}
+              </div>
             ))}
           </div>
-        )}
+        ) : null}
+        {onAddBench ? (
+          <div className="flex gap-2 mt-3">
+            <ImeTextInput
+              key={extraKey}
+              className="tap flex-1 px-3 bg-[#070a08] min-h-11"
+              lang="ja"
+              autoCapitalize="off"
+              autoComplete="off"
+              placeholder="控えの名前"
+              value={extraName}
+              onCommit={setExtraName}
+              aria-label="控えの名前"
+            />
+            <input
+              className="tap px-2 bg-[#070a08] w-16 min-h-11 text-center tabular-nums"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={3}
+              placeholder="#"
+              aria-label="控えの背番号"
+              value={extraNumber}
+              onChange={(e) => setExtraNumber(e.target.value.replace(/\D/g, "").slice(0, 3))}
+            />
+            <button
+              type="button"
+              className="tap tap-accent px-3 shrink-0"
+              disabled={!extraName.trim()}
+              onClick={() => {
+                onAddBench({ name: extraName.trim(), number: extraNumber });
+                setExtraName("");
+                setExtraNumber("");
+                setExtraKey((n) => n + 1);
+              }}
+            >
+              追加
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section>
