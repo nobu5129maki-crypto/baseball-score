@@ -92,6 +92,13 @@ describe("buildScorebook", () => {
     expect(book.first.orders[0].innings[0].find((m) => m.label === "三振")?.hit).toBeUndefined();
   });
 
+  it("見逃し三振と空振り三振をスコアブックで書き分ける", () => {
+    let game = commitPlay(makeGame(), "strikeout_looking");
+    expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("見三");
+    game = commitPlay(makeGame(), "strikeout_swinging");
+    expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("空三");
+  });
+
   it("同じ選手の守備位置変更は名前を増やさない", () => {
     const game = commitSub(makeGame(), "first", 1, "A1", "A1", "LF");
     const row = buildScorebook(game).first.orders[0];

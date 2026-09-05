@@ -96,6 +96,8 @@ export type PlayResult =
   | "triple"
   | "homerun"
   | "strikeout"
+  | "strikeout_looking"
+  | "strikeout_swinging"
   | "dropped_third"
   | "walk"
   | "hbp"

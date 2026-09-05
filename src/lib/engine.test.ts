@@ -15,6 +15,7 @@ import {
   needsStrikeThreeChoice,
   canDroppedThird,
   needsFieldPosition,
+  needsRunnerConfirm,
   playAddsPitch,
   playBlockedReason,
   nextStealBaseOpen,
@@ -436,7 +437,21 @@ describe("らくスコア engine", () => {
     expect(needsFieldPosition("homerun")).toBe(true);
     expect(needsFieldPosition("single")).toBe(true);
     expect(needsFieldPosition("strikeout")).toBe(false);
+    expect(needsFieldPosition("strikeout_looking")).toBe(false);
+    expect(needsFieldPosition("strikeout_swinging")).toBe(false);
     expect(needsFieldPosition("walk")).toBe(false);
+  });
+
+  it("見逃し三振と空振り三振はどちらも打者アウト", () => {
+    expect(reduceGame(commitPlay(makeGame(), "strikeout_looking")).outs).toBe(1);
+    expect(reduceGame(commitPlay(makeGame(), "strikeout_swinging")).outs).toBe(1);
+  });
+
+  it("走者がいても見逃し・空振り三振は走者確認しない", () => {
+    const onFirst = reduceGame(commitPlay(makeGame(), "single"));
+    expect(needsRunnerConfirm("strikeout_looking", onFirst)).toBe(false);
+    expect(needsRunnerConfirm("strikeout_swinging", onFirst)).toBe(false);
+    expect(proposeMoves("strikeout_looking", onFirst, onFirst.firstLineup[1])[0].to).toBe("out");
   });
 
   it("交代すると前の選手の背番号は残さない", () => {

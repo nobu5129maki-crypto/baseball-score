@@ -112,6 +112,14 @@ describe("gamePitcherStats", () => {
     expect(mine!.strikes).toBeGreaterThanOrEqual(3);
   });
 
+  it("見逃し三振も空振り三振も奪三振に数える", () => {
+    let game = makeGame();
+    game = commitPlay(game, "strikeout_looking");
+    game = commitPlay(game, "strikeout_swinging");
+    const mine = gamePitcherStats(game).find((p) => p.playerId === "B1");
+    expect(mine?.so).toBe(2);
+  });
+
   it("アウトを投球回に積む", () => {
     let game = makeGame();
     game = retireSide(game);

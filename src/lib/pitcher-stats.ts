@@ -8,6 +8,7 @@ import {
   reduceGame,
   totalRuns,
 } from "./engine";
+import { isStrikeoutResult } from "./rules";
 import type { Game, GameState, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PitcherGameStats = {
@@ -237,7 +238,7 @@ export function gamePitcherStats(game: Game): PitcherGameStats[] {
       }
 
       if (play.result === "walk") pRow.bb += 1;
-      if (play.result === "strikeout" || play.result === "dropped_third") pRow.so += 1;
+      if (isStrikeoutResult(play.result) || play.result === "dropped_third") pRow.so += 1;
       if (isHit(play.result)) {
         pRow.hits += 1;
         if (play.result === "homerun") pRow.hr += 1;

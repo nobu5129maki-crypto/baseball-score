@@ -6,6 +6,9 @@ describe("playLabel", () => {
     expect(playLabel("single")).toBe("安");
     expect(playLabel("groundout")).toBe("ゴ");
     expect(playLabel("dropped_third")).toBe("振逃");
+    expect(playLabel("strikeout")).toBe("三振");
+    expect(playLabel("strikeout_looking")).toBe("見三");
+    expect(playLabel("strikeout_swinging")).toBe("空三");
     expect(playLabel("homerun")).toBe("本");
   });
 
@@ -31,5 +34,7 @@ describe("needsField", () => {
   it("本塁打も方向が必要", () => {
     expect(needsField("homerun")).toBe(true);
     expect(needsField("strikeout")).toBe(false);
+    expect(needsField("strikeout_looking")).toBe(false);
+    expect(needsField("strikeout_swinging")).toBe(false);
   });
 });

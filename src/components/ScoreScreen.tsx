@@ -450,33 +450,41 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           <div className="px-2 pb-2">
             {chooseK ? (
               <div className="mb-2">
+                <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
+                  {allowDroppedThird ? DROPPED_THIRD.choosePrompt : DROPPED_THIRD.strikeoutOnlyPrompt}
+                </p>
+                {!allowDroppedThird ? (
+                  <p className="text-xs text-[#9aa894] text-center mb-2 leading-relaxed">
+                    {DROPPED_THIRD.blockedHint}
+                  </p>
+                ) : null}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="tap tap-result tap-out min-h-16"
+                    onClick={() => startResult("strikeout_looking")}
+                  >
+                    <span className="block text-xs font-normal opacity-90">見送った</span>
+                    見逃し三振
+                  </button>
+                  <button
+                    type="button"
+                    className="tap tap-result tap-out min-h-16"
+                    onClick={() => startResult("strikeout_swinging")}
+                  >
+                    <span className="block text-xs font-normal opacity-90">振った</span>
+                    空振り三振
+                  </button>
+                </div>
                 {allowDroppedThird ? (
-                  <>
-                    <p className="text-sm text-[#f5c518] text-center font-bold mb-2 leading-relaxed">
-                      {DROPPED_THIRD.choosePrompt}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button type="button" className="tap tap-result tap-out" onClick={() => startResult("strikeout")}>
-                        三振
-                      </button>
-                      <button type="button" className="tap tap-result tap-hit" onClick={() => startResult("dropped_third")}>
-                        振り逃げ
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-[#f5c518] text-center font-bold mb-1 leading-relaxed">
-                      {DROPPED_THIRD.strikeoutOnlyPrompt}
-                    </p>
-                    <p className="text-xs text-[#9aa894] text-center mb-2 leading-relaxed">
-                      {DROPPED_THIRD.blockedHint}
-                    </p>
-                    <button type="button" className="tap tap-result tap-out w-full" onClick={() => startResult("strikeout")}>
-                      三振
-                    </button>
-                  </>
-                )}
+                  <button
+                    type="button"
+                    className="tap tap-result tap-hit w-full mt-2"
+                    onClick={() => startResult("dropped_third")}
+                  >
+                    振り逃げ
+                  </button>
+                ) : null}
               </div>
             ) : (
               <>

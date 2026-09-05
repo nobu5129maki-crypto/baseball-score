@@ -52,6 +52,8 @@ describe("PLAY_RULES", () => {
 
   it("打数・安打・打点の数え方もルール表に従う", () => {
     expect(playIsAtBat("walk")).toBe(false);
+    expect(playIsAtBat("strikeout_looking")).toBe(true);
+    expect(playIsAtBat("strikeout_swinging")).toBe(true);
     expect(playIsAtBat("single")).toBe(true);
     expect(playHitValue("homerun")).toBe(4);
     expect(playHitValue("runner_hit")).toBe(1);
@@ -61,7 +63,7 @@ describe("PLAY_RULES", () => {
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {
-    for (const id of ["fc", "sh", "sf", "ks", "rh", "bk", "rbi", "slg", "ops", "ab"]) {
+    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "bk", "rbi", "slg", "ops", "ab"]) {
       expect(GLOSSARY.some((term) => term.id === id)).toBe(true);
     }
   });

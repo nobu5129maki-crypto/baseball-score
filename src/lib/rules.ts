@@ -29,6 +29,32 @@ export const PLAY_RULES: Record<PlayResult, PlayRule> = {
   triple: { needsField: true, isAb: true, hitValue: 3, awardsRbi: true },
   homerun: { needsField: true, isAb: true, hitValue: 4, awardsRbi: true },
   strikeout: { needsField: false, isAb: true, hitValue: 0, awardsRbi: true },
+  strikeout_looking: {
+    needsField: false,
+    isAb: true,
+    hitValue: 0,
+    awardsRbi: true,
+    term: {
+      id: "kl",
+      title: "見逃し三振",
+      plain: "3ストライク目をバットを振らずに見送って、打者がアウトになった三振です。スコアブックでは「見三」と書きます。",
+      when: "3ストライク目がストライクゾーンを通って、打者が振らなかったとき。",
+      symbol: "見三",
+    },
+  },
+  strikeout_swinging: {
+    needsField: false,
+    isAb: true,
+    hitValue: 0,
+    awardsRbi: true,
+    term: {
+      id: "ksw",
+      title: "空振り三振",
+      plain: "3ストライク目をバットが空振りして、打者がアウトになった三振です。スコアブックでは「空三」と書きます。",
+      when: "3ストライク目にバットがボールに当たらなかったとき（ファウルでなく空振り）。",
+      symbol: "空三",
+    },
+  },
   dropped_third: { needsField: false, isAb: true, hitValue: 0, awardsRbi: true },
   walk: { needsField: false, isAb: false, hitValue: 0, awardsRbi: true },
   hbp: { needsField: false, isAb: false, hitValue: 0, awardsRbi: true },
@@ -119,8 +145,8 @@ export const DROPPED_THIRD = {
   allowed(state: Pick<GameState, "outs" | "bases">): boolean {
     return state.outs >= 2 || state.bases[0] == null;
   },
-  choosePrompt: "3ストライクです。三振か振り逃げを選んでください。",
-  strikeoutOnlyPrompt: "3ストライクです。三振を選んでください。",
+  choosePrompt: "3ストライクです。見逃し・空振り・振り逃げを選んでください。",
+  strikeoutOnlyPrompt: "3ストライクです。見逃し三振か空振り三振を選んでください。",
   blockedHint: "1塁に走者がいて2死未満のため、振り逃げはできません。",
   term: {
     id: "ks",
@@ -170,6 +196,10 @@ export const SITUATION_TERMS: RuleTerm[] = [
     symbol: "BK",
   },
 ];
+
+export function isStrikeoutResult(result: PlayResult): boolean {
+  return result === "strikeout" || result === "strikeout_looking" || result === "strikeout_swinging";
+}
 
 export function playRule(result: PlayResult): PlayRule {
   return PLAY_RULES[result];

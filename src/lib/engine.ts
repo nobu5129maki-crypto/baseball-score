@@ -16,7 +16,7 @@ import type {
   Side,
 } from "./types";
 import { stampEndTime } from "./game-time";
-import { droppedThirdAllowed, needsField } from "./rules";
+import { droppedThirdAllowed, isStrikeoutResult, needsField } from "./rules";
 import { PITCHER_ORDER, SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
@@ -130,7 +130,7 @@ export function canDroppedThird(state: GameState): boolean {
 
 export function playAddsPitch(result: PlayResult, state: Pick<GameState, "balls" | "strikes">): boolean {
   if (result === "walk") return state.balls < 4;
-  if (result === "strikeout" || result === "dropped_third") return state.strikes < 3;
+  if (isStrikeoutResult(result) || result === "dropped_third") return state.strikes < 3;
   return true;
 }
 
@@ -177,7 +177,7 @@ export function previewAfterMoves(
 }
 
 export function needsRunnerConfirm(result: PlayResult, state: GameState): boolean {
-  if (result === "strikeout") return false;
+  if (isStrikeoutResult(result)) return false;
   if (result === "homerun") return false;
   const hasRunner = state.bases.some(Boolean);
   if (hasRunner) return true;
@@ -222,6 +222,8 @@ export function proposeMoves(
     case "dropped_third":
       return forceWalk(batter.playerId, state.bases);
     case "strikeout":
+    case "strikeout_looking":
+    case "strikeout_swinging":
     case "groundout":
     case "flyout":
     case "lineout":
