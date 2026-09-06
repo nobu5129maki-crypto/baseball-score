@@ -137,6 +137,22 @@ describe("gamePitcherStats", () => {
     expect(mine).toMatchObject({ groundBalls: 1, flyBalls: 1, lineBalls: 1 });
   });
 
+  it("ヒットのゴロ・フライ・ライナーも打球種類に数える", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single", undefined, "LF", "ground");
+    game = commitPlay(game, "double", undefined, "CF", "fly");
+    game = commitPlay(game, "single", undefined, "RF", "line");
+    const mine = gamePitcherStats(game).find((p) => p.playerId === "B1");
+    expect(mine).toMatchObject({ groundBalls: 1, flyBalls: 1, lineBalls: 1, hits: 3 });
+  });
+
+  it("本塁打にライナーを付けたときはフライではなくライナーに数える", () => {
+    let game = makeGame();
+    game = commitPlay(game, "homerun", undefined, "LF", "line");
+    const mine = gamePitcherStats(game).find((p) => p.playerId === "B1");
+    expect(mine).toMatchObject({ lineBalls: 1, flyBalls: 0, hr: 1 });
+  });
+
   it("エラーで出た走者の得点は自責にしない", () => {
     let game = makeGame();
     game = commitPlay(game, "error", undefined, "SS");

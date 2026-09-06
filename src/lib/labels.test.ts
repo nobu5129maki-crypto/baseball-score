@@ -14,6 +14,10 @@ describe("playLabel", () => {
 
   it("方向付きは左安・遊ゴ・左本と書く", () => {
     expect(playLabel("single", "LF")).toBe("左安");
+    expect(playLabel("single", "LF", "ground")).toBe("左安ゴ");
+    expect(playLabel("single", "LF", "fly")).toBe("左安飛");
+    expect(playLabel("double", "RF", "line")).toBe("右二直");
+    expect(playLabel("homerun", "CF", "fly")).toBe("中本飛");
     expect(playLabel("groundout", "SS")).toBe("遊ゴ");
     expect(playLabel("homerun", "CF")).toBe("中本");
   });

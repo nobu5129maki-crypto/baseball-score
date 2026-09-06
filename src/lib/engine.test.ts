@@ -469,6 +469,13 @@ describe("らくスコア engine", () => {
     expect(play && play.t === "play" && play.field).toBe("LF");
   });
 
+  it("ヒットにゴロ・フライ・ライナーを付けて記録できる", () => {
+    const game = commitPlay(makeGame(), "single", undefined, "LF", "ground");
+    const play = game.events.find((e) => e.t === "play");
+    expect(play && play.t === "play" && play.batted).toBe("ground");
+    expect(play && play.t === "play" && play.field).toBe("LF");
+  });
+
   it("投手交代で今の投手の投球数はリセットされる", () => {
     let game = makeGame();
     game = commitPitch(game, "strike");

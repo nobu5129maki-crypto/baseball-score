@@ -1,6 +1,7 @@
 import { newId } from "./ids";
 import type {
   Base,
+  BattedBall,
   Dest,
   Game,
   GameEvent,
@@ -689,12 +690,19 @@ export function commitPlay(
   result: PlayResult,
   moves?: RunnerMove[],
   field?: Position,
+  batted?: BattedBall,
 ): Game {
   const state = reduceGame(game);
   if (state.ended) return game;
   const batter = getBatter(state);
   const resolved = moves ?? proposeMoves(result, state, batter);
-  return commitEvent(game, { t: "play", result, moves: resolved, field });
+  return commitEvent(game, {
+    t: "play",
+    result,
+    moves: resolved,
+    field,
+    ...(batted ? { batted } : {}),
+  });
 }
 
 export function commitSteal(game: Game, from: Base, to: Dest): Game {

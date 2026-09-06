@@ -1,4 +1,4 @@
-import type { GameState, PlayResult } from "./types";
+import type { BattedBall, GameState, PlayResult } from "./types";
 
 /** 採点ルールの単一ソース。ここを直すとボタン表示・成績集計・用語解説が追随する。 */
 
@@ -199,6 +199,15 @@ export const SITUATION_TERMS: RuleTerm[] = [
 
 export function isStrikeoutResult(result: PlayResult): boolean {
   return result === "strikeout" || result === "strikeout_looking" || result === "strikeout_swinging";
+}
+
+/** 打球種類。ヒットに明示があればそれを使い、アウトは結果から推定する */
+export function inferredBattedBall(result: PlayResult, batted?: BattedBall): BattedBall | undefined {
+  if (batted) return batted;
+  if (result === "groundout" || result === "gidp") return "ground";
+  if (result === "flyout" || result === "sac_fly" || result === "homerun") return "fly";
+  if (result === "lineout") return "line";
+  return undefined;
 }
 
 export function playRule(result: PlayResult): PlayRule {

@@ -1,5 +1,5 @@
 import { FIELD_RESULTS, needsField } from "./rules";
-import { POSITION_SHORT, type PlayResult, type Position } from "./types";
+import { POSITION_SHORT, type BattedBall, type PlayResult, type Position } from "./types";
 
 export const PLAY_LABELS: Record<PlayResult, string> = {
   single: "シングル",
@@ -49,16 +49,34 @@ export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun
 export const OUT_RESULTS: PlayResult[] = ["groundout", "flyout", "lineout", "gidp"];
 export const OTHER_RESULTS: PlayResult[] = ["fielders_choice", "sac_bunt", "sac_fly"];
 
+export const BATTED_BALLS: BattedBall[] = ["ground", "fly", "line"];
+export const BATTED_LABELS: Record<BattedBall, string> = {
+  ground: "ゴロ",
+  fly: "フライ",
+  line: "ライナー",
+};
+export const BATTED_HINTS: Record<BattedBall, string> = {
+  ground: "転がった",
+  fly: "上がった",
+  line: "直線",
+};
+export const BATTED_SHORT: Record<BattedBall, string> = {
+  ground: "ゴ",
+  fly: "飛",
+  line: "直",
+};
+
 export { FIELD_RESULTS, needsField };
 
 export function isHitResult(result: PlayResult): boolean {
   return HIT_RESULTS.includes(result);
 }
 
-export function playLabel(result: PlayResult, field?: Position): string {
+export function playLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {
   const short = PLAY_SHORT[result];
-  if (!field) return short;
-  return `${POSITION_SHORT[field]}${short}`;
+  const kind = isHitResult(result) && batted ? BATTED_SHORT[batted] : "";
+  if (!field) return `${short}${kind}`;
+  return `${POSITION_SHORT[field]}${short}${kind}`;
 }
 
 /** 打順と区別するため、背番号は #18 と書く */

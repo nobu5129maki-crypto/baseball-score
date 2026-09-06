@@ -90,6 +90,9 @@ export const SCOREBOARD_INNINGS = 12;
 
 export type PitchKind = "ball" | "strike" | "foul";
 
+/** ヒットの当たり方。アウトのゴロ／フライ／ライナーとは別に、安打側で持つ */
+export type BattedBall = "ground" | "fly" | "line";
+
 export type PlayResult =
   | "single"
   | "double"
@@ -131,6 +134,8 @@ export type PlayEvent = {
   result: PlayResult;
   moves: RunnerMove[];
   field?: Position;
+  /** ヒットのゴロ／フライ／ライナー。古い試合には無い */
+  batted?: BattedBall;
 };
 
 export type StealEvent = {

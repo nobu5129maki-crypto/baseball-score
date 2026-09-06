@@ -8,7 +8,7 @@ import {
   reduceGame,
   totalRuns,
 } from "./engine";
-import { isStrikeoutResult } from "./rules";
+import { inferredBattedBall, isStrikeoutResult } from "./rules";
 import type { Game, GameState, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PitcherGameStats = {
@@ -243,11 +243,10 @@ export function gamePitcherStats(game: Game): PitcherGameStats[] {
         pRow.hits += 1;
         if (play.result === "homerun") pRow.hr += 1;
       }
-      if (play.result === "groundout" || play.result === "gidp") pRow.groundBalls += 1;
-      if (play.result === "flyout" || play.result === "sac_fly" || play.result === "homerun") {
-        pRow.flyBalls += 1;
-      }
-      if (play.result === "lineout") pRow.lineBalls += 1;
+      const batted = inferredBattedBall(play.result, play.batted);
+      if (batted === "ground") pRow.groundBalls += 1;
+      if (batted === "fly") pRow.flyBalls += 1;
+      if (batted === "line") pRow.lineBalls += 1;
 
       const outsMade = countOuts(play.moves);
       pRow.outs += outsMade;

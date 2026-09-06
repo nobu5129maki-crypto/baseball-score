@@ -99,6 +99,15 @@ describe("buildScorebook", () => {
     expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("空三");
   });
 
+  it("ヒットのゴロ・フライ・ライナーをスコアブックで書き分ける", () => {
+    const ground = commitPlay(makeGame(), "single", undefined, "LF", "ground");
+    expect(buildScorebook(ground).first.orders[0].innings[0].map((m) => m.label)).toContain("左安ゴ");
+    const fly = commitPlay(makeGame(), "double", undefined, "CF", "fly");
+    expect(buildScorebook(fly).first.orders[0].innings[0].map((m) => m.label)).toContain("中二飛");
+    const line = commitPlay(makeGame(), "single", undefined, "RF", "line");
+    expect(buildScorebook(line).first.orders[0].innings[0].map((m) => m.label)).toContain("右安直");
+  });
+
   it("同じ選手の守備位置変更は名前を増やさない", () => {
     const game = commitSub(makeGame(), "first", 1, "A1", "A1", "LF");
     const row = buildScorebook(game).first.orders[0];

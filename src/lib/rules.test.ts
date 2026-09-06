@@ -9,6 +9,7 @@ import {
   playBlockedReason,
   playHitValue,
   playIsAtBat,
+  inferredBattedBall,
 } from "./rules";
 import type { GameState, PlayResult } from "./types";
 
@@ -60,6 +61,15 @@ describe("PLAY_RULES", () => {
     expect(playAwardsRbi("gidp")).toBe(false);
     expect(playAwardsRbi("error")).toBe(false);
     expect(playAwardsRbi("sac_fly")).toBe(true);
+  });
+
+  it("ヒットに付けた当たり方を優先し、付けてない本塁打はフライとみなす", () => {
+    expect(inferredBattedBall("single")).toBeUndefined();
+    expect(inferredBattedBall("single", "ground")).toBe("ground");
+    expect(inferredBattedBall("homerun")).toBe("fly");
+    expect(inferredBattedBall("homerun", "line")).toBe("line");
+    expect(inferredBattedBall("groundout")).toBe("ground");
+    expect(inferredBattedBall("lineout")).toBe("line");
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {

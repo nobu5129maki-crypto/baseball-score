@@ -1,6 +1,6 @@
 import { isHitResult, playLabel } from "./labels";
 import { battingSide, getBatter, reduceGame } from "./engine";
-import type { Game, LineupSlot, PlayResult, Position, Side } from "./types";
+import type { BattedBall, Game, LineupSlot, PlayResult, Position, Side } from "./types";
 
 export type ScorebookMark = {
   label: string;
@@ -51,8 +51,8 @@ export function displayInnings(game: Game, liveInning = 0): number {
   return Math.min(MAX_INNINGS, Math.max(REGULATION_DISPLAY_INNINGS, played));
 }
 
-function bookPlayLabel(result: PlayResult, field?: Position): string {
-  return playLabel(result, field);
+function bookPlayLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {
+  return playLabel(result, field, batted);
 }
 
 function emptySide(lineup: LineupSlot[], innings: number): ScorebookSide {
@@ -136,7 +136,7 @@ export function buildScorebook(game: Game): Scorebook {
         battingBook,
         batter.order,
         before.inning,
-        bookPlayLabel(event.result, event.field),
+        bookPlayLabel(event.result, event.field, event.batted),
         isHitResult(event.result),
       );
       const scored = event.moves.filter((m) => m.to === 4).length;

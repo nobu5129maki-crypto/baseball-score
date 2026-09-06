@@ -36,13 +36,13 @@ import {
 } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
-import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
+import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD } from "@/lib/rules";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
 import { POSITION_LABELS } from "@/lib/types";
-import type { Base, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
+import type { Base, BattedBall, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { DefenseSheet } from "./DefenseSheet";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { DiamondMap } from "./DiamondMap";
@@ -73,6 +73,7 @@ type SheetKind =
   | "pr"
   | "ph"
   | "field"
+  | "batted"
   | "hit_runner";
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
@@ -88,10 +89,12 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const [glossaryId, setGlossaryId] = useState<string | "index">("index");
   const [glossaryBack, setGlossaryBack] = useState<SheetKind>(null);
   const [pendingResult, setPendingResult] = useState<PlayResult | null>(null);
+  const [pendingBatted, setPendingBatted] = useState<BattedBall | undefined>(undefined);
   const [confirm, setConfirm] = useState<{
     result: PlayResult;
     moves: RunnerMove[];
     field?: Position;
+    batted?: BattedBall;
     selectedId: string | null;
   } | null>(null);
   const [startNotice, setStartNotice] = useState<string | null>(null);
@@ -143,22 +146,29 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     setSheet(null);
     if (!state) return;
     if (playBlockedReason(result, state)) return;
+    if (isHitResult(result)) {
+      setPendingResult(result);
+      setPendingBatted(undefined);
+      setSheet("batted");
+      return;
+    }
     if (needsFieldPosition(result)) {
       setPendingResult(result);
+      setPendingBatted(undefined);
       setSheet("field");
       return;
     }
     finishResult(result);
   }
 
-  function finishResult(result: PlayResult, field?: Position) {
+  function finishResult(result: PlayResult, field?: Position, batted?: BattedBall) {
     if (!state) return;
     const moves = proposeMoves(result, state, batter);
     if (needsRunnerConfirm(result, state)) {
-      setConfirm({ result, moves, field, selectedId: null });
+      setConfirm({ result, moves, field, batted, selectedId: null });
       return;
     }
-    void patch((g) => commitPlay(g, result, moves, field));
+    void patch((g) => commitPlay(g, result, moves, field, batted));
   }
 
   function setMove(playerId: string, from: 0 | 1 | 2 | 3, to: Dest) {
@@ -379,12 +389,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               type="button"
               className="tap tap-accent flex-1"
               onClick={() => {
-                const { result, moves, field } = confirm;
+                const { result, moves, field, batted } = confirm;
                 setConfirm(null);
-                void patch((g) => commitPlay(g, result, moves, field));
+                void patch((g) => commitPlay(g, result, moves, field, batted));
               }}
             >
-              {PLAY_LABELS[confirm.result]}で確定
+              {PLAY_LABELS[confirm.result]}
+              {confirm.batted ? `（${BATTED_LABELS[confirm.batted]}）` : ""}
+              で確定
             </button>
           </div>
         </div>
@@ -551,6 +563,41 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       {sheet === "hit" ? (
         <ResultSheet title="どんなヒット？" results={HIT_RESULTS} onPick={startResult} onClose={() => setSheet(null)} />
       ) : null}
+      {sheet === "batted" && pendingResult ? (
+        <Sheet
+          title={`${PLAY_LABELS[pendingResult]}はどんな当たり？`}
+          onClose={() => {
+            setSheet(null);
+            setPendingResult(null);
+            setPendingBatted(undefined);
+          }}
+        >
+          <div className="grid grid-cols-3 gap-2">
+            {BATTED_BALLS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={`tap tap-result min-h-20 ${pendingBatted === kind ? "tap-accent" : ""}`}
+                onClick={() => {
+                  const result = pendingResult;
+                  setPendingBatted(kind);
+                  if (needsFieldPosition(result)) {
+                    setSheet("field");
+                    return;
+                  }
+                  setPendingResult(null);
+                  setPendingBatted(undefined);
+                  setSheet(null);
+                  finishResult(result, undefined, kind);
+                }}
+              >
+                <span className="block text-xs font-normal opacity-90">{BATTED_HINTS[kind]}</span>
+                {BATTED_LABELS[kind]}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      ) : null}
       {sheet === "out" ? (
         <ResultSheet title="どんなアウト？" results={outResults} onPick={startResult} onClose={() => setSheet(null)} />
       ) : null}
@@ -586,16 +633,23 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       ) : null}
       {sheet === "field" && pendingResult ? (
         <PositionPicker
-          title={`${PLAY_LABELS[pendingResult]} — どこへ？`}
+          title={`${PLAY_LABELS[pendingResult]}${pendingBatted ? `（${BATTED_LABELS[pendingBatted]}）` : ""} — どこへ？`}
           onClose={() => {
+            if (isHitResult(pendingResult)) {
+              setSheet("batted");
+              return;
+            }
             setSheet(null);
             setPendingResult(null);
+            setPendingBatted(undefined);
           }}
           onPick={(pos) => {
             const result = pendingResult;
+            const batted = pendingBatted;
             setPendingResult(null);
+            setPendingBatted(undefined);
             setSheet(null);
-            finishResult(result, pos);
+            finishResult(result, pos, batted);
           }}
         />
       ) : null}
