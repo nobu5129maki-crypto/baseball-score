@@ -99,13 +99,22 @@ describe("buildScorebook", () => {
     expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("空三");
   });
 
-  it("ヒットのゴロ・フライ・ライナーをスコアブックで書き分ける", () => {
+  it("ヒットのゴロ・フライ・ライナーは漢字を変えず当たり方を載せる", () => {
     const ground = commitPlay(makeGame(), "single", undefined, "LF", "ground");
-    expect(buildScorebook(ground).first.orders[0].innings[0].map((m) => m.label)).toContain("左安ゴ");
+    const groundMark = buildScorebook(ground).first.orders[0].innings[0].find((m) => m.label === "左安");
+    expect(groundMark).toMatchObject({ label: "左安", hit: true, batted: "ground" });
     const fly = commitPlay(makeGame(), "double", undefined, "CF", "fly");
-    expect(buildScorebook(fly).first.orders[0].innings[0].map((m) => m.label)).toContain("中二飛");
+    expect(buildScorebook(fly).first.orders[0].innings[0].find((m) => m.label === "中二")).toMatchObject({
+      label: "中二",
+      hit: true,
+      batted: "fly",
+    });
     const line = commitPlay(makeGame(), "single", undefined, "RF", "line");
-    expect(buildScorebook(line).first.orders[0].innings[0].map((m) => m.label)).toContain("右安直");
+    expect(buildScorebook(line).first.orders[0].innings[0].find((m) => m.label === "右安")).toMatchObject({
+      label: "右安",
+      hit: true,
+      batted: "line",
+    });
   });
 
   it("同じ選手の守備位置変更は名前を増やさない", () => {

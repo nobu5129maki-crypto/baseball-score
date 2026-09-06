@@ -11,7 +11,7 @@ import {
   totalRuns,
 } from "./engine";
 import { playAwardsRbi, playHitValue, playIsAtBat } from "./rules";
-import type { Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
+import type { BattedBall, Game, GameEvent, Half, LineupSlot, PlayEvent, PlayResult, Side } from "./types";
 
 export type PlayerSlash = {
   playerId: string;
@@ -126,6 +126,7 @@ export type AtBatNote = {
   half: Half;
   label: string;
   result: PlayResult;
+  batted?: BattedBall;
 };
 
 export function atBatsThisGame(
@@ -148,8 +149,9 @@ export function atBatsThisGame(
       notes.push({
         inning: before.inning,
         half: before.half,
-        label: playLabel(play.result, play.field, play.batted),
+        label: playLabel(play.result, play.field),
         result: play.result,
+        ...(play.batted ? { batted: play.batted } : {}),
       });
     }
     cursor = { ...cursor, events: [...cursor.events, event] };

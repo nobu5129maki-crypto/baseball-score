@@ -133,7 +133,7 @@ export default function SummaryPage() {
           onHelpWin={() => setPitchHelp("win")}
         />
 
-        <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
+        <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} legend />
         <ScorebookView title={`後攻 ${second}`} side={book.second} innings={book.innings} />
 
         <BattingLines

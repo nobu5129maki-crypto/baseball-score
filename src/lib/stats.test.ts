@@ -42,6 +42,13 @@ describe("atBatsThisGame", () => {
     ]);
   });
 
+  it("ヒットの当たり方を打席メモに残す", () => {
+    const game = commitPlay(makeGame(), "single", undefined, "LF", "ground");
+    expect(atBatsThisGame(game, { playerId: "A1", order: 1 }, "top")).toEqual([
+      { inning: 1, half: "top", label: "左安", result: "single", batted: "ground" },
+    ]);
+  });
+
   it("代打は同じ打順でも前の打者の打席を出さない", () => {
     let game = makeGame();
     for (let i = 0; i < 18; i++) game = commitPlay(game, "strikeout");
