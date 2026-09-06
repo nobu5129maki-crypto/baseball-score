@@ -45,7 +45,7 @@ describe("atBatsThisGame", () => {
   it("ヒットの当たり方を打席メモに残す", () => {
     const game = commitPlay(makeGame(), "single", undefined, "LF", "ground");
     expect(atBatsThisGame(game, { playerId: "A1", order: 1 }, "top")).toEqual([
-      { inning: 1, half: "top", label: "左安", result: "single", batted: "ground" },
+      { inning: 1, half: "top", label: "左安ゴ", result: "single", batted: "ground" },
     ]);
   });
 

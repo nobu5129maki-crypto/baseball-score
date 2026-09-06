@@ -5,7 +5,6 @@ import type { BattedBall, Game, LineupSlot, PlayResult, Position, Side } from ".
 export type ScorebookMark = {
   label: string;
   hit?: boolean;
-  batted?: BattedBall;
 };
 
 export type ScorebookPlayer = {
@@ -52,8 +51,8 @@ export function displayInnings(game: Game, liveInning = 0): number {
   return Math.min(MAX_INNINGS, Math.max(REGULATION_DISPLAY_INNINGS, played));
 }
 
-function bookPlayLabel(result: PlayResult, field?: Position): string {
-  return playLabel(result, field);
+function bookPlayLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {
+  return playLabel(result, field, batted);
 }
 
 function emptySide(lineup: LineupSlot[], innings: number): ScorebookSide {
@@ -87,16 +86,12 @@ function pushMark(
   inning: number,
   label: string,
   hit = false,
-  batted?: BattedBall,
 ) {
   const row = side.orders.find((o) => o.order === battingOrder);
   if (!row) return;
   const col = inning - 1;
   if (col < 0 || col >= row.innings.length) return;
-  const mark: ScorebookMark = { label };
-  if (hit) mark.hit = true;
-  if (hit && batted) mark.batted = batted;
-  row.innings[col].push(mark);
+  row.innings[col].push(hit ? { label, hit: true } : { label });
 }
 
 function applyPlayerChange(
@@ -141,9 +136,8 @@ export function buildScorebook(game: Game): Scorebook {
         battingBook,
         batter.order,
         before.inning,
-        bookPlayLabel(event.result, event.field),
+        bookPlayLabel(event.result, event.field, event.batted),
         isHitResult(event.result),
-        event.batted,
       );
       const scored = event.moves.filter((m) => m.to === 4).length;
       if (scored > 0 && event.result !== "homerun") {

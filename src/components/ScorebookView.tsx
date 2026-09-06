@@ -1,6 +1,5 @@
 "use client";
 
-import { BattedKanji, BattedLegend } from "./BattedKanji";
 import { POSITION_SHORT } from "@/lib/types";
 import { jerseyLabel } from "@/lib/labels";
 import type { Scorebook, ScorebookOrder, ScorebookPlayer } from "@/lib/scorebook";
@@ -16,23 +15,20 @@ export function ScorebookView({
   title,
   side,
   innings,
-  legend = false,
 }: {
   title: string;
   side: Scorebook["first"];
   innings: number;
-  legend?: boolean;
 }) {
   const hasMarks = side.orders.some((row) => row.innings.some((cell) => cell.length > 0));
 
   return (
     <section className="scorebook-team">
       <h3 className="font-bold mb-2">{title}</h3>
-      {legend ? <BattedLegend /> : null}
       {!hasMarks ? (
         <p className="text-sm text-[#9aa894] mb-2">このチームの打席記録はまだありません。</p>
       ) : null}
-      <div className="overflow-x-auto pt-1">
+      <div className="overflow-x-auto">
         <table className="scorebook-table w-full text-center border-collapse">
           <thead>
             <tr>
@@ -58,8 +54,8 @@ export function ScorebookView({
                       <span className="scorebook-empty">　</span>
                     ) : (
                       cell.map((m, i) => (
-                        <div key={`${m.label}-${m.batted ?? ""}-${i}`} className="scorebook-mark">
-                          <BattedKanji text={m.label} hit={m.hit} batted={m.batted} />
+                        <div key={`${m.label}-${i}`} className={`leading-tight ${m.hit ? "scorebook-hit" : ""}`}>
+                          {m.label}
                         </div>
                       ))
                     )}

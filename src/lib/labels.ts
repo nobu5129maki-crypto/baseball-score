@@ -60,6 +60,11 @@ export const BATTED_HINTS: Record<BattedBall, string> = {
   fly: "上がった",
   line: "直線",
 };
+export const BATTED_SHORT: Record<BattedBall, string> = {
+  ground: "ゴ",
+  fly: "飛",
+  line: "直",
+};
 
 export { FIELD_RESULTS, needsField };
 
@@ -67,10 +72,11 @@ export function isHitResult(result: PlayResult): boolean {
   return HIT_RESULTS.includes(result);
 }
 
-export function playLabel(result: PlayResult, field?: Position): string {
+export function playLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {
   const short = PLAY_SHORT[result];
-  if (!field) return short;
-  return `${POSITION_SHORT[field]}${short}`;
+  const kind = isHitResult(result) && batted ? BATTED_SHORT[batted] : "";
+  if (!field) return `${short}${kind}`;
+  return `${POSITION_SHORT[field]}${short}${kind}`;
 }
 
 /** 打順と区別するため、背番号は #18 と書く */

@@ -149,7 +149,7 @@ export function atBatsThisGame(
       notes.push({
         inning: before.inning,
         half: before.half,
-        label: playLabel(play.result, play.field),
+        label: playLabel(play.result, play.field, play.batted),
         result: play.result,
         ...(play.batted ? { batted: play.batted } : {}),
       });

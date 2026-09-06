@@ -43,7 +43,6 @@ import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGa
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
 import { POSITION_LABELS } from "@/lib/types";
 import type { Base, BattedBall, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
-import { BattedKanji } from "./BattedKanji";
 import { DefenseSheet } from "./DefenseSheet";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { DiamondMap } from "./DiamondMap";
@@ -289,12 +288,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             {atBats.map((ab, i) => (
               <span
                 key={`${ab.inning}-${ab.result}-${i}`}
-                className={`at-bat-chip rounded-lg bg-[#070a08] border border-[#2c3c30] px-2 py-2 text-sm font-bold ${
+                className={`rounded-lg bg-[#070a08] border border-[#2c3c30] px-2 py-1 text-sm font-bold ${
                   isHitResult(ab.result) ? "text-[#ff5a5a]" : ""
                 }`}
               >
-                {ab.inning}回{" "}
-                <BattedKanji text={ab.label} hit={isHitResult(ab.result)} batted={ab.batted} />
+                {ab.inning}回 {ab.label}
               </span>
             ))}
           </div>
