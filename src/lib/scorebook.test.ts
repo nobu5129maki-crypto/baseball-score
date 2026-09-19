@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commitEnd, commitPickoff, commitPinchHitter, commitPlay, commitSteal, commitSub, reduceGame } from "./engine";
-import { buildScorebook, displayInnings, lastPlayedInning } from "./scorebook";
+import { buildScorebook, displayInnings, lastPlayedInning, lineScoreCells } from "./scorebook";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -159,5 +159,74 @@ describe("displayInnings", () => {
     expect(lastPlayedInning(game)).toBe(12);
     expect(displayInnings(game)).toBe(12);
     expect(buildScorebook(game).innings).toBe(12);
+  });
+});
+
+function outs(game: Game, n: number): Game {
+  let next = game;
+  for (let i = 0; i < n; i++) next = commitPlay(next, "groundout");
+  return next;
+}
+
+function line(game: Game, cols = 4) {
+  const state = reduceGame(game);
+  return {
+    first: lineScoreCells(state.scores.first, cols, "first", game, state),
+    second: lineScoreCells(state.scores.second, cols, "second", game, state),
+    state,
+  };
+}
+
+describe("lineScoreCells", () => {
+  it("1回表の開始直後は先攻1回だけ0、後攻1回は未開始", () => {
+    const { first, second } = line(makeGame());
+    expect(first).toEqual([0, null, null, null]);
+    expect(second).toEqual([null, null, null, null]);
+  });
+
+  it("2回表のあいだは後攻2回を未開始のままにする", () => {
+    const { first, second, state } = line(outs(makeGame(), 6));
+    expect(state.inning).toBe(2);
+    expect(state.half).toBe("top");
+    expect(first).toEqual([0, 0, null, null]);
+    expect(second).toEqual([0, null, null, null]);
+  });
+
+  it("2回表で試合終了したら後攻2回は点ではなく未開始", () => {
+    const { first, second, state } = line(commitEnd(outs(makeGame(), 6)));
+    expect(state.ended).toBe(true);
+    expect(state.half).toBe("top");
+    expect(first).toEqual([0, 0, null, null]);
+    expect(second).toEqual([0, null, null, null]);
+  });
+
+  it("2回表が終わった直後に終了したら後攻2回も未開始のままにする", () => {
+    const { first, second, state } = line(commitEnd(outs(makeGame(), 9)));
+    expect(state.ended).toBe(true);
+    expect(state.inning).toBe(2);
+    expect(state.half).toBe("bottom");
+    expect(first).toEqual([0, 0, null, null]);
+    expect(second).toEqual([0, null, null, null]);
+  });
+
+  it("2回裏が始まったら後攻2回は0になる", () => {
+    const game = commitPlay(outs(makeGame(), 9), "groundout");
+    const { first, second, state } = line(game);
+    expect(state.inning).toBe(2);
+    expect(state.half).toBe("bottom");
+    expect(first).toEqual([0, 0, null, null]);
+    expect(second).toEqual([0, 0, null, null]);
+  });
+
+  it("規定回表のあと裏を省略したら後攻はその回をXにする", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 2 };
+    game = outs(game, 3);
+    game = commitPlay(game, "homerun");
+    game = outs(game, 6);
+    const { first, second, state } = line(game);
+    expect(state.ended).toBe(true);
+    expect(state.bottomUnplayed).toBe(true);
+    expect(first).toEqual([0, 0, null, null]);
+    expect(second).toEqual([1, "X", null, null]);
   });
 });

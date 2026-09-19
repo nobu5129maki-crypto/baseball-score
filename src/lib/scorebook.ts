@@ -1,6 +1,6 @@
 import { isHitResult, playLabel } from "./labels";
 import { battingSide, getBatter, reduceGame } from "./engine";
-import type { BattedBall, Game, LineupSlot, PlayResult, Position, Side } from "./types";
+import type { BattedBall, Game, GameState, LineupSlot, PlayResult, Position, Side } from "./types";
 
 export type ScorebookMark = {
   label: string;
@@ -49,6 +49,45 @@ export function lastPlayedInning(game: Game): number {
 export function displayInnings(game: Game, liveInning = 0): number {
   const played = Math.max(lastPlayedInning(game), liveInning);
   return Math.min(MAX_INNINGS, Math.max(REGULATION_DISPLAY_INNINGS, played));
+}
+
+function halfHasEvents(game: Game, side: Side, inning: number): boolean {
+  let cursor: Game = { ...game, events: [] };
+  for (const event of game.events) {
+    if (event.t === "end_game") continue;
+    const before = reduceGame(cursor);
+    if (before.inning === inning && battingSide(before.half) === side) return true;
+    cursor = { ...cursor, events: [...cursor.events, event] };
+  }
+  return false;
+}
+
+/** まだ始まっていない半イニングは null（表示は「·」）。裏を省略した回は "X"。 */
+export function inningScoreCell(
+  inningIndex: number,
+  score: number,
+  side: Side,
+  game: Game,
+  state: Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed">,
+): number | "X" | null {
+  const inning = inningIndex + 1;
+  if (side === "second" && state.bottomUnplayed && inning === state.inning) return "X";
+  if (state.inning < inning) return null;
+  if (state.inning > inning) return score;
+  if (side === "first") return score;
+  if (state.half !== "bottom") return null;
+  if (!state.ended) return score;
+  return halfHasEvents(game, "second", inning) ? score : null;
+}
+
+export function lineScoreCells(
+  scores: number[],
+  cols: number,
+  side: Side,
+  game: Game,
+  state: Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed">,
+): Array<number | "X" | null> {
+  return Array.from({ length: cols }, (_, i) => inningScoreCell(i, scores[i] ?? 0, side, game, state));
 }
 
 function bookPlayLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {

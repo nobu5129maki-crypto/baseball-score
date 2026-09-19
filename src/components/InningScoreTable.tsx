@@ -1,6 +1,5 @@
 import { totalRuns } from "@/lib/engine";
-import { displayInnings } from "@/lib/scorebook";
-import { inningScoreCells } from "@/lib/inning-score";
+import { displayInnings, lineScoreCells } from "@/lib/scorebook";
 import type { Game, GameState } from "@/lib/types";
 
 export function InningScoreTable({
@@ -37,7 +36,7 @@ export function InningScoreTable({
         <tbody>
           <ScoreRow
             name={firstName}
-            innings={inningScoreCells(state.scores.first, cols, state, "first")}
+            innings={lineScoreCells(state.scores.first, cols, "first", game, state)}
             r={totalRuns(state.scores.first)}
             h={state.hits.first}
             e={state.errors.first}
@@ -45,7 +44,7 @@ export function InningScoreTable({
           />
           <ScoreRow
             name={secondName}
-            innings={inningScoreCells(state.scores.second, cols, state, "second")}
+            innings={lineScoreCells(state.scores.second, cols, "second", game, state)}
             r={totalRuns(state.scores.second)}
             h={state.hits.second}
             e={state.errors.second}
