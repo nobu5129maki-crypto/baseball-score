@@ -1,5 +1,6 @@
 import { totalRuns } from "@/lib/engine";
-import { displayInnings, lastPlayedInning } from "@/lib/scorebook";
+import { displayInnings } from "@/lib/scorebook";
+import { inningScoreCells } from "@/lib/inning-score";
 import type { Game, GameState } from "@/lib/types";
 
 export function InningScoreTable({
@@ -15,9 +16,7 @@ export function InningScoreTable({
 }) {
   const liveInning = state.ended ? 0 : state.inning;
   const cols = displayInnings(game, liveInning);
-  const played = Math.max(lastPlayedInning(game), liveInning);
   const headers = Array.from({ length: cols }, (_, i) => String(i + 1));
-  const skipBottomAt = state.bottomUnplayed ? state.inning : 0;
 
   return (
     <div className="overflow-x-auto">
@@ -38,7 +37,7 @@ export function InningScoreTable({
         <tbody>
           <ScoreRow
             name={firstName}
-            innings={cells(state.scores.first, cols, played)}
+            innings={inningScoreCells(state.scores.first, cols, state, "first")}
             r={totalRuns(state.scores.first)}
             h={state.hits.first}
             e={state.errors.first}
@@ -46,7 +45,7 @@ export function InningScoreTable({
           />
           <ScoreRow
             name={secondName}
-            innings={cells(state.scores.second, cols, played, skipBottomAt)}
+            innings={inningScoreCells(state.scores.second, cols, state, "second")}
             r={totalRuns(state.scores.second)}
             h={state.hits.second}
             e={state.errors.second}
@@ -56,18 +55,6 @@ export function InningScoreTable({
       </table>
     </div>
   );
-}
-
-function cells(
-  scores: number[],
-  cols: number,
-  played: number,
-  skipAt = 0,
-): Array<number | "X" | null> {
-  return Array.from({ length: cols }, (_, i) => {
-    if (skipAt > 0 && i === skipAt - 1) return "X";
-    return i < played ? (scores[i] ?? 0) : null;
-  });
 }
 
 function ScoreRow({

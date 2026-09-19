@@ -214,8 +214,13 @@ select {
   }
 
   .scorebook-cell {
-    min-width: 2.4em;
+    min-width: 3.75em;
     height: 2.6em;
+    white-space: nowrap;
+  }
+
+  .scorebook-cell > div {
+    white-space: nowrap;
   }
 }
 
@@ -249,12 +254,17 @@ select {
 }
 
 .scorebook-inning {
-  min-width: 2.4rem;
+  min-width: 3.75rem;
 }
 
 .scorebook-cell {
-  min-width: 2.4rem;
+  min-width: 3.75rem;
   min-height: 2.4rem;
+  white-space: nowrap;
+}
+
+.scorebook-cell > div {
+  white-space: nowrap;
 }
 
 .scorebook-empty {
