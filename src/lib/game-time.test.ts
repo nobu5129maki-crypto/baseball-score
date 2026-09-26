@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyGameTimes,
   clockTime,
+  localDateKey,
   formatClockJa,
   formatDuration,
   gameTimeLabel,
@@ -33,6 +34,13 @@ function game(times: { startTime?: string; endTime?: string } = {}): Game {
     ...times,
   };
 }
+
+describe("localDateKey", () => {
+  it("端末の暦日を使い、早朝でもUTCの前日にならない", () => {
+    const morning = new Date(2026, 8, 27, 0, 30);
+    expect(localDateKey(morning)).toBe("2026-09-27");
+  });
+});
 
 describe("normalizeTime", () => {
   it("HH:MMと秒付きを正規化する", () => {

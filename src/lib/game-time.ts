@@ -16,6 +16,11 @@ export function clockTime(at = new Date()): string {
   return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
+/** 端末の暦日。UTC の toISOString だと日本の早朝が前日になる */
+export function localDateKey(at = new Date()): string {
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
 /** 表示用。「21時31分」「9時5分」 */
 export function formatClockJa(raw: string | undefined): string {
   const time = normalizeTime(raw);

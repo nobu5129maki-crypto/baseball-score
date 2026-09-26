@@ -289,7 +289,7 @@ export default function StatsPage() {
           )}
           {pitchers.length > 0 ? (
             <p className="text-xs text-[#9aa894] mt-2 print:hidden">
-              見出しをタップすると並べ替えます。奪空振り率はストライク投球の割合です。
+              見出しをタップすると並べ替えます。奪空振り率は「ストライク」で記録した球の割合で、ファウルや打球は含みません。
             </p>
           ) : null}
         </section>

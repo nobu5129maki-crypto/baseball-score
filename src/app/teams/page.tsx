@@ -140,7 +140,11 @@ export default function TeamsPage() {
                   <button
                     type="button"
                     className="text-sm text-[#ff5a5a]"
-                    onClick={() => void db.players.delete(p.id)}
+                    onClick={() => {
+                      const label = p.name.trim() || "この選手";
+                      if (!window.confirm(`${label}を選手一覧から削除しますか？過去の試合の記録は残ります。`)) return;
+                      void db.players.delete(p.id);
+                    }}
                   >
                     削除
                   </button>

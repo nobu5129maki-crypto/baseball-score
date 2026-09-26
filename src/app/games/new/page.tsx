@@ -8,6 +8,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { db, saveGame } from "@/lib/db";
 import { newId } from "@/lib/ids";
+import { localDateKey } from "@/lib/game-time";
 import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
 import {
   lineupFromPlayers,
@@ -34,7 +35,7 @@ export default function NewGamePage() {
   const recentTournaments = recentTournamentNames(games);
   const recentVenues = recentVenueNames(games);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey();
   const [opponent, setOpponent] = useState("");
   const [tournament, setTournament] = useState("");
   const [venue, setVenue] = useState("");
