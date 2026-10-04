@@ -1,5 +1,5 @@
 import { isHitResult, playLabel } from "./labels";
-import { battingSide, getBatter, reduceGame } from "./engine";
+import { battingSide, getBatter, reduceGame, totalRuns } from "./engine";
 import type { BattedBall, Game, GameState, LineupSlot, PlayResult, Position, Side } from "./types";
 
 export type ScorebookMark = {
@@ -64,11 +64,14 @@ function halfHasEvents(game: Game, side: Side, inning: number): boolean {
 
 export type LineScoreCell = number | string | null;
 
-type LineScoreState = Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed" | "outs">;
+type LineScoreState = Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed" | "outs" | "scores">;
 
-function endedByWalkOff(game: Game): boolean {
-  const natural = reduceGame({ ...game, events: game.events.filter((e) => e.t !== "end_game") });
-  return natural.ended && natural.half === "bottom" && !natural.bottomUnplayed && natural.outs < 3;
+/** 時間制限で規定回より前に打ち切る試合も含め、裏の途中で後攻が逆転・勝ち越して終わったらサヨナラ。 */
+function endedByWalkOff(state: LineScoreState, bottomRuns: number): boolean {
+  if (state.outs >= 3) return false;
+  const first = totalRuns(state.scores.first);
+  const second = totalRuns(state.scores.second);
+  return second > first && second - bottomRuns <= first;
 }
 
 /** まだ始まっていない半イニングは null（表示は「·」）。裏を省略した回は "X"、サヨナラの回は "2X" のように点の後に X。 */
@@ -90,7 +93,7 @@ export function inningScoreCell(
   if (state.half !== "bottom") return null;
   if (!state.ended) return score;
   if (!halfHasEvents(game, "second", inning)) return null;
-  return endedByWalkOff(game) ? `${score}X` : score;
+  return endedByWalkOff(state, score) ? `${score}X` : score;
 }
 
 export function lineScoreCells(
