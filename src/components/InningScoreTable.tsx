@@ -1,5 +1,5 @@
 import { totalRuns } from "@/lib/engine";
-import { displayInnings, lineScoreCells } from "@/lib/scorebook";
+import { displayInnings, lineScoreCells, type LineScoreCell } from "@/lib/scorebook";
 import type { Game, GameState } from "@/lib/types";
 
 export function InningScoreTable({
@@ -65,7 +65,7 @@ function ScoreRow({
   active,
 }: {
   name: string;
-  innings: Array<number | "X" | null>;
+  innings: LineScoreCell[];
   r: number;
   h: number;
   e: number;

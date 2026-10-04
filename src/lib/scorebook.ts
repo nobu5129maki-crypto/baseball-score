@@ -62,22 +62,35 @@ function halfHasEvents(game: Game, side: Side, inning: number): boolean {
   return false;
 }
 
-/** まだ始まっていない半イニングは null（表示は「·」）。裏を省略した回は "X"。 */
+export type LineScoreCell = number | string | null;
+
+type LineScoreState = Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed" | "outs">;
+
+function endedByWalkOff(game: Game): boolean {
+  const natural = reduceGame({ ...game, events: game.events.filter((e) => e.t !== "end_game") });
+  return natural.ended && natural.half === "bottom" && !natural.bottomUnplayed && natural.outs < 3;
+}
+
+/** まだ始まっていない半イニングは null（表示は「·」）。裏を省略した回は "X"、サヨナラの回は "2X" のように点の後に X。 */
 export function inningScoreCell(
   inningIndex: number,
   score: number,
   side: Side,
   game: Game,
-  state: Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed">,
-): number | "X" | null {
+  state: LineScoreState,
+): LineScoreCell {
   const inning = inningIndex + 1;
   if (side === "second" && state.bottomUnplayed && inning === state.inning) return "X";
   if (state.inning < inning) return null;
   if (state.inning > inning) return score;
-  if (side === "first") return score;
+  if (side === "first") {
+    if (state.ended && state.half === "top" && !halfHasEvents(game, "first", inning)) return null;
+    return score;
+  }
   if (state.half !== "bottom") return null;
   if (!state.ended) return score;
-  return halfHasEvents(game, "second", inning) ? score : null;
+  if (!halfHasEvents(game, "second", inning)) return null;
+  return endedByWalkOff(game) ? `${score}X` : score;
 }
 
 export function lineScoreCells(
@@ -85,8 +98,8 @@ export function lineScoreCells(
   cols: number,
   side: Side,
   game: Game,
-  state: Pick<GameState, "inning" | "half" | "ended" | "bottomUnplayed">,
-): Array<number | "X" | null> {
+  state: LineScoreState,
+): LineScoreCell[] {
   return Array.from({ length: cols }, (_, i) => inningScoreCell(i, scores[i] ?? 0, side, game, state));
 }
 

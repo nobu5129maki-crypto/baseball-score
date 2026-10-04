@@ -192,12 +192,50 @@ describe("lineScoreCells", () => {
     expect(second).toEqual([0, null, null, null]);
   });
 
-  it("2回表で試合終了したら後攻2回は点ではなく未開始", () => {
-    const { first, second, state } = line(commitEnd(outs(makeGame(), 6)));
+  it("2回表の途中で試合終了したら先攻2回は点、後攻2回は未開始", () => {
+    const { first, second, state } = line(commitEnd(outs(makeGame(), 7)));
     expect(state.ended).toBe(true);
     expect(state.half).toBe("top");
     expect(first).toEqual([0, 0, null, null]);
     expect(second).toEqual([0, null, null, null]);
+  });
+
+  it("1回裏が終わって試合終了したら2回表は0を出さない", () => {
+    const { first, second, state } = line(commitEnd(outs(makeGame(), 6)));
+    expect(state.ended).toBe(true);
+    expect(state.inning).toBe(2);
+    expect(state.half).toBe("top");
+    expect(first).toEqual([0, null, null, null]);
+    expect(second).toEqual([0, null, null, null]);
+  });
+
+  it("3回裏が終わって試合終了したら4回表は0を出さず、3回裏の点はそのまま", () => {
+    let game = outs(makeGame(), 15);
+    game = commitPlay(game, "homerun");
+    game = outs(game, 3);
+    const { first, second, state } = line(commitEnd(game), 9);
+    expect(state.ended).toBe(true);
+    expect(state.inning).toBe(4);
+    expect(first).toEqual([0, 0, 0, null, null, null, null, null, null]);
+    expect(second).toEqual([0, 0, 1, null, null, null, null, null, null]);
+  });
+
+  it("サヨナラで終わったら後攻のその回は点の後にXを付ける", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 3 };
+    game = outs(game, 15);
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "homerun");
+    const { first, second, state } = line(game);
+    expect(state.ended).toBe(true);
+    expect(first).toEqual([0, 0, 0, null]);
+    expect(second).toEqual([0, 0, "2X", null]);
+  });
+
+  it("時間切れなど手動で裏の途中に終了したらXは付けない", () => {
+    let game = outs(makeGame(), 15);
+    game = commitPlay(game, "homerun");
+    const { second } = line(commitEnd(game));
+    expect(second).toEqual([0, 0, 1, null]);
   });
 
   it("2回表が終わった直後に終了したら後攻2回も未開始のままにする", () => {
