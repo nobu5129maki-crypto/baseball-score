@@ -60,6 +60,7 @@ export function emptyState(
     errors: { first: 0, second: 0 },
     pitchCountAtBat: 0,
     pitchesThrown: { first: 0, second: 0 },
+    pitchesByPlayer: { first: {}, second: {} },
     useDh: Boolean(game.useDh),
     firstLineup: game.firstLineup.map((slot) => ({ ...slot })),
     secondLineup: game.secondLineup.map((slot) => ({ ...slot })),
@@ -351,17 +352,39 @@ function applyPitch(state: GameState, kind: PitchKind): GameState {
   else if (kind === "strike") strikes += 1;
   else if (kind === "foul" && strikes < 2) strikes += 1;
 
-  const fielding = fieldingSide(state.half);
   return {
     ...state,
+    ...countPitch(state, fieldingSide(state.half)),
     balls,
     strikes,
     pitchCountAtBat: state.pitchCountAtBat + 1,
-    pitchesThrown: {
-      ...state.pitchesThrown,
-      [fielding]: state.pitchesThrown[fielding] + 1,
+  };
+}
+
+function countPitch(
+  state: GameState,
+  side: Side,
+): Pick<GameState, "pitchesThrown" | "pitchesByPlayer"> {
+  const pitchesThrown = { ...state.pitchesThrown, [side]: state.pitchesThrown[side] + 1 };
+  const pitcherId = getPitcherOnSide(state, side)?.playerId;
+  if (!pitcherId) return { pitchesThrown, pitchesByPlayer: state.pitchesByPlayer };
+  return {
+    pitchesThrown,
+    pitchesByPlayer: {
+      ...state.pitchesByPlayer,
+      [side]: { ...state.pitchesByPlayer[side], [pitcherId]: pitchesThrown[side] },
     },
   };
+}
+
+function pitchesOnChange(
+  state: GameState,
+  side: Side,
+  oldPitcherId: string | undefined,
+  newPitcherId: string | undefined,
+): GameState["pitchesThrown"] {
+  if (!newPitcherId || oldPitcherId === newPitcherId) return state.pitchesThrown;
+  return { ...state.pitchesThrown, [side]: state.pitchesByPlayer[side][newPitcherId] ?? 0 };
 }
 
 function runnerLookup(state: GameState, batter: LineupSlot): Map<string, RunnerOnBase> {
@@ -461,17 +484,14 @@ function applyOccupancy(
     lineupIndex[side] = (lineupIndex[side] + 1) % 9;
   }
 
-  const fielding = fieldingSide(state.half);
-  let pitchesThrown = state.pitchesThrown;
-  if (opts.consumeAtBat && result && playAddsPitch(result, state)) {
-    pitchesThrown = {
-      ...pitchesThrown,
-      [fielding]: pitchesThrown[fielding] + 1,
-    };
-  }
+  const pitchCount =
+    opts.consumeAtBat && result && playAddsPitch(result, state)
+      ? countPitch(state, fieldingSide(state.half))
+      : { pitchesThrown: state.pitchesThrown, pitchesByPlayer: state.pitchesByPlayer };
 
   let next: GameState = {
     ...state,
+    ...pitchCount,
     outs,
     balls: opts.consumeAtBat ? 0 : state.balls,
     strikes: opts.consumeAtBat ? 0 : state.strikes,
@@ -480,7 +500,6 @@ function applyOccupancy(
     errors,
     scores,
     lineupIndex,
-    pitchesThrown,
     pitchCountAtBat: opts.consumeAtBat ? 0 : state.pitchCountAtBat,
   };
 
@@ -573,10 +592,7 @@ function applySub(
   if (state.useDh && (order === PITCHER_ORDER || position === "P")) {
     const oldPitcher = (side === "first" ? state.firstPitcher : state.secondPitcher)?.playerId;
     const nextPitcher: PitcherOnly = { playerId, playerName, number };
-    const pitchesThrown =
-      oldPitcher !== playerId
-        ? { ...state.pitchesThrown, [side]: 0 }
-        : state.pitchesThrown;
+    const pitchesThrown = pitchesOnChange(state, side, oldPitcher, playerId);
     if (side === "first") {
       return { ...state, firstPitcher: nextPitcher, pitchesThrown };
     }
@@ -601,10 +617,9 @@ function applySub(
   });
   const oldPitcher = getPitcherOnSide(state, side)?.playerId;
   const newPitcher = nextLineup.find((slot) => slot.position === "P")?.playerId ?? oldPitcher;
-  const pitchesThrown =
-    !state.useDh && oldPitcher !== newPitcher
-      ? { ...state.pitchesThrown, [side]: 0 }
-      : state.pitchesThrown;
+  const pitchesThrown = state.useDh
+    ? state.pitchesThrown
+    : pitchesOnChange(state, side, oldPitcher, newPitcher);
   if (side === "first") {
     return { ...state, firstLineup: nextLineup, pitchesThrown };
   }

@@ -298,6 +298,8 @@ export type GameState = {
   errors: { first: number; second: number };
   pitchCountAtBat: number;
   pitchesThrown: { first: number; second: number };
+  /** 投手が野手に回って再登板したとき、続きから数えるための選手別の投球数 */
+  pitchesByPlayer: { first: Record<string, number>; second: Record<string, number> };
   useDh: boolean;
   firstLineup: LineupSlot[];
   secondLineup: LineupSlot[];

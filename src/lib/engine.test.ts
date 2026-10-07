@@ -26,6 +26,7 @@ import {
   undoAtBat,
   undoLast,
 } from "./engine";
+import { PITCHER_ORDER } from "./types";
 import type { Game, LineupSlot, Position } from "./types";
 
 function slot(order: number, prefix: string, position: Position): LineupSlot {
@@ -485,6 +486,54 @@ describe("らくスコア engine", () => {
     expect(reduceGame(game).pitchesThrown.second).toBe(0);
     game = commitPitch(game, "strike");
     expect(reduceGame(game).pitchesThrown.second).toBe(1);
+  });
+
+  it("投手が野手に回ってから再登板したら投球数は続きから数える", () => {
+    let game = makeGame();
+    for (let i = 0; i < 3; i++) game = commitPitch(game, "ball");
+    game = commitPlay(game, "walk");
+    expect(reduceGame(game).pitchesThrown.second).toBe(4);
+
+    game = commitPositionSwap(game, "second", 1, 6);
+    let state = reduceGame(game);
+    expect(state.secondLineup.find((s) => s.position === "P")?.playerId).toBe("B6");
+    expect(state.pitchesThrown.second).toBe(0);
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "foul");
+    expect(reduceGame(game).pitchesThrown.second).toBe(2);
+
+    game = commitPositionSwap(game, "second", 6, 1);
+    state = reduceGame(game);
+    expect(state.secondLineup.find((s) => s.position === "P")?.playerId).toBe("B1");
+    expect(state.pitchesThrown.second).toBe(4);
+    game = commitPitch(game, "ball");
+    expect(reduceGame(game).pitchesThrown.second).toBe(5);
+
+    game = commitPositionSwap(game, "second", 1, 6);
+    expect(reduceGame(game).pitchesThrown.second).toBe(2);
+  });
+
+  it("野手からの再登板は守備位置の入れ替えをどちらから選んでも続きから数える", () => {
+    let game = makeGame();
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPositionSwap(game, "second", 7, 1);
+    game = commitPitch(game, "strike");
+    game = commitPositionSwap(game, "second", 7, 1);
+    expect(reduceGame(game).secondLineup.find((s) => s.position === "P")?.playerId).toBe("B1");
+    expect(reduceGame(game).pitchesThrown.second).toBe(2);
+  });
+
+  it("DHありでも同じ投手が戻ったら投球数は続きから数える", () => {
+    let game: Game = { ...makeGame(), useDh: true, secondPitcher: { playerId: "SP", playerName: "先発" } };
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "foul");
+    game = commitSub(game, "second", PITCHER_ORDER, "RP", "救援", "P");
+    expect(reduceGame(game).pitchesThrown.second).toBe(0);
+    game = commitPitch(game, "ball");
+    game = commitSub(game, "second", PITCHER_ORDER, "SP", "先発", "P");
+    expect(reduceGame(game).pitchesThrown.second).toBe(3);
   });
 
   it("打球が走者に当たるとその走者はアウト、打者は1塁", () => {

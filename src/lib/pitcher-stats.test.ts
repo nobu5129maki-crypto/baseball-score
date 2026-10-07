@@ -3,6 +3,7 @@ import {
   commitEnd,
   commitPlay,
   commitPitch,
+  commitPositionSwap,
   commitSub,
 } from "./engine";
 import {
@@ -110,6 +111,22 @@ describe("gamePitcherStats", () => {
       whiffs: 1,
     });
     expect(mine!.strikes).toBeGreaterThanOrEqual(3);
+  });
+
+  it("投手→野手→投手と戻った投手の投球数と投球回は1人分に合算する", () => {
+    let game = makeGame();
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "strike");
+    game = commitPlay(game, "groundout", undefined, "SS");
+    game = commitPositionSwap(game, "second", 1, 6);
+    game = commitPitch(game, "ball");
+    game = commitPlay(game, "flyout", undefined, "CF");
+    game = commitPositionSwap(game, "second", 6, 1);
+    game = commitPitch(game, "strike");
+    game = commitPlay(game, "groundout", undefined, "2B");
+    const rows = gamePitcherStats(game);
+    expect(rows.find((p) => p.playerId === "B1")).toMatchObject({ pitches: 5, outs: 2 });
+    expect(rows.find((p) => p.playerId === "B6")).toMatchObject({ pitches: 2, outs: 1 });
   });
 
   it("見逃し三振も空振り三振も奪三振に数える", () => {
