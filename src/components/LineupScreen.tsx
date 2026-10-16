@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
@@ -10,12 +10,15 @@ import { rememberOpponentBench } from "@/lib/opponent-bench";
 import { db, saveGame } from "@/lib/db";
 import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
+import { nudgeLineup, swapLineupOrders } from "@/lib/lineup-edit";
 import { newId } from "@/lib/ids";
+import { createSaveQueue } from "@/lib/save-queue";
 import { PITCHER_ORDER } from "@/lib/types";
-import type { LineupSlot, PitcherOnly, Player, Position, Side } from "@/lib/types";
+import type { Game, LineupSlot, PitcherOnly, Player, Position, Side } from "@/lib/types";
 
 export function LineupScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
+  const enqueueSave = useRef(createSaveQueue()).current;
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const players =
     useLiveQuery(async () => {
@@ -239,34 +242,55 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     await patchLineup(current);
   }
 
-  async function moveOrder(from: number, to: number) {
-    const copy = slots.map((s) => ({ ...s }));
-    const a = copy.find((s) => s.order === from);
-    const b = copy.find((s) => s.order === to);
-    if (!a || !b) return;
-    const swap = {
-      playerName: a.playerName,
-      playerId: a.playerId,
-      number: a.number,
-      position: a.position,
-    };
-    a.playerName = b.playerName;
-    a.playerId = b.playerId;
-    a.number = b.number;
-    a.position = b.position;
-    b.playerName = swap.playerName;
-    b.playerId = swap.playerId;
-    b.number = swap.number;
-    b.position = swap.position;
-    const latest = await db.games.get(gameId);
-    if (!latest) return;
+  async function applyLineupSwap(
+    latest: Game,
+    side: Side,
+    from: number,
+    to: number,
+    nextSlots: LineupSlot[],
+  ) {
+    const key = side === "first" ? "firstLineup" : "secondLineup";
     if (latest.status === "in_progress") {
-      let next = commitSub(latest, tab, a.order, a.playerId, a.playerName, a.position, a.number);
-      next = commitSub(next, tab, b.order, b.playerId, b.playerName, b.position, b.number);
+      const a = nextSlots.find((slot) => slot.order === from);
+      const b = nextSlots.find((slot) => slot.order === to);
+      if (!a || !b) return;
+      let next = commitSub(latest, side, a.order, a.playerId, a.playerName, a.position, a.number);
+      next = commitSub(next, side, b.order, b.playerId, b.playerName, b.position, b.number);
       await saveGame(next);
       return;
     }
-    await patchLineup(copy);
+    await saveGame({ ...latest, [key]: nextSlots });
+  }
+
+  function currentLineup(latest: Game, side: Side) {
+    const key = side === "first" ? "firstLineup" : "secondLineup";
+    if (latest.status === "in_progress") return reduceGame(latest)[key];
+    return latest[key];
+  }
+
+  function moveOrder(from: number, to: number) {
+    const side = tab;
+    return enqueueSave(async () => {
+      const latest = await db.games.get(gameId);
+      if (!latest) return;
+      const nextSlots = swapLineupOrders(currentLineup(latest, side), from, to);
+      if (!nextSlots) return;
+      await applyLineupSwap(latest, side, from, to, nextSlots);
+    });
+  }
+
+  function nudgePlayer(playerId: string, delta: number) {
+    const side = tab;
+    return enqueueSave(async () => {
+      const latest = await db.games.get(gameId);
+      if (!latest) return;
+      const source = currentLineup(latest, side);
+      const current = source.find((slot) => slot.playerId === playerId);
+      if (!current) return;
+      const nextSlots = nudgeLineup(source, playerId, delta);
+      if (!nextSlots) return;
+      await applyLineupSwap(latest, side, current.order, current.order + delta, nextSlots);
+    });
   }
 
   return (
@@ -314,6 +338,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
             void replaceOpponentSlot(order, player);
           }}
           onMoveOrder={(from, to) => void moveOrder(from, to)}
+          onNudge={(playerId, delta) => void nudgePlayer(playerId, delta)}
           onPitcherChange={game.useDh ? (next) => void patchPitcher(next) : undefined}
           onAddBench={!isMine ? (p) => void addOpponentBench(p.name, p.number) : undefined}
           onRemoveBench={!isMine ? (id) => void removeOpponentBench(id) : undefined}

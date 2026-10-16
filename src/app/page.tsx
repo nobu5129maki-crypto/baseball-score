@@ -46,14 +46,14 @@ export default function HomePage() {
   }
 
   return (
-    <main className="max-w-lg mx-auto w-full min-h-dvh flex flex-col">
-      <header className="px-4 py-5">
+    <main className="max-w-lg mx-auto w-full h-dvh flex flex-col overflow-hidden">
+      <header className="px-4 py-5 shrink-0">
         <p className="text-sm text-[#9aa894]">記号いらずのスコア記録</p>
         <h1 className="text-2xl font-bold mt-1">らくスコア</h1>
         {team ? <p className="text-sm text-[#f5c518] mt-1">{team.name}</p> : null}
       </header>
 
-      <section className="px-4 flex flex-col gap-3 flex-1">
+      <section className="px-4 pb-4 flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">
         <InstallPrompt />
         {active.map((g) => (
           <GameCard key={g.id} game={g} cta="試合を続ける" href={`/games/${g.id}/score`} highlight />
@@ -84,7 +84,7 @@ export default function HomePage() {
         ) : null}
       </section>
 
-      <nav className="sticky bottom-0 border-t border-[#2c3c30] bg-[#070a08] px-4 py-3 flex gap-2">
+      <nav className="shrink-0 border-t border-[#2c3c30] bg-[#070a08] px-4 py-3 flex gap-2">
         <Link href="/teams" className="tap flex-1 flex items-center justify-center text-sm">
           チーム
         </Link>

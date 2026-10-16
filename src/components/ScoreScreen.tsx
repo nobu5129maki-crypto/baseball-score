@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -35,6 +35,7 @@ import {
   undoLast,
 } from "@/lib/engine";
 import { db, saveGame } from "@/lib/db";
+import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
@@ -78,6 +79,7 @@ type SheetKind =
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
+  const enqueueSave = useRef(createSaveQueue()).current;
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const players = useLiveQuery(async () => {
     const g = await db.games.get(gameId);
@@ -136,10 +138,12 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     ? previewAfterMoves(state, confirm.moves, batter)
     : null;
 
-  async function patch(mut: (g: Game) => Game) {
-    const latest = await db.games.get(gameId);
-    if (!latest) return;
-    await saveGame(mut(latest));
+  function patch(mut: (g: Game) => Game) {
+    return enqueueSave(async () => {
+      const latest = await db.games.get(gameId);
+      if (!latest) return;
+      await saveGame(mut(latest));
+    });
   }
 
   function startResult(result: PlayResult) {

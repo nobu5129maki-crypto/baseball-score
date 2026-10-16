@@ -49,6 +49,7 @@ export function LineupBoard({
   pitcher,
   onReplace,
   onMoveOrder,
+  onNudge,
   onPosition,
   onRename,
   onPitcherChange,
@@ -63,6 +64,7 @@ export function LineupBoard({
   pitcher?: PitcherOnly;
   onReplace: (order: number, player: Player) => void;
   onMoveOrder: (fromOrder: number, toOrder: number) => void;
+  onNudge: (playerId: string, delta: number) => void;
   onPosition: (order: number, position: Position) => void;
   onRename: (order: number, name: string) => void;
   onPitcherChange?: (pitcher: PitcherOnly) => void;
@@ -212,7 +214,7 @@ export function LineupBoard({
                       type="button"
                       className="h-11 rounded-xl border border-[#2c3c30] bg-[#070a08] text-lg font-bold disabled:opacity-30"
                       disabled={index === 0}
-                      onClick={() => onMoveOrder(slot.order, slot.order - 1)}
+                      onClick={() => onNudge(slot.playerId, -1)}
                       aria-label="打順を上げる"
                     >
                       ▲
@@ -221,7 +223,7 @@ export function LineupBoard({
                       type="button"
                       className="h-11 rounded-xl border border-[#2c3c30] bg-[#070a08] text-lg font-bold disabled:opacity-30"
                       disabled={index === lineup.length - 1}
-                      onClick={() => onMoveOrder(slot.order, slot.order + 1)}
+                      onClick={() => onNudge(slot.playerId, 1)}
                       aria-label="打順を下げる"
                     >
                       ▼
