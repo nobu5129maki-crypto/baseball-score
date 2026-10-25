@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
-import { db } from "@/lib/db";
+import { db, loadAllGames } from "@/lib/db";
 import {
   comparePitchers,
   formatEra,
@@ -81,7 +81,7 @@ export default function StatsPage() {
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
   const games =
     useLiveQuery(async () => {
-      const rows = await db.games.toArray();
+      const rows = await loadAllGames();
       return rows.filter((g) => g.status === "ended" || g.status === "in_progress");
     }) ?? [];
   const mine = team ? games.filter((g) => g.myTeamId === team.id) : games.filter((g) => g.myTeamId);

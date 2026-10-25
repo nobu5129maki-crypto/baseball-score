@@ -76,7 +76,7 @@ export default function SettingsPage() {
         <section className="rounded-2xl border border-[#2c3c30] p-4 flex flex-col gap-3">
           <h2 className="font-bold">データの書き出し・読み込み</h2>
           <p className="text-sm text-[#9aa894] leading-relaxed">
-            試合・チーム・選手のデータをファイルに残したり、ほかの人のデータを今の成績に足したりできます。同じ選手は名前と背番号で結びます。読み込んでも、今ある試合は消えません。
+            試合・チーム・選手のデータをファイルに残したり、ほかの人のデータを今の成績に足したりできます。同じ選手は名前と背番号で結びます。読み込んでも、今ある試合は消えません。日付が変わっても端末の記録は消えません。
           </p>
           <button type="button" className="tap tap-accent" disabled={busy} onClick={() => void exportBackup()}>
             {busy ? "処理中…" : "データを書き出す"}

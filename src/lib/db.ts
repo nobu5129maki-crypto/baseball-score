@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from "dexie";
 import { isEndedGameDeletable, type DeleteEndedGameResult } from "./game-delete";
+import { gamesKeptAfterDateChange, sortGamesForHome } from "./game-list";
+import { localDateKey } from "./game-time";
 import type { Game, Player, RosterPack, Settings, Team } from "./types";
 
 export type { DeleteEndedGameResult } from "./game-delete";
@@ -37,6 +39,12 @@ export class RakuScoreDB extends Dexie {
 }
 
 export const db = new RakuScoreDB();
+
+/** 保存済みの試合を全部返す。当日以外も日付では消さない。 */
+export async function loadAllGames(): Promise<Game[]> {
+  const rows = await db.games.toArray();
+  return sortGamesForHome(gamesKeptAfterDateChange(rows, localDateKey()));
+}
 
 export async function saveGame(game: Game): Promise<void> {
   await db.games.put({ ...game, updatedAt: Date.now() });

@@ -4,21 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { db, deleteEndedGame } from "@/lib/db";
+import { db, deleteEndedGame, loadAllGames } from "@/lib/db";
 import { inningLabel, reduceGame, totalRuns } from "@/lib/engine";
+import { splitGamesByStatus } from "@/lib/game-list";
 import { gameTimeLabel } from "@/lib/game-time";
 import type { Game } from "@/lib/types";
 
 export default function HomePage() {
-  const games =
-    useLiveQuery(() => db.games.orderBy("updatedAt").reverse().toArray()) ?? [];
+  const games = useLiveQuery(() => loadAllGames()) ?? [];
   const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
 
-  const active = games.filter((g) => g.status === "in_progress");
-  const setup = games.filter((g) => g.status === "lineup");
-  const done = games.filter((g) => g.status === "ended");
+  const { active, setup, done } = splitGamesByStatus(games);
 
   async function removeEnded(game: Game) {
     if (deletingId) return;
