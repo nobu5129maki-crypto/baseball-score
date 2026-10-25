@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
@@ -297,6 +298,19 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     <main className="max-w-lg mx-auto w-full min-h-dvh pb-8">
       <AppHeader title="打順・守備" backHref={game.status === "in_progress" ? `/games/${gameId}/score` : "/"} />
       <div className="p-4 flex flex-col gap-3">
+        <p className="text-sm text-[#9aa894]">
+          {game.date}
+          {game.tournament ? `　${game.tournament}` : ""}
+          {game.venue ? `　${game.venue}` : ""}
+          {game.mySide === "first" ? "　自チームが先攻" : "　自チームが後攻"}
+          {game.useDh ? "　DH制" : ""}
+          {`　${game.scheduledInnings}回`}
+        </p>
+        {game.status === "lineup" ? (
+          <Link href={`/games/${gameId}/setup`} className="tap flex items-center justify-center">
+            先攻・日付などを変える
+          </Link>
+        ) : null}
         <div className="grid grid-cols-2 gap-2">
           <button type="button" className={`tap ${tab === "first" ? "tap-accent" : ""}`} onClick={() => setTab("first")}>
             先攻 {names.first}

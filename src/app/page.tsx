@@ -57,7 +57,12 @@ export default function HomePage() {
           <GameCard key={g.id} game={g} cta="試合を続ける" href={`/games/${g.id}/score`} highlight />
         ))}
         {setup.map((g) => (
-          <GameCard key={g.id} game={g} cta="打順を決める" href={`/games/${g.id}/lineup`} />
+          <div key={g.id} className="flex flex-col gap-2">
+            <GameCard game={g} cta="打順を決める" href={`/games/${g.id}/lineup`} />
+            <Link href={`/games/${g.id}/setup`} className="text-sm text-center text-[#f5c518] underline">
+              先攻・日付などを変える
+            </Link>
+          </div>
         ))}
 
         <Link href="/games/new" className="tap tap-accent flex items-center justify-center">
