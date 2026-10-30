@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { LineupBoard } from "@/components/LineupBoard";
 import { commitSub, getPitcherOnly, reduceGame } from "@/lib/engine";
 import { rememberOpponentBench } from "@/lib/opponent-bench";
+import { runChangeRuleSuffix } from "@/lib/run-change";
 import { db, saveGame } from "@/lib/db";
 import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
@@ -305,6 +306,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
           {game.mySide === "first" ? "　自チームが先攻" : "　自チームが後攻"}
           {game.useDh ? "　DH制" : ""}
           {`　${game.scheduledInnings}回`}
+          {runChangeRuleSuffix(game.runChangeAt)}
         </p>
         {game.status === "lineup" ? (
           <Link href={`/games/${gameId}/setup`} className="tap flex items-center justify-center">

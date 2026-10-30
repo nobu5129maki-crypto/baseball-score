@@ -8,6 +8,7 @@ import { db, deleteEndedGame, loadAllGames } from "@/lib/db";
 import { inningLabel, reduceGame, totalRuns } from "@/lib/engine";
 import { splitGamesByStatus } from "@/lib/game-list";
 import { gameTimeLabel } from "@/lib/game-time";
+import { runChangeRuleSuffix } from "@/lib/run-change";
 import type { Game } from "@/lib/types";
 
 export default function HomePage() {
@@ -127,6 +128,7 @@ function GameCard({
         {game.tournament ? `　${game.tournament}` : ""}
         {game.venue ? `　${game.venue}` : ""}
         {game.useDh ? "　DH制" : ""}
+        {runChangeRuleSuffix(game.runChangeAt)}
         {times ? `　${times}` : ""}
       </p>
       <p className="font-bold text-lg mt-1">
@@ -168,6 +170,7 @@ function EndedGameCard({
         {game.tournament ? `　${game.tournament}` : ""}
         {game.venue ? `　${game.venue}` : ""}
         {game.useDh ? "　DH制" : ""}
+        {runChangeRuleSuffix(game.runChangeAt)}
         {times ? `　${times}` : ""}
       </p>
       <p className="font-bold text-lg mt-1">

@@ -73,6 +73,7 @@ function GameSetupScreen({ gameId }: { gameId: string }) {
             mySide: values.mySide,
             useDh: values.useDh,
             scheduledInnings: values.innings,
+            runChangeAt: values.runChangeAt,
           },
           players,
         ),
@@ -98,6 +99,7 @@ function GameSetupScreen({ gameId }: { gameId: string }) {
         mySide: game.mySide,
         useDh: Boolean(game.useDh),
         innings: game.scheduledInnings,
+        runChangeAt: game.runChangeAt ?? 0,
       }}
       recentOpponents={recentOpponentNames(games)}
       recentTournaments={recentTournamentNames(games)}

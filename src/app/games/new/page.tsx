@@ -8,6 +8,7 @@ import { GameSetupForm, type GameSetupValues } from "@/components/GameSetupForm"
 import { db, saveGame } from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { localDateKey } from "@/lib/game-time";
+import { normalizeRunChangeAt } from "@/lib/run-change";
 import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
 import {
   lineupFromPlayers,
@@ -56,6 +57,7 @@ export default function NewGamePage() {
       const id = newId();
       const meet = values.tournament.trim();
       const place = values.venue.trim();
+      const runChangeAt = normalizeRunChangeAt(values.runChangeAt);
       await saveGame({
         id,
         myTeamId: team.id,
@@ -66,6 +68,7 @@ export default function NewGamePage() {
         mySide: values.mySide,
         ...(values.useDh ? { useDh: true, ...pitchers } : {}),
         scheduledInnings: values.innings,
+        ...(runChangeAt ? { runChangeAt } : {}),
         date: values.date,
         status: "lineup",
         firstLineup: sides.firstLineup,
@@ -106,6 +109,7 @@ export default function NewGamePage() {
         mySide: "second",
         useDh: false,
         innings: 7,
+        runChangeAt: 0,
       }}
       recentOpponents={recentOpponentNames(games)}
       recentTournaments={recentTournamentNames(games)}

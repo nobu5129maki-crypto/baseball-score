@@ -13,6 +13,7 @@ type Props = {
   showOutButton?: boolean;
   displayBases?: GameState["bases"];
   pitcherName?: string;
+  ruleLabel?: string;
   onSelectRunner: (runner: RunnerOnBase, from: 0 | 1 | 2 | 3) => void;
   onSelectDest: (to: Dest) => void;
 };
@@ -26,6 +27,7 @@ export function DiamondMap({
   showOutButton,
   displayBases,
   pitcherName,
+  ruleLabel,
   onSelectRunner,
   onSelectDest,
 }: Props) {
@@ -49,7 +51,10 @@ export function DiamondMap({
   return (
     <div className="px-2 py-1">
       <div className="flex items-start justify-between px-1 mb-1 gap-3">
-        <p className="text-xl font-bold leading-none pt-0.5">{inningLabel(state.inning, state.half)}</p>
+        <div className="pt-0.5">
+          <p className="text-xl font-bold leading-none">{inningLabel(state.inning, state.half)}</p>
+          {ruleLabel ? <p className="text-xs font-bold text-[#f5c518] mt-1">{ruleLabel}</p> : null}
+        </div>
         <div className="min-w-0 text-right">
           <ScoreLine name={firstName} runs={firstRuns} active={!state.ended && state.half === "top"} />
           <ScoreLine name={secondName} runs={secondRuns} active={!state.ended && state.half === "bottom"} />

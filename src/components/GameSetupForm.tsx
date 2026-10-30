@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { RUN_CHANGE_CHOICES } from "@/lib/run-change";
 import type { Side } from "@/lib/types";
 
 export type GameSetupValues = {
@@ -14,6 +15,8 @@ export type GameSetupValues = {
   mySide: Side;
   useDh: boolean;
   innings: number;
+  /** 0 は使わない。1〜10 はその点数で攻守交代 */
+  runChangeAt: number;
 };
 
 export function GameSetupForm({
@@ -50,6 +53,7 @@ export function GameSetupForm({
   const [mySide, setMySide] = useState<Side>(initial.mySide);
   const [useDh, setUseDh] = useState(initial.useDh);
   const [innings, setInnings] = useState(initial.innings);
+  const [runChangeAt, setRunChangeAt] = useState(initial.runChangeAt);
   const seededOpponent = useRef(Boolean(initial.opponent));
   const seededTournament = useRef(Boolean(initial.tournament));
   const seededVenue = useRef(Boolean(initial.venue));
@@ -80,7 +84,7 @@ export function GameSetupForm({
         onSubmit={(e) => {
           e.preventDefault();
           if (busy) return;
-          onSubmit({ opponent, tournament, venue, date, mySide, useDh, innings });
+          onSubmit({ opponent, tournament, venue, date, mySide, useDh, innings, runChangeAt });
         }}
       >
         {note ? <p className="text-sm text-[#9aa894] leading-relaxed">{note}</p> : null}
@@ -206,6 +210,45 @@ export function GameSetupForm({
             ))}
           </select>
         </label>
+        <fieldset>
+          <legend className="text-sm text-[#9aa894] mb-2">特別ルール（得点で交代）</legend>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={`tap ${runChangeAt === 0 ? "tap-accent" : ""}`}
+              onClick={() => setRunChangeAt(0)}
+            >
+              使わない
+            </button>
+            <button
+              type="button"
+              className={`tap ${runChangeAt > 0 ? "tap-accent" : ""}`}
+              onClick={() => setRunChangeAt((current) => (current > 0 ? current : 5))}
+            >
+              使う
+            </button>
+          </div>
+          <p className="text-xs text-[#9aa894] mt-2 leading-relaxed">
+            攻撃側がその点数を取ると、3アウトになる前でも攻守を交代します。交代したとき「○点取ったから交代です」と表示します。
+          </p>
+          {runChangeAt > 0 ? (
+            <div className="mt-3">
+              <p className="text-sm text-[#9aa894] mb-2">何点取ったら交代するか</p>
+              <div className="grid grid-cols-5 gap-2">
+                {RUN_CHANGE_CHOICES.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`tap ${runChangeAt === n ? "tap-accent" : ""}`}
+                    onClick={() => setRunChangeAt(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </fieldset>
         {error ? <p className="text-sm text-[#ff5a5a]">{error}</p> : null}
         <button type="submit" className="tap tap-accent mt-2" disabled={busy || teamName === "…"}>
           {busy ? "保存しています…" : submitLabel}

@@ -23,9 +23,11 @@ import {
   proposeMoves,
   proposeRunnerHit,
   reduceGame,
+  totalRuns,
   undoAtBat,
   undoLast,
 } from "./engine";
+import { runChangeMessage } from "./run-change";
 import { PITCHER_ORDER } from "./types";
 import type { Game, LineupSlot, Position } from "./types";
 
@@ -612,5 +614,107 @@ describe("らくスコア engine", () => {
     expect(state.ended).toBe(true);
     expect(state.bottomUnplayed).toBe(true);
     expect(state.inning).toBe(2);
+  });
+
+  it("指定点に達すると3アウト前でも攻守交代し、点数の案内を残す", () => {
+    let game: Game = { ...makeGame(), runChangeAt: 2 };
+    game = commitPlay(game, "homerun");
+    expect(reduceGame(game).half).toBe("top");
+    expect(reduceGame(game).runChangeNotice).toBeUndefined();
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.half).toBe("bottom");
+    expect(state.inning).toBe(1);
+    expect(state.outs).toBe(0);
+    expect(state.bases).toEqual([null, null, null]);
+    expect(state.scores.first[0]).toBe(2);
+    expect(state.runChangeNotice).toBe(2);
+    expect(runChangeMessage(state.runChangeNotice ?? 0)).toBe("2点取ったから交代です");
+    expect(getBatter(state).playerId).toBe("B1");
+    game = commitPitch(game, "strike");
+    expect(reduceGame(game).runChangeNotice).toBeUndefined();
+    expect(reduceGame(game).half).toBe("bottom");
+  });
+
+  it("1プレーで指定点を超えても、入った点数で交代する", () => {
+    let game: Game = { ...makeGame(), runChangeAt: 3 };
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.scores.first[0]).toBe(4);
+    expect(state.half).toBe("bottom");
+    expect(state.runChangeNotice).toBe(4);
+    expect(runChangeMessage(4)).toBe("4点取ったから交代です");
+  });
+
+  it("指定点に届かない3アウトでは案内を出さずに交代する", () => {
+    let game: Game = { ...makeGame(), runChangeAt: 5 };
+    game = commitPlay(game, "homerun");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    const state = reduceGame(game);
+    expect(state.half).toBe("bottom");
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.runChangeNotice).toBeUndefined();
+  });
+
+  it("ルールが無い試合は得点だけでは交代しない", () => {
+    let game = commitPlay(makeGame(), "homerun");
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.half).toBe("top");
+    expect(state.scores.first[0]).toBe(2);
+    expect(state.runChangeNotice).toBeUndefined();
+  });
+
+  it("暴投で指定点に達しても攻守交代する", () => {
+    let game: Game = { ...makeGame(), runChangeAt: 1 };
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitWp(game);
+    const state = reduceGame(game);
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.half).toBe("bottom");
+    expect(state.runChangeNotice).toBe(1);
+    expect(runChangeMessage(1)).toBe("1点取ったから交代です");
+  });
+
+  it("最終回裏のサヨナラは得点交代より優先する", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 1, runChangeAt: 1 };
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.ended).toBe(true);
+    expect(state.half).toBe("bottom");
+    expect(state.runChangeNotice).toBeUndefined();
+    expect(totalRuns(state.scores.second)).toBe(1);
+  });
+
+  it("最終回表で指定点に達し後攻がリードなら裏を行わず案内を残す", () => {
+    let game: Game = { ...makeGame(), scheduledInnings: 3, runChangeAt: 1 };
+    const retire = () => {
+      game = commitPlay(game, "groundout");
+      game = commitPlay(game, "groundout");
+      game = commitPlay(game, "groundout");
+    };
+    retire();
+    game = commitPlay(game, "homerun");
+    retire();
+    game = commitPlay(game, "homerun");
+    game = commitPlay(game, "homerun");
+    const state = reduceGame(game);
+    expect(state.ended).toBe(true);
+    expect(state.bottomUnplayed).toBe(true);
+    expect(state.inning).toBe(3);
+    expect(state.runChangeNotice).toBe(1);
+    expect(runChangeMessage(state.runChangeNotice ?? 0)).toBe("1点取ったから交代です");
+    expect(totalRuns(state.scores.second)).toBe(2);
+    expect(totalRuns(state.scores.first)).toBe(1);
   });
 });

@@ -18,6 +18,7 @@ import type {
 } from "./types";
 import { stampEndTime } from "./game-time";
 import { droppedThirdAllowed, isStrikeoutResult, needsField } from "./rules";
+import { normalizeRunChangeAt } from "./run-change";
 import { PITCHER_ORDER, SCOREBOARD_INNINGS } from "./types";
 
 export function battingSide(half: Half): Side {
@@ -77,6 +78,13 @@ export function reduceGame(game: Game): GameState {
     (state, event) => applyEvent(game, state, event),
     emptyState(game),
   );
+}
+
+function dropRunChangeNotice(state: GameState): GameState {
+  if (state.runChangeNotice == null) return state;
+  const next = { ...state };
+  delete next.runChangeNotice;
+  return next;
 }
 
 export function getLineup(state: GameState, side: Side): LineupSlot[] {
@@ -304,27 +312,28 @@ function forceWalk(batterId: string, bases: GameState["bases"]): RunnerMove[] {
 
 function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
   if (state.ended && event.t !== "end_game") return state;
+  const current = dropRunChangeNotice(state);
   switch (event.t) {
     case "pitch":
-      return applyPitch(state, event.kind);
+      return applyPitch(current, event.kind);
     case "play":
-      return applyOccupancy(game, state, event.moves, {
+      return applyOccupancy(game, current, event.moves, {
         consumeAtBat: true,
         result: event.result,
       });
     case "steal":
-      return applySteal(game, state, event.from, event.to);
+      return applySteal(game, current, event.from, event.to);
     case "pickoff":
-      return applySteal(game, state, event.from, "out");
+      return applySteal(game, current, event.from, "out");
     case "wp":
     case "pb":
     case "bk":
-      return applyOccupancy(game, state, plus(state.bases, 1), {
+      return applyOccupancy(game, current, plus(current.bases, 1), {
         consumeAtBat: false,
       });
     case "sub":
       return applySub(
-        state,
+        current,
         event.side,
         event.order,
         event.playerId,
@@ -334,7 +343,7 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       );
     case "pr":
       return applyPinchRunner(
-        state,
+        current,
         event.base,
         event.playerId,
         event.playerName,
@@ -342,7 +351,7 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
         event.number,
       );
     case "end_game":
-      return { ...state, ended: true };
+      return { ...current, ended: true };
   }
 }
 
@@ -506,8 +515,13 @@ function applyOccupancy(
   if (isWalkOff(next, game.scheduledInnings)) {
     return { ...next, ended: true, regulationComplete: true };
   }
+  const halfRuns = next.scores[side][state.inning - 1] ?? 0;
+  const runChangeAt = normalizeRunChangeAt(game.runChangeAt);
   if (outs >= 3) {
-    next = advanceHalf(next, game.scheduledInnings);
+    return advanceHalf(next, game.scheduledInnings);
+  }
+  if (runChangeAt != null && halfRuns >= runChangeAt) {
+    return { ...advanceHalf(next, game.scheduledInnings), runChangeNotice: halfRuns };
   }
   return next;
 }

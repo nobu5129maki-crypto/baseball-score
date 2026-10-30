@@ -1,4 +1,5 @@
 import { pickPlayerProfile } from "./player-profile";
+import { normalizeRunChangeAt } from "./run-change";
 import type { Game, LineupSlot, PitcherOnly, Player, Side } from "./types";
 
 export type GameSetupInput = {
@@ -9,6 +10,7 @@ export type GameSetupInput = {
   mySide: Side;
   useDh: boolean;
   scheduledInnings: number;
+  runChangeAt?: number;
 };
 
 const INNINGS = new Set([5, 6, 7, 9, 12]);
@@ -40,6 +42,7 @@ export function applyGameSetup(game: Game, input: GameSetupInput, myPlayers: Pla
 
   const tournament = input.tournament.trim();
   const venue = input.venue.trim();
+  const runChangeAt = normalizeRunChangeAt(input.runChangeAt);
   next = {
     ...next,
     opponentName: input.opponentName.trim() || "相手",
@@ -48,10 +51,12 @@ export function applyGameSetup(game: Game, input: GameSetupInput, myPlayers: Pla
     scheduledInnings: INNINGS.has(input.scheduledInnings) ? input.scheduledInnings : game.scheduledInnings,
     ...(tournament ? { tournament } : {}),
     ...(venue ? { venue } : {}),
+    ...(runChangeAt ? { runChangeAt } : {}),
   };
   if (!tournament) delete next.tournament;
   if (!venue) delete next.venue;
   if (!input.useDh) delete next.useDh;
+  if (!runChangeAt) delete next.runChangeAt;
   return next;
 }
 

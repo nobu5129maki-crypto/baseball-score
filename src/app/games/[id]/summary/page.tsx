@@ -14,6 +14,7 @@ import { deliverBackupFile } from "@/lib/backup-export";
 import { db, deleteEndedGame } from "@/lib/db";
 import { otherSide, reduceGame, totalRuns } from "@/lib/engine";
 import { gameTimeReadout } from "@/lib/game-time";
+import { runChangeRuleSuffix } from "@/lib/run-change";
 import {
   formatInnings,
   pitcherDecisionMark,
@@ -112,6 +113,7 @@ export default function SummaryPage() {
             {game.tournament ? `　${game.tournament}` : ""}
             {game.venue ? `　${game.venue}` : ""}
             {game.useDh ? "　DH制" : ""}
+            {runChangeRuleSuffix(game.runChangeAt)}
             　スコアブック
           </p>
           <h2 className="text-2xl font-bold text-center mt-1">

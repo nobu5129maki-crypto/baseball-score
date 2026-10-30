@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -40,6 +40,7 @@ import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD } from "@/lib/rules";
+import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
 import { POSITION_LABELS } from "@/lib/types";
@@ -102,6 +103,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const [startNotice, setStartNotice] = useState<string | null>(null);
   const dismissStartNotice = useCallback(() => setStartNotice(null), []);
   const state = useMemo(() => (game ? reduceGame(game) : null), [game]);
+  const noticeRuns = state?.runChangeNotice;
+  useEffect(() => {
+    if (noticeRuns == null) return;
+    document.getElementById("run-change-notice")?.scrollIntoView({ block: "center" });
+  }, [noticeRuns, game?.events.length]);
 
   if (game === undefined) {
     return <p className="p-6 text-[#9aa894]">読み込み中…</p>;
@@ -253,6 +259,16 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </button>
       </header>
 
+      {state.runChangeNotice != null ? (
+        <p
+          id="run-change-notice"
+          role="status"
+          className="sticky top-0 z-40 mx-3 mt-2 rounded-2xl bg-[#f5c518] px-4 py-4 text-center text-xl font-bold leading-snug text-[#14180c] shadow-lg"
+        >
+          {runChangeMessage(state.runChangeNotice)}
+        </p>
+      ) : null}
+
       {startNotice ? (
         <StartTimeConfirmed
           time={startNotice}
@@ -312,6 +328,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         state={state}
         firstName={firstName}
         secondName={secondName}
+        ruleLabel={runChangeRuleLabel(game.runChangeAt) ?? undefined}
         selectedId={confirm?.selectedId ?? null}
         edit={Boolean(confirm)}
         showOutButton={Boolean(confirm)}

@@ -92,6 +92,15 @@ describe("applyGameSetup", () => {
     expect(next.firstLineup[0]).toMatchObject({ playerId: "相手1", position: "P" });
   });
 
+  it("得点で交代する点数を保存し、使わないときは消す", () => {
+    const on = applyGameSetup(game(), { ...base, runChangeAt: 5 });
+    expect(on.runChangeAt).toBe(5);
+    const off = applyGameSetup(on, { ...base, runChangeAt: 0 });
+    expect(off.runChangeAt).toBeUndefined();
+    const invalid = applyGameSetup(on, { ...base, runChangeAt: 99 });
+    expect(invalid.runChangeAt).toBeUndefined();
+  });
+
   it("試合開始後は条件を変えない", () => {
     const started = game({ status: "in_progress" });
     const next = applyGameSetup(started, { ...base, date: "2026-11-01", mySide: "first" });

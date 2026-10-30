@@ -234,6 +234,11 @@ export type Game = {
   mySide: Side;
   /** true のとき指名打者制（投手は打順外） */
   useDh?: boolean;
+  /**
+   * 攻撃側のその回の得点がこの数に達したら、3アウト前でも攻守交代する。
+   * 未設定なら使わない。
+   */
+  runChangeAt?: number;
   scheduledInnings: number;
   date: string;
   startTime?: string;
@@ -308,6 +313,8 @@ export type GameState = {
   ended: boolean;
   regulationComplete: boolean;
   bottomUnplayed: boolean;
+  /** 直前のプレーで得点による攻守交代が起きたとき、その回に入った得点 */
+  runChangeNotice?: number;
 };
 
 export type AppSettings = Settings;
