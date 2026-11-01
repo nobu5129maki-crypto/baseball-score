@@ -6,17 +6,32 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { PlayerProfileFields } from "@/components/PlayerProfileFields";
 import {
+  addExistingPlayerToTeam,
+  addPlayerToTeam,
   createOwnTeam,
   db,
   deleteOwnTeam,
   getSettings,
+  linkOverlappingPlayers,
+  removePlayerFromTeam,
+  savePlayerOnTeam,
   saveTeamName,
   setActiveTeamId,
 } from "@/lib/db";
 import { newId } from "@/lib/ids";
-import { compactPlayer, pickPlayerProfile, playerProfileLabel } from "@/lib/player-profile";
+import { pickPlayerProfile, playerProfileLabel } from "@/lib/player-profile";
 import { decodeRoster, encodeRoster } from "@/lib/roster-share";
-import { resolveActiveTeam, sortOwnTeams, teamDisplayName } from "@/lib/teams";
+import {
+  numberOnTeam,
+  otherTeamLabels,
+  normPlayerName,
+  planSameNameLinks,
+  playerOnTeam,
+  playersOnTeam,
+  resolveActiveTeam,
+  sortOwnTeams,
+  teamDisplayName,
+} from "@/lib/teams";
 import type { Player, PlayerProfile } from "@/lib/types";
 
 export default function TeamsPage() {
@@ -26,10 +41,12 @@ export default function TeamsPage() {
   const active = resolveActiveTeam(teams, settings?.activeTeamId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const team = teams.find((t) => t.id === selectedId) ?? active ?? teams[0];
-  const players =
-    useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
-      team?.id,
-    ]) ?? [];
+  const allPlayers = useLiveQuery(() => db.players.toArray()) ?? [];
+  const players = team ? playersOnTeam(allPlayers, team.id) : [];
+  const elsewhere = team
+    ? allPlayers.filter((player) => !playerOnTeam(player, team.id))
+    : [];
+  const sameNameLinks = planSameNameLinks(allPlayers);
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [draft, setDraft] = useState<PlayerProfile>({});
@@ -58,8 +75,8 @@ export default function TeamsPage() {
       await saveTeamName(team.id, next);
       setTeamNameDraft(null);
     }
-    if (editing) {
-      await db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
+    if (editing && team) {
+      await savePlayerOnTeam({ ...editing, name: editing.name.trim() }, team.id);
       setEditing(null);
     }
   }
@@ -93,7 +110,7 @@ export default function TeamsPage() {
       setEditing(null);
       setSaved(
         copyRoster && team
-          ? `${created.name} を追加し、${teamDisplayName(team)} の選手をコピーしました`
+          ? `${created.name} を追加し、${teamDisplayName(team)} と同じ選手を入れました`
           : `${created.name} を追加しました`,
       );
     } finally {
@@ -195,8 +212,11 @@ export default function TeamsPage() {
               checked={copyRoster}
               onChange={(e) => setCopyRoster(e.target.checked)}
             />
-            いま選んでいるチームの選手をコピーする
+            いまの選手を、同じ選手として新しいチームにも入れる
           </label>
+          <p className="text-xs text-[#9aa894] leading-relaxed">
+            1部と2部で同じ選手が出るときは、コピーではなく同じ選手のまま両方の名簿に入ります。名前は共通、背番号はチームごとに変えられます。
+          </p>
           <button
             type="button"
             className="tap"
@@ -246,9 +266,10 @@ export default function TeamsPage() {
                       type="button"
                       className="tap tap-accent flex-1"
                       onClick={() => {
-                        void db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
+                        if (!team) return;
+                        void savePlayerOnTeam({ ...editing, name: editing.name.trim() }, team.id);
                         setEditing(null);
-                        setSaved("選手を保存しました");
+                        setSaved("選手を保存しました。同じ選手で入っている他のチームにも名前は反映されます");
                       }}
                     >
                       この選手を保存
@@ -260,26 +281,40 @@ export default function TeamsPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-[#9aa894] w-8">{p.number}</span>
+                  <span className="text-[#9aa894] w-8">{team ? numberOnTeam(p, team.id) : p.number}</span>
                   <span className="flex-1 min-w-0">
                     <span className="font-bold">{p.name}</span>
+                    {team && otherTeamLabels(p, teams, team.id).length > 0 ? (
+                      <span className="block text-xs text-[#f5c518]">
+                        {otherTeamLabels(p, teams, team.id).join("・")} と同じ選手
+                      </span>
+                    ) : null}
                     {playerProfileLabel(p) ? (
                       <span className="block text-xs text-[#9aa894]">{playerProfileLabel(p)}</span>
                     ) : null}
                   </span>
-                  <button type="button" className="text-sm" onClick={() => setEditing(p)}>
+                  <button
+                    type="button"
+                    className="text-sm"
+                    onClick={() => setEditing(team ? { ...p, number: numberOnTeam(p, team.id) } : p)}
+                  >
                     修正
                   </button>
                   <button
                     type="button"
                     className="text-sm text-[#ff5a5a]"
                     onClick={() => {
+                      if (!team) return;
                       const label = p.name.trim() || "この選手";
-                      if (!window.confirm(`${label}を選手一覧から削除しますか？過去の試合の記録は残ります。`)) return;
-                      void db.players.delete(p.id);
+                      const also = otherTeamLabels(p, teams, team.id);
+                      const message = also.length
+                        ? `${label}を${teamDisplayName(team)}の名簿から外しますか？${also.join("・")}には残ります。過去の試合の記録も残ります。`
+                        : `${label}を選手一覧から削除しますか？過去の試合の記録は残ります。`;
+                      if (!window.confirm(message)) return;
+                      void removePlayerFromTeam(p.id, team.id);
                     }}
                   >
-                    削除
+                    {team && otherTeamLabels(p, teams, team.id).length > 0 ? "外す" : "削除"}
                   </button>
                 </div>
               )}
@@ -310,23 +345,67 @@ export default function TeamsPage() {
             className="tap tap-accent"
             onClick={() => {
               if (!team || !name.trim()) return;
-              void db.players.add({
-                id: newId(),
-                teamId: team.id,
-                name: name.trim(),
-                number: number.trim(),
-                ...pickPlayerProfile(draft),
-                createdAt: Date.now(),
-              });
+              const named = name.trim();
+              const same = elsewhere.filter((player) => normPlayerName(player.name) === normPlayerName(named));
+              if (same.length === 1) {
+                void addExistingPlayerToTeam(same[0].id, team.id).then(async (added) => {
+                  if (added && number.trim() && number.trim() !== added.number) {
+                    await savePlayerOnTeam({ ...added, number: number.trim() }, team.id);
+                  }
+                });
+                setSaved(`${named} は他のチームにいるので、同じ選手として追加しました`);
+              } else {
+                void addPlayerToTeam(team.id, { name: named, number: number.trim(), ...pickPlayerProfile(draft) });
+                setSaved("選手を追加しました");
+              }
               setName("");
               setNumber("");
               setDraft({});
-              setSaved("選手を追加しました");
             }}
           >
             追加
           </button>
         </div>
+
+        {elsewhere.length > 0 && team ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-[#9aa894]">他の自チームにいる選手</p>
+            {elsewhere.map((player) => (
+              <button
+                key={player.id}
+                type="button"
+                className="tap text-sm text-left"
+                onClick={() => {
+                  void addExistingPlayerToTeam(player.id, team.id);
+                  setSaved(`${player.name} を${teamDisplayName(team)}にも入れました`);
+                }}
+              >
+                {player.name} をこのチームにも入れる
+                <span className="block text-xs text-[#9aa894]">
+                  {otherTeamLabels(player, teams, team.id).join("・") || "他チーム"}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {sameNameLinks.length > 0 ? (
+          <button
+            type="button"
+            className="tap"
+            onClick={() => {
+              const names = sameNameLinks.map((link) => link.name).join("、");
+              if (!window.confirm(`${names} を、1部と2部で同じ選手として結びつけますか？試合の記録も同じ選手にまとまります。`)) {
+                return;
+              }
+              void linkOverlappingPlayers().then((count) => {
+                setSaved(count > 0 ? `${count}人を同じ選手として結びつけました` : "結びつける選手はいませんでした");
+              });
+            }}
+          >
+            同名の選手を同じ選手として結びつける
+          </button>
+        ) : null}
 
         <div className="border-t border-[#2c3c30] pt-4 flex flex-col gap-2">
           <h2 className="font-bold">メンバー交換</h2>

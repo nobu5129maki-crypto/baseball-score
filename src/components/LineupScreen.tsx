@@ -9,7 +9,7 @@ import { LineupBoard } from "@/components/LineupBoard";
 import { commitSub, getPitcherOnly, reduceGame } from "@/lib/engine";
 import { rememberOpponentBench } from "@/lib/opponent-bench";
 import { runChangeRuleSuffix } from "@/lib/run-change";
-import { db, saveGame } from "@/lib/db";
+import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
 import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
 import { nudgeLineup, swapLineupOrders } from "@/lib/lineup-edit";
@@ -26,7 +26,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
     useLiveQuery(async () => {
       const g = await db.games.get(gameId);
       if (!g) return [];
-      return db.players.where("teamId").equals(g.myTeamId).toArray();
+      return loadPlayersOnTeam(g.myTeamId);
     }, [gameId]) ?? [];
   const savedRosters =
     useLiveQuery(async () => {

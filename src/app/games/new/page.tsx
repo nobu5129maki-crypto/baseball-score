@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameSetupForm, type GameSetupValues } from "@/components/GameSetupForm";
-import { db, getSettings, saveGame, setActiveTeamId } from "@/lib/db";
+import { db, getSettings, loadPlayersOnTeam, saveGame, setActiveTeamId } from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { localDateKey } from "@/lib/game-time";
 import { normalizeRunChangeAt } from "@/lib/run-change";
@@ -29,9 +29,7 @@ export default function NewGamePage() {
   const settings = useLiveQuery(() => getSettings());
   const team = resolveActiveTeam(teams, settings?.activeTeamId);
   const players =
-    useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
-      team?.id,
-    ]) ?? [];
+    useLiveQuery(() => (team ? loadPlayersOnTeam(team.id) : []), [team?.id]) ?? [];
   const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
   const [leaving, setLeaving] = useState(() => suppressForm);
   const [error, setError] = useState("");

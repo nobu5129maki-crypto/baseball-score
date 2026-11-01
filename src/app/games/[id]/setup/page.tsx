@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameSetupForm, type GameSetupValues } from "@/components/GameSetupForm";
-import { db, saveGame } from "@/lib/db";
+import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
 import { applyGameSetup } from "@/lib/game-setup";
 import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
 
@@ -20,9 +20,7 @@ function GameSetupScreen({ gameId }: { gameId: string }) {
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const teamId = game?.myTeamId;
   const players =
-    useLiveQuery(() => (teamId ? db.players.where("teamId").equals(teamId).toArray() : []), [
-      teamId,
-    ]) ?? [];
+    useLiveQuery(() => (teamId ? loadPlayersOnTeam(teamId) : []), [teamId]) ?? [];
   const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);

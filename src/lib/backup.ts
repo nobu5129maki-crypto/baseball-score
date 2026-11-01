@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { playerOnTeam } from "./teams";
 import type { Game, Player, RosterPack, Settings, Team } from "./types";
 
 export const BACKUP_KIND = "rakuscore-backup";
@@ -53,7 +54,7 @@ export async function collectGameBackup(gameId: string): Promise<AppBackup | nul
     db.rosters.toArray(),
   ]);
   const team = teams.find((row) => row.id === game.myTeamId) ?? teams[0];
-  const mine = players.filter((p) => p.teamId === game.myTeamId);
+  const mine = players.filter((p) => playerOnTeam(p, game.myTeamId));
   return makeBackup({
     teams: team ? [team] : [],
     players: mine,

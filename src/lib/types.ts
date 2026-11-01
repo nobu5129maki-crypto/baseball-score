@@ -265,9 +265,14 @@ export type Team = {
 
 export type Player = {
   id: string;
+  /** 最初に所属した自チーム。1部と2部の両方にいるときは teamIds も見る */
   teamId: string;
+  /** 1部・2部など、この選手が所属する自チーム。未設定なら teamId だけ */
+  teamIds?: string[];
   name: string;
   number: string;
+  /** チームごとの背番号。未設定のチームは number を使う */
+  numbersByTeam?: Record<string, string>;
   kana?: string;
   createdAt: number;
 } & PlayerProfile;

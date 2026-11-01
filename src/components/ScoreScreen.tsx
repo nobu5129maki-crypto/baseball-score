@@ -34,7 +34,7 @@ import {
   undoAtBat,
   undoLast,
 } from "@/lib/engine";
-import { db, saveGame } from "@/lib/db";
+import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
 import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
@@ -85,7 +85,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const players = useLiveQuery(async () => {
     const g = await db.games.get(gameId);
     if (!g) return [];
-    return db.players.where("teamId").equals(g.myTeamId).toArray();
+    return loadPlayersOnTeam(g.myTeamId);
   }, [gameId]);
   const allGames = useLiveQuery(() => db.games.toArray(), []);
   const [sheet, setSheet] = useState<SheetKind>(null);

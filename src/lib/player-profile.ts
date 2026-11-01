@@ -1,4 +1,5 @@
-import type { BatsSide, PlayerProfile, ThrowsHand } from "./types";
+import { playerTeamIds } from "./teams";
+import type { BatsSide, Player, PlayerProfile, ThrowsHand } from "./types";
 
 export const THROWS_OPTIONS: Array<{ value: ThrowsHand; label: string }> = [
   { value: "right", label: "右投げ" },
@@ -48,21 +49,20 @@ export function pickPlayerProfile(source: PlayerProfile | undefined | null): Pla
   return next;
 }
 
-export function compactPlayer(player: {
-  id: string;
-  teamId: string;
-  name: string;
-  number: string;
-  kana?: string;
-  createdAt: number;
-} & PlayerProfile) {
+export function compactPlayer(player: Player): Player {
+  const teamIds = playerTeamIds(player);
+  const numbersByTeam = Object.fromEntries(
+    Object.entries(player.numbersByTeam ?? {}).filter(([id, number]) => teamIds.includes(id) && number.trim()),
+  );
   return {
     id: player.id,
-    teamId: player.teamId,
-    name: player.name,
+    teamId: teamIds.includes(player.teamId) ? player.teamId : teamIds[0],
+    name: player.name.trim(),
     number: player.number,
     createdAt: player.createdAt,
     ...(player.kana ? { kana: player.kana } : {}),
+    ...(teamIds.length > 1 ? { teamIds } : {}),
+    ...(Object.keys(numbersByTeam).length > 0 ? { numbersByTeam } : {}),
     ...pickPlayerProfile(player),
   };
 }
