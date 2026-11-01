@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commitEnd, commitPickoff, commitPinchHitter, commitPlay, commitSteal, commitSub, reduceGame } from "./engine";
+import { commitEnd, commitPickoff, commitPinchHitter, commitPlay, commitSteal, commitSub, commitWp, reduceGame } from "./engine";
 import { buildScorebook, displayInnings, lastPlayedInning, lineScoreCells } from "./scorebook";
 import type { Game, LineupSlot, Position } from "./types";
 
@@ -82,6 +82,17 @@ describe("buildScorebook", () => {
     game = commitSteal(game, 1, 2);
     const book = buildScorebook(game);
     expect(book.first.orders[0].innings[0].map((m) => m.label)).toContain("盗");
+  });
+
+  it("一塁を残した暴投は進んだ走者だけに暴が付く", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitSteal(game, 1, 2);
+    game = commitPlay(game, "walk");
+    game = commitSteal(game, 2, 3);
+    game = commitWp(game, { holdFirst: true });
+    const book = buildScorebook(game);
+    expect(book.first.orders[0].innings[0].map((m) => m.label)).toContain("暴");
+    expect(book.first.orders[1].innings[0].map((m) => m.label)).not.toContain("暴");
   });
 
   it("試合終了後も打席がスコアブックに残る", () => {

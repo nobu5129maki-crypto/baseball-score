@@ -146,8 +146,8 @@ export type StealEvent = {
   to: Dest;
 };
 
-export type WpEvent = { id: string; seq: number; t: "wp" };
-export type PbEvent = { id: string; seq: number; t: "pb" };
+export type WpEvent = { id: string; seq: number; t: "wp"; holdFirst?: boolean };
+export type PbEvent = { id: string; seq: number; t: "pb"; holdFirst?: boolean };
 export type BkEvent = { id: string; seq: number; t: "bk" };
 
 export type PickoffEvent = {

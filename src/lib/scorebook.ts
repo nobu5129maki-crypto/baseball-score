@@ -211,9 +211,12 @@ export function buildScorebook(game: Game): Scorebook {
       }
     } else if (event.t === "wp" || event.t === "pb" || event.t === "bk") {
       const label = event.t === "wp" ? "暴" : event.t === "pb" ? "捕逸" : "ボ";
-      for (const runner of before.bases) {
-        if (runner) pushMark(battingBook, runner.battingOrder, before.inning, label);
-      }
+      const holdFirst = event.t !== "bk" && event.holdFirst === true && before.bases[0] && before.bases[2];
+      before.bases.forEach((runner, index) => {
+        if (!runner) return;
+        if (holdFirst && index === 0) return;
+        pushMark(battingBook, runner.battingOrder, before.inning, label);
+      });
     } else if (event.t === "pr") {
       const runner = before.bases[event.base - 1];
       const order = runner?.battingOrder ?? event.base;

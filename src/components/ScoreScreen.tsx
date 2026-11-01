@@ -76,7 +76,9 @@ type SheetKind =
   | "ph"
   | "field"
   | "batted"
-  | "hit_runner";
+  | "hit_runner"
+  | "wp_hold"
+  | "pb_hold";
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -150,6 +152,15 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       if (!latest) return;
       await saveGame(mut(latest));
     });
+  }
+
+  function askWildPitch(kind: "wp" | "pb") {
+    if (!state) return;
+    if (state.bases[0] && state.bases[2]) {
+      setSheet(kind === "wp" ? "wp_hold" : "pb_hold");
+      return;
+    }
+    void patch((g) => (kind === "wp" ? commitWp(g) : commitPb(g)));
   }
 
   function startResult(result: PlayResult) {
@@ -441,7 +452,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           <div className="px-2 grid grid-cols-4 gap-1 pb-2">
             <Action
               disabled={occupiedCount === 0}
-              onClick={() => void patch(commitWp)}
+              onClick={() => askWildPitch("wp")}
               label="暴投"
               help={() => {
                 setGlossaryId("wp");
@@ -451,7 +462,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             />
             <Action
               disabled={occupiedCount === 0}
-              onClick={() => void patch(commitPb)}
+              onClick={() => askWildPitch("pb")}
               label="捕逸"
               help={() => {
                 setGlossaryId("pb");
@@ -719,6 +730,18 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           myPitcher={game.mySide === "first" ? state.firstPitcher : state.secondPitcher}
           otherPitcher={game.mySide === "first" ? state.secondPitcher : state.firstPitcher}
           onApply={(mut) => void patch(mut)}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "wp_hold" || sheet === "pb_hold" ? (
+        <WildAdvanceSheet
+          kind={sheet === "wp_hold" ? "wp" : "pb"}
+          bases={state.bases}
+          onChoose={(holdFirst) => {
+            const kind = sheet === "wp_hold" ? "wp" : "pb";
+            void patch((g) => (kind === "wp" ? commitWp(g, { holdFirst }) : commitPb(g, { holdFirst })));
+            setSheet(null);
+          }}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -1111,6 +1134,39 @@ function PinchHitterSheet({
           onClick={() => onPick({ id: `ph-${Date.now()}`, name: name.trim() })}
         >
           出す
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+function WildAdvanceSheet({
+  kind,
+  bases,
+  onChoose,
+  onClose,
+}: {
+  kind: "wp" | "pb";
+  bases: Array<RunnerOnBase | null>;
+  onChoose: (holdFirst: boolean) => void;
+  onClose: () => void;
+}) {
+  const first = bases[0];
+  const second = bases[1];
+  const third = bases[2];
+  return (
+    <Sheet title={kind === "wp" ? "暴投" : "捕逸"} onClose={onClose}>
+      <p className="text-sm leading-relaxed mb-4">
+        三塁の{third?.playerName ?? "走者"}はホームへ進みます。
+        {second ? `二塁の${second.playerName}は三塁へ進みます。` : ""}
+        一塁の{first?.playerName ?? "走者"}はどうしますか？
+      </p>
+      <div className="flex flex-col gap-2">
+        <button type="button" className="tap tap-accent" onClick={() => onChoose(false)}>
+          一塁も2塁へ進む
+        </button>
+        <button type="button" className="tap" onClick={() => onChoose(true)}>
+          一塁はそのまま
         </button>
       </div>
     </Sheet>

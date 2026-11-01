@@ -311,6 +311,47 @@ describe("らくスコア engine", () => {
     expect(reduceGame(game).bases[1]?.playerId).toBe("A1");
   });
 
+  it("一塁と三塁の暴投で一塁を残すと三塁だけホームに入る", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitSteal(game, 1, 2);
+    game = commitPlay(game, "walk");
+    game = commitSteal(game, 2, 3);
+    const before = reduceGame(game);
+    expect(before.bases[0]?.playerId).toBe("A2");
+    expect(before.bases[2]?.playerId).toBe("A1");
+    game = commitWp(game, { holdFirst: true });
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A2");
+    expect(state.bases[1]).toBeNull();
+    expect(state.bases[2]).toBeNull();
+    expect(state.scores.first[0]).toBe(1);
+    expect(getBatter(state).playerId).toBe("A3");
+  });
+
+  it("一塁と三塁の暴投で一塁も進塁できる", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitSteal(game, 1, 2);
+    game = commitPlay(game, "walk");
+    game = commitSteal(game, 2, 3);
+    game = commitWp(game);
+    const state = reduceGame(game);
+    expect(state.bases[0]).toBeNull();
+    expect(state.bases[1]?.playerId).toBe("A2");
+    expect(state.scores.first[0]).toBe(1);
+  });
+
+  it("満塁の捕逸で一塁を残すと二塁は三塁へ進む", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPb(game, { holdFirst: true });
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A3");
+    expect(state.bases[1]).toBeNull();
+    expect(state.bases[2]?.playerId).toBe("A2");
+    expect(state.scores.first[0]).toBe(1);
+  });
+
   it("エラーは安打にせず失策が守備側に付く", () => {
     const game = commitPlay(makeGame(), "error");
     const state = reduceGame(game);

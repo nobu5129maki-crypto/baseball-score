@@ -293,6 +293,13 @@ function plus(bases: GameState["bases"], steps: number): RunnerMove[] {
   return moves;
 }
 
+/** 一塁と三塁に走者がいるとき、一塁だけ残す暴投・捕逸。それ以外は全員が1つ進む。 */
+export function wildPitchMoves(bases: GameState["bases"], holdFirst: boolean): RunnerMove[] {
+  const advance = plus(bases, 1);
+  if (!holdFirst || !bases[0] || !bases[2]) return advance;
+  return advance.filter((move) => move.from !== 1);
+}
+
 function forceWalk(batterId: string, bases: GameState["bases"]): RunnerMove[] {
   const moves: RunnerMove[] = [{ playerId: batterId, from: 0, to: 1 }];
   const r1 = bases[0];
@@ -327,6 +334,9 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       return applySteal(game, current, event.from, "out");
     case "wp":
     case "pb":
+      return applyOccupancy(game, current, wildPitchMoves(current.bases, event.holdFirst === true), {
+        consumeAtBat: false,
+      });
     case "bk":
       return applyOccupancy(game, current, plus(current.bases, 1), {
         consumeAtBat: false,
@@ -498,7 +508,7 @@ function applyOccupancy(
       ? countPitch(state, fieldingSide(state.half))
       : { pitchesThrown: state.pitchesThrown, pitchesByPlayer: state.pitchesByPlayer };
 
-  let next: GameState = {
+  const next: GameState = {
     ...state,
     ...pitchCount,
     outs,
@@ -742,12 +752,12 @@ export function commitPickoff(game: Game, from: Base): Game {
   return commitEvent(game, { t: "pickoff", from });
 }
 
-export function commitWp(game: Game): Game {
-  return commitEvent(game, { t: "wp" });
+export function commitWp(game: Game, options?: { holdFirst?: boolean }): Game {
+  return commitEvent(game, { t: "wp", ...(options?.holdFirst ? { holdFirst: true } : {}) });
 }
 
-export function commitPb(game: Game): Game {
-  return commitEvent(game, { t: "pb" });
+export function commitPb(game: Game, options?: { holdFirst?: boolean }): Game {
+  return commitEvent(game, { t: "pb", ...(options?.holdFirst ? { holdFirst: true } : {}) });
 }
 
 export function commitBk(game: Game): Game {
