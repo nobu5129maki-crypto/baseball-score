@@ -91,9 +91,7 @@ export async function saveTeamName(teamId: string, name: string): Promise<void> 
 export async function getSettings(): Promise<Settings> {
   const row = await db.settings.get("app");
   if (row) return row;
-  const fresh: Settings = { id: "app", leftHanded: false };
-  await db.settings.put(fresh);
-  return fresh;
+  return { id: "app", leftHanded: false };
 }
 
 export async function listOwnTeams(): Promise<Team[]> {

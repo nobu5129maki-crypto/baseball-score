@@ -129,6 +129,10 @@ select {
   background: currentColor;
 }
 
+.print-legend {
+  display: none;
+}
+
 @media print {
   @page {
     size: A4 landscape;
@@ -192,6 +196,12 @@ select {
   .scorebook-team {
     break-inside: avoid;
     margin-bottom: 12px;
+  }
+
+  .print-legend {
+    display: block !important;
+    break-inside: avoid;
+    margin-top: 10px;
   }
 
   .result-block {

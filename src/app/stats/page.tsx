@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
+import { PrintLegend } from "@/components/PrintLegend";
 import { db, getSettings, loadAllGames, setActiveTeamId } from "@/lib/db";
 import {
   comparePitchers,
@@ -29,6 +30,7 @@ import {
   type SlashSortKey,
   type SortDir,
 } from "@/lib/stats";
+import { legendForStatHeaders } from "@/lib/print-legend";
 import { resolveActiveTeam, sortOwnTeams, teamDisplayName } from "@/lib/teams";
 
 const COLUMNS: Array<{
@@ -301,6 +303,20 @@ export default function StatsPage() {
             </p>
           ) : null}
         </section>
+
+        <PrintLegend
+          items={legendForStatHeaders([
+            "打点",
+            "打率",
+            "出塁率",
+            "長打率",
+            "OPS",
+            ...(rows.length > 0 ? COLUMNS.map((col) => col.label) : []),
+            ...(pitchers.length > 0
+              ? [...PITCH_COLS_A, ...PITCH_COLS_B].map((col) => col.label)
+              : []),
+          ])}
+        />
 
         <div className="flex gap-2 print:hidden">
           <button type="button" className="tap tap-accent flex-1" onClick={() => window.print()}>

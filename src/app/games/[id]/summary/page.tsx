@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
 import { InningScoreTable } from "@/components/InningScoreTable";
 import { PlayerIdentity } from "@/components/PlayerIdentity";
+import { PrintLegend } from "@/components/PrintLegend";
 import { ScorebookView } from "@/components/ScorebookView";
 import { collectGameBackup, gameBackupFileName, stringifyBackup } from "@/lib/backup";
 import { deliverBackupFile } from "@/lib/backup-export";
@@ -21,8 +22,11 @@ import {
   teamPitcherStats,
   type PitcherGameStats,
 } from "@/lib/pitcher-stats";
-import { buildScorebook } from "@/lib/scorebook";
+import { legendForMarks, positionMarks } from "@/lib/print-legend";
+import { buildScorebook, displayInnings, lineScoreCells } from "@/lib/scorebook";
 import { gameSlashes, type PlayerSlash } from "@/lib/stats";
+import type { Scorebook } from "@/lib/scorebook";
+import type { Game, GameState } from "@/lib/types";
 
 export default function SummaryPage() {
   const params = useParams<{ id: string }>();
@@ -145,6 +149,8 @@ export default function SummaryPage() {
           theirs={slashes.filter((p) => p.side !== game.mySide)}
         />
 
+        <PrintLegend items={legendForMarks(sheetMarks(game, state, book), sheetLegendOptions(game, book))} />
+
         <div className="flex flex-col gap-2 print:hidden">
           <button type="button" className="tap tap-accent w-full" disabled={shareBusy} onClick={() => void shareGame()}>
             {shareBusy ? "書き出し中…" : "この試合データをバックアップする"}
@@ -178,6 +184,31 @@ export default function SummaryPage() {
       {pitchHelp ? <GlossarySheet termId={pitchHelp} onClose={() => setPitchHelp(null)} /> : null}
     </main>
   );
+}
+
+function sheetMarks(game: Game, state: GameState, book: Scorebook): string[] {
+  const labels = [book.first, book.second].flatMap((side) =>
+    side.orders.flatMap((row) => row.innings.flatMap((cell) => cell.map((mark) => mark.label))),
+  );
+  const cols = displayInnings(game, state.ended ? 0 : state.inning);
+  const scores = [
+    ...lineScoreCells(state.scores.first, cols, "first", game, state),
+    ...lineScoreCells(state.scores.second, cols, "second", game, state),
+  ];
+  return [...labels, ...scores.filter((cell): cell is string => typeof cell === "string")];
+}
+
+function sheetLegendOptions(game: Game, book: Scorebook) {
+  const players = [book.first, book.second].flatMap((side) => side.orders.flatMap((row) => row.players));
+  const pitchers = [
+    ...teamPitcherStats(game, game.mySide),
+    ...teamPitcherStats(game, otherSide(game.mySide)),
+  ];
+  return {
+    positions: positionMarks(players.map((player) => player.position)),
+    defensiveSub: players.some((player) => player.via === "sub"),
+    save: pitchers.some((pitcher) => pitcher.saves > 0),
+  };
 }
 
 function PitcherStaff({
