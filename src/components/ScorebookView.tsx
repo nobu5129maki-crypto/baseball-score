@@ -1,8 +1,10 @@
 "use client";
 
-import { POSITION_SHORT } from "@/lib/types";
+import { PrintLegend } from "@/components/PrintLegend";
 import { jerseyLabel } from "@/lib/labels";
+import type { LegendItem } from "@/lib/print-legend";
 import type { Scorebook, ScorebookOrder, ScorebookPlayer } from "@/lib/scorebook";
+import { POSITION_SHORT } from "@/lib/types";
 
 const VIA: Record<ScorebookPlayer["via"], string> = {
   start: "",
@@ -15,10 +17,12 @@ export function ScorebookView({
   title,
   side,
   innings,
+  legend = [],
 }: {
   title: string;
   side: Scorebook["first"];
   innings: number;
+  legend?: LegendItem[];
 }) {
   const hasMarks = side.orders.some((row) => row.innings.some((cell) => cell.length > 0));
 
@@ -40,6 +44,13 @@ export function ScorebookView({
                 </th>
               ))}
             </tr>
+            {legend.length > 0 ? (
+              <tr className="print-legend-row">
+                <th colSpan={2 + innings} className="text-left font-normal">
+                  <PrintLegend items={legend} />
+                </th>
+              </tr>
+            ) : null}
           </thead>
           <tbody>
             {side.orders.map((row) => (

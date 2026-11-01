@@ -1,4 +1,6 @@
+import { PrintLegend } from "@/components/PrintLegend";
 import { totalRuns } from "@/lib/engine";
+import type { LegendItem } from "@/lib/print-legend";
 import { displayInnings, lineScoreCells, type LineScoreCell } from "@/lib/scorebook";
 import type { Game, GameState } from "@/lib/types";
 
@@ -7,11 +9,13 @@ export function InningScoreTable({
   state,
   firstName,
   secondName,
+  legend = [],
 }: {
   game: Game;
   state: GameState;
   firstName: string;
   secondName: string;
+  legend?: LegendItem[];
 }) {
   const liveInning = state.ended ? 0 : state.inning;
   const cols = displayInnings(game, liveInning);
@@ -32,6 +36,13 @@ export function InningScoreTable({
             <th className="p-1">H</th>
             <th className="p-1">E</th>
           </tr>
+          {legend.length > 0 ? (
+            <tr className="print-legend-row">
+              <th colSpan={headers.length + 4} className="text-left font-normal">
+                <PrintLegend items={legend} />
+              </th>
+            </tr>
+          ) : null}
         </thead>
         <tbody>
           <ScoreRow

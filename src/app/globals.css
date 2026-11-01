@@ -129,7 +129,8 @@ select {
   background: currentColor;
 }
 
-.print-legend {
+.print-legend,
+.print-legend-row {
   display: none;
 }
 
@@ -194,14 +195,24 @@ select {
   }
 
   .scorebook-team {
-    break-inside: avoid;
     margin-bottom: 12px;
+  }
+
+  .print-legend-row {
+    display: table-row !important;
   }
 
   .print-legend {
     display: block !important;
+    break-before: avoid;
+    page-break-before: avoid;
     break-inside: avoid;
-    margin-top: 10px;
+    margin-top: 4px;
+  }
+
+  .print-legend-row .print-legend {
+    margin-top: 0;
+    padding: 4px 0 6px;
   }
 
   .result-block {

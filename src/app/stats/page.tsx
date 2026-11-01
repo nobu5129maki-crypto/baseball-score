@@ -30,7 +30,7 @@ import {
   type SlashSortKey,
   type SortDir,
 } from "@/lib/stats";
-import { legendForStatHeaders } from "@/lib/print-legend";
+import { legendForStatHeaders, type LegendItem } from "@/lib/print-legend";
 import { resolveActiveTeam, sortOwnTeams, teamDisplayName } from "@/lib/teams";
 
 const COLUMNS: Array<{
@@ -179,6 +179,9 @@ export default function StatsPage() {
               <Stat label="OPS" value={formatOps(season.batting)} onHelp={() => setHelp("ops")} />
             </dl>
           </div>
+          {rows.length === 0 ? (
+            <PrintLegend items={legendForStatHeaders(["打点", "打率", "出塁率", "長打率", "OPS"])} />
+          ) : null}
         </section>
 
         <section>
@@ -219,6 +222,10 @@ export default function StatsPage() {
                       </th>
                     ))}
                   </tr>
+                  <LegendRow
+                    span={COLUMNS.length}
+                    items={legendForStatHeaders(COLUMNS.map((col) => col.label))}
+                  />
                 </thead>
                 <tbody>
                   {sorted.map((p) => (
@@ -257,6 +264,10 @@ export default function StatsPage() {
                       />
                     ))}
                   </tr>
+                  <LegendRow
+                    span={PITCH_COLS_A.length}
+                    items={legendForStatHeaders(PITCH_COLS_A.map((col) => col.label))}
+                  />
                 </thead>
                 <tbody>
                   {sortedPitchA.map((p) => (
@@ -288,6 +299,10 @@ export default function StatsPage() {
                       />
                     ))}
                   </tr>
+                  <LegendRow
+                    span={PITCH_COLS_B.length}
+                    items={legendForStatHeaders(PITCH_COLS_B.map((col) => col.label))}
+                  />
                 </thead>
                 <tbody>
                   {sortedPitchB.map((p) => (
@@ -303,20 +318,6 @@ export default function StatsPage() {
             </p>
           ) : null}
         </section>
-
-        <PrintLegend
-          items={legendForStatHeaders([
-            "打点",
-            "打率",
-            "出塁率",
-            "長打率",
-            "OPS",
-            ...(rows.length > 0 ? COLUMNS.map((col) => col.label) : []),
-            ...(pitchers.length > 0
-              ? [...PITCH_COLS_A, ...PITCH_COLS_B].map((col) => col.label)
-              : []),
-          ])}
-        />
 
         <div className="flex gap-2 print:hidden">
           <button type="button" className="tap tap-accent flex-1" onClick={() => window.print()}>
@@ -357,6 +358,17 @@ function Stat({ label, value, onHelp }: { label: string; value: string; onHelp?:
       </dt>
       <dd className="font-bold mt-1 break-words">{value}</dd>
     </div>
+  );
+}
+
+function LegendRow({ span, items }: { span: number; items: LegendItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <tr className="print-legend-row">
+      <th colSpan={span} className="text-left font-normal">
+        <PrintLegend items={items} />
+      </th>
+    </tr>
   );
 }
 

@@ -22,7 +22,7 @@ import {
   teamPitcherStats,
   type PitcherGameStats,
 } from "@/lib/pitcher-stats";
-import { legendForMarks, positionMarks } from "@/lib/print-legend";
+import { legendForMarks, positionMarks, type LegendItem } from "@/lib/print-legend";
 import { buildScorebook, displayInnings, lineScoreCells } from "@/lib/scorebook";
 import { gameSlashes, type PlayerSlash } from "@/lib/stats";
 import type { Scorebook } from "@/lib/scorebook";
@@ -129,7 +129,13 @@ export default function SummaryPage() {
           ) : null}
         </header>
 
-        <InningScoreTable game={game} state={state} firstName={first} secondName={second} />
+        <InningScoreTable
+          game={game}
+          state={state}
+          firstName={first}
+          secondName={second}
+          legend={scoreMarkLegend(game, state)}
+        />
 
         <PitcherStaff
           mineName={game.myTeamName}
@@ -139,8 +145,18 @@ export default function SummaryPage() {
           onHelpWin={() => setPitchHelp("win")}
         />
 
-        <ScorebookView title={`先攻 ${first}`} side={book.first} innings={book.innings} />
-        <ScorebookView title={`後攻 ${second}`} side={book.second} innings={book.innings} />
+        <ScorebookView
+          title={`先攻 ${first}`}
+          side={book.first}
+          innings={book.innings}
+          legend={sideLegend(book.first)}
+        />
+        <ScorebookView
+          title={`後攻 ${second}`}
+          side={book.second}
+          innings={book.innings}
+          legend={sideLegend(book.second)}
+        />
 
         <BattingLines
           mineName={game.myTeamName}
@@ -148,8 +164,6 @@ export default function SummaryPage() {
           mine={slashes.filter((p) => p.side === game.mySide)}
           theirs={slashes.filter((p) => p.side !== game.mySide)}
         />
-
-        <PrintLegend items={legendForMarks(sheetMarks(game, state, book), sheetLegendOptions(game, book))} />
 
         <div className="flex flex-col gap-2 print:hidden">
           <button type="button" className="tap tap-accent w-full" disabled={shareBusy} onClick={() => void shareGame()}>
@@ -186,29 +200,22 @@ export default function SummaryPage() {
   );
 }
 
-function sheetMarks(game: Game, state: GameState, book: Scorebook): string[] {
-  const labels = [book.first, book.second].flatMap((side) =>
-    side.orders.flatMap((row) => row.innings.flatMap((cell) => cell.map((mark) => mark.label))),
-  );
+function sideLegend(side: Scorebook["first"]): LegendItem[] {
+  const labels = side.orders.flatMap((row) => row.innings.flatMap((cell) => cell.map((mark) => mark.label)));
+  const players = side.orders.flatMap((row) => row.players);
+  return legendForMarks(labels, {
+    positions: positionMarks(players.map((player) => player.position)),
+    defensiveSub: players.some((player) => player.via === "sub"),
+  });
+}
+
+function scoreMarkLegend(game: Game, state: GameState): LegendItem[] {
   const cols = displayInnings(game, state.ended ? 0 : state.inning);
   const scores = [
     ...lineScoreCells(state.scores.first, cols, "first", game, state),
     ...lineScoreCells(state.scores.second, cols, "second", game, state),
   ];
-  return [...labels, ...scores.filter((cell): cell is string => typeof cell === "string")];
-}
-
-function sheetLegendOptions(game: Game, book: Scorebook) {
-  const players = [book.first, book.second].flatMap((side) => side.orders.flatMap((row) => row.players));
-  const pitchers = [
-    ...teamPitcherStats(game, game.mySide),
-    ...teamPitcherStats(game, otherSide(game.mySide)),
-  ];
-  return {
-    positions: positionMarks(players.map((player) => player.position)),
-    defensiveSub: players.some((player) => player.via === "sub"),
-    save: pitchers.some((pitcher) => pitcher.saves > 0),
-  };
+  return legendForMarks(scores.filter((cell): cell is string => typeof cell === "string"));
 }
 
 function PitcherStaff({
@@ -292,6 +299,13 @@ function PitcherTeam({
                 <th className="font-medium pb-1">回数</th>
                 <th className="font-medium pb-1">投球</th>
               </tr>
+              {pitchers.some((pitcher) => pitcher.saves > 0) ? (
+                <tr className="print-legend-row">
+                  <th colSpan={5} className="text-left font-normal">
+                    <PrintLegend items={legendForMarks([], { save: true })} />
+                  </th>
+                </tr>
+              ) : null}
             </thead>
             <tbody>
               {pitchers.map((p) => {
