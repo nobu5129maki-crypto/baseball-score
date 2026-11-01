@@ -1,20 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { PlayerProfileFields } from "@/components/PlayerProfileFields";
-import { db, saveTeamName } from "@/lib/db";
+import {
+  createOwnTeam,
+  db,
+  deleteOwnTeam,
+  getSettings,
+  saveTeamName,
+  setActiveTeamId,
+} from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { compactPlayer, pickPlayerProfile, playerProfileLabel } from "@/lib/player-profile";
 import { decodeRoster, encodeRoster } from "@/lib/roster-share";
+import { resolveActiveTeam, sortOwnTeams, teamDisplayName } from "@/lib/teams";
 import type { Player, PlayerProfile } from "@/lib/types";
 
 export default function TeamsPage() {
   const router = useRouter();
-  const teams = useLiveQuery(() => db.teams.toArray()) ?? [];
-  const team = teams[0];
+  const teams = sortOwnTeams(useLiveQuery(() => db.teams.toArray()) ?? []);
+  const settings = useLiveQuery(() => getSettings());
+  const active = resolveActiveTeam(teams, settings?.activeTeamId);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const team = teams.find((t) => t.id === selectedId) ?? active ?? teams[0];
   const players =
     useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
       team?.id,
@@ -22,25 +33,31 @@ export default function TeamsPage() {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [draft, setDraft] = useState<PlayerProfile>({});
-  const [teamName, setTeamName] = useState("");
+  const [teamNameDraft, setTeamNameDraft] = useState<{ id: string; name: string } | null>(null);
+  const teamName =
+    team && teamNameDraft?.id === team.id ? teamNameDraft.name : (team?.name ?? "");
   const [editing, setEditing] = useState<Player | null>(null);
   const [importText, setImportText] = useState("");
   const [share, setShare] = useState("");
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
-  const nameReady = useRef(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [copyRoster, setCopyRoster] = useState(true);
 
-  useEffect(() => {
-    if (team && !nameReady.current) {
-      setTeamName(team.name);
-      nameReady.current = true;
-    }
-  }, [team]);
+  function selectTeam(id: string) {
+    setSelectedId(id);
+    setTeamNameDraft(null);
+    setEditing(null);
+    void setActiveTeamId(id);
+  }
 
   async function persist() {
     if (!team) return;
     const next = teamName.trim();
-    if (next) await saveTeamName(team.id, next);
+    if (next && next !== team.name) {
+      await saveTeamName(team.id, next);
+      setTeamNameDraft(null);
+    }
     if (editing) {
       await db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
       setEditing(null);
@@ -52,7 +69,57 @@ export default function TeamsPage() {
     setBusy(true);
     try {
       await persist();
+      if (team) await setActiveTeamId(team.id);
       router.push("/");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addTeam() {
+    if (busy) return;
+    const label = newTeamName.trim();
+    if (!label) return;
+    setBusy(true);
+    try {
+      await persist();
+      const created = await createOwnTeam(label, {
+        copyFromTeamId: copyRoster && team ? team.id : undefined,
+      });
+      if (!created) return;
+      setNewTeamName("");
+      setSelectedId(created.id);
+      setTeamNameDraft(null);
+      setEditing(null);
+      setSaved(
+        copyRoster && team
+          ? `${created.name} を追加し、${teamDisplayName(team)} の選手をコピーしました`
+          : `${created.name} を追加しました`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeTeam() {
+    if (!team || busy) return;
+    const label = teamDisplayName(team);
+    if (!window.confirm(`${label} を削除しますか？選手名簿も消えます。試合があるチームは削除できません。`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await deleteOwnTeam(team.id);
+      if (result === "last") {
+        setSaved("自チームは最低1つ必要です");
+      } else if (result === "has_games") {
+        setSaved("試合があるチームは削除できません。先に試合を消すか、別チームとして残してください");
+      } else if (result === "deleted") {
+        setSelectedId(null);
+        setTeamNameDraft(null);
+        setEditing(null);
+        setSaved(`${label} を削除しました`);
+      }
     } finally {
       setBusy(false);
     }
@@ -63,6 +130,33 @@ export default function TeamsPage() {
       <AppHeader title="チーム・選手" onBack={() => void finish()} />
       <div className="p-4 flex flex-col gap-4">
         {saved ? <p className="text-sm text-[#3ddc84]">{saved}</p> : null}
+
+        <section className="flex flex-col gap-2">
+          <p className="text-sm text-[#9aa894]">自チーム（1部・2部など複数可）</p>
+          <div className="flex flex-wrap gap-2">
+            {teams.map((t) => {
+              const selected = team?.id === t.id;
+              const isActive = active?.id === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`tap min-h-12 px-3 text-sm ${selected ? "tap-accent" : ""}`}
+                  onClick={() => {
+                    void persist().then(() => selectTeam(t.id));
+                  }}
+                >
+                  {t.name}
+                  {isActive ? " ·使用中" : ""}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-[#9aa894] leading-relaxed">
+            1部と2部は別チームとして追加してください。名前を変えると、そのチームの過去の試合名だけが変わります。
+          </p>
+        </section>
+
         {team ? (
           <label className="flex flex-col gap-1">
             <span className="text-sm text-[#9aa894]">チーム名</span>
@@ -72,7 +166,7 @@ export default function TeamsPage() {
               autoCapitalize="off"
               autoComplete="off"
               value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
+              onChange={(e) => team && setTeamNameDraft({ id: team.id, name: e.target.value })}
               aria-label="チーム名"
             />
           </label>
@@ -83,6 +177,45 @@ export default function TeamsPage() {
         <button type="button" className="tap tap-accent" disabled={busy || !team} onClick={() => void finish()}>
           完了してホームへ
         </button>
+
+        <section className="rounded-xl border border-[#2c3c30] p-3 flex flex-col gap-2">
+          <h2 className="font-bold text-sm">チームを追加</h2>
+          <input
+            className="tap px-3 bg-[#121a14]"
+            lang="ja"
+            autoCapitalize="off"
+            autoComplete="off"
+            placeholder="例: ひまわり2部"
+            value={newTeamName}
+            onChange={(e) => setNewTeamName(e.target.value)}
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={copyRoster}
+              onChange={(e) => setCopyRoster(e.target.checked)}
+            />
+            いま選んでいるチームの選手をコピーする
+          </label>
+          <button
+            type="button"
+            className="tap"
+            disabled={busy || !newTeamName.trim()}
+            onClick={() => void addTeam()}
+          >
+            追加してこのチームを使う
+          </button>
+          {teams.length > 1 ? (
+            <button
+              type="button"
+              className="tap text-[#ff5a5a]"
+              disabled={busy || !team}
+              onClick={() => void removeTeam()}
+            >
+              このチームを削除
+            </button>
+          ) : null}
+        </section>
 
         <ul className="flex flex-col gap-2">
           {players.map((p) => (
@@ -104,22 +237,22 @@ export default function TeamsPage() {
                     value={editing.name}
                     onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   />
-                    <PlayerProfileFields
-                      value={editing}
-                      onChange={(next) => setEditing({ ...editing, ...next })}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="tap tap-accent flex-1"
-                        onClick={() => {
-                          void db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
-                          setEditing(null);
-                          setSaved("選手を保存しました");
-                        }}
-                      >
-                        この選手を保存
-                      </button>
+                  <PlayerProfileFields
+                    value={editing}
+                    onChange={(next) => setEditing({ ...editing, ...next })}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="tap tap-accent flex-1"
+                      onClick={() => {
+                        void db.players.put(compactPlayer({ ...editing, name: editing.name.trim() }));
+                        setEditing(null);
+                        setSaved("選手を保存しました");
+                      }}
+                    >
+                      この選手を保存
+                    </button>
                     <button type="button" className="tap flex-1" onClick={() => setEditing(null)}>
                       キャンセル
                     </button>
@@ -155,7 +288,7 @@ export default function TeamsPage() {
         </ul>
 
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-[#9aa894]">選手を追加</p>
+          <p className="text-sm text-[#9aa894]">選手を追加（{teamDisplayName(team)}）</p>
           <input
             className="tap w-24 px-2 bg-[#121a14]"
             placeholder="背番号"

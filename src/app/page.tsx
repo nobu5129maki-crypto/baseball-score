@@ -4,16 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { db, deleteEndedGame, loadAllGames } from "@/lib/db";
+import { db, deleteEndedGame, getSettings, loadAllGames } from "@/lib/db";
 import { inningLabel, reduceGame, totalRuns } from "@/lib/engine";
 import { splitGamesByStatus } from "@/lib/game-list";
 import { gameTimeLabel } from "@/lib/game-time";
 import { runChangeRuleSuffix } from "@/lib/run-change";
+import { resolveActiveTeam, teamDisplayName } from "@/lib/teams";
 import type { Game } from "@/lib/types";
 
 export default function HomePage() {
   const games = useLiveQuery(() => loadAllGames()) ?? [];
-  const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
+  const teams = useLiveQuery(() => db.teams.toArray()) ?? [];
+  const settings = useLiveQuery(() => getSettings());
+  const team = resolveActiveTeam(teams, settings?.activeTeamId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
 
@@ -49,7 +52,12 @@ export default function HomePage() {
       <header className="px-4 py-5 shrink-0">
         <p className="text-sm text-[#9aa894]">記号いらずのスコア記録</p>
         <h1 className="text-2xl font-bold mt-1">らくスコア</h1>
-        {team ? <p className="text-sm text-[#f5c518] mt-1">{team.name}</p> : null}
+        {team ? (
+          <p className="text-sm text-[#f5c518] mt-1">
+            {teamDisplayName(team)}
+            {teams.length > 1 ? "（使用中）" : ""}
+          </p>
+        ) : null}
       </header>
 
       <section className="px-4 pb-4 flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">

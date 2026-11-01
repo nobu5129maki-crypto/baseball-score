@@ -145,6 +145,32 @@ describe("mergeSummary", () => {
   });
 });
 
+describe("planMerge 複数自チーム", () => {
+  it("1部と2部は別チームのまま取り込む", () => {
+    const plan = planMerge(
+      {
+        teams: [team("local-1", "ひまわり1部")],
+        players: [player("a1", "佐藤", "1", "local-1")],
+        games: [],
+        rosters: [],
+      },
+      makeBackup({
+        teams: [team("remote-2", "ひまわり2部")],
+        players: [player("b1", "佐藤", "1", "remote-2")],
+        games: [game("g2", "remote-2", "b1")],
+        settings: [],
+        rosters: [],
+      }),
+    );
+    expect(plan.teamsToPut).toHaveLength(1);
+    expect(plan.teamsToPut[0].name).toBe("ひまわり2部");
+    expect(plan.gamesToPut[0].myTeamId).toBe(plan.teamsToPut[0].id);
+    expect(plan.gamesToPut[0].myTeamName).toBe("ひまわり2部");
+    expect(plan.playersToPut[0].teamId).toBe(plan.teamsToPut[0].id);
+    expect(plan.result.linkedPlayers).toBe(0);
+  });
+});
+
 describe("playerKey", () => {
   it("全角数字と先頭ゼロを同じ背番号にする", () => {
     expect(playerKey("佐藤", "01")).toBe(playerKey("佐藤", "1"));

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { newId } from "./ids";
+import { matchTeamByName, normTeamName } from "./teams";
 import type { AppBackup } from "./backup";
 import type { Game, GameEvent, LineupSlot, Player, RosterPack, Team } from "./types";
 
@@ -40,31 +41,79 @@ export function planMerge(local: MergeLocal, incoming: AppBackup, now = Date.now
   const rostersToPut: RosterPack[] = [];
   const result: MergeResult = { addedGames: 0, skippedGames: 0, addedPlayers: 0, linkedPlayers: 0 };
 
-  let team = local.teams[0];
-  if (!team) {
-    team = incoming.teams[0]
-      ? { ...incoming.teams[0] }
-      : { id: newId(), name: incoming.games[0]?.myTeamName?.trim() || "自チーム", createdAt: now };
-    teamsToPut.push(team);
+  const knownTeams = [...local.teams];
+  const teamIdMap = new Map<string, string>();
+
+  const ensureLocalTeam = (incomingTeam: Team | undefined, fallbackName: string): Team => {
+    if (incomingTeam) {
+      const mapped = teamIdMap.get(incomingTeam.id);
+      if (mapped) {
+        const existing = knownTeams.find((t) => t.id === mapped);
+        if (existing) return existing;
+      }
+      const byName = matchTeamByName(knownTeams, incomingTeam.name);
+      if (byName) {
+        teamIdMap.set(incomingTeam.id, byName.id);
+        return byName;
+      }
+      const created: Team = { ...incomingTeam };
+      if (knownTeams.some((t) => t.id === created.id) || teamsToPut.some((t) => t.id === created.id)) {
+        created.id = newId();
+      }
+      knownTeams.push(created);
+      teamsToPut.push(created);
+      teamIdMap.set(incomingTeam.id, created.id);
+      return created;
+    }
+    const byName = matchTeamByName(knownTeams, fallbackName);
+    if (byName) return byName;
+    if (knownTeams[0]) return knownTeams[0];
+    const created: Team = {
+      id: newId(),
+      name: fallbackName.trim() || "自チーム",
+      createdAt: now,
+    };
+    knownTeams.push(created);
+    teamsToPut.push(created);
+    return created;
+  };
+
+  if (incoming.teams.length > 0) {
+    for (const incomingTeam of incoming.teams) ensureLocalTeam(incomingTeam, incomingTeam.name);
+  } else if (knownTeams.length === 0) {
+    ensureLocalTeam(undefined, incoming.games[0]?.myTeamName?.trim() || "自チーム");
   }
 
+  const defaultTeam = knownTeams[0] ?? ensureLocalTeam(undefined, "自チーム");
+
   const usedPlayerIds = new Set(local.players.map((p) => p.id));
-  const byKey = new Map<string, Player>();
-  const byName: Map<string, Player[]> = new Map();
+  const byTeamKey = new Map<string, Player>();
+  const byTeamName: Map<string, Player[]> = new Map();
   for (const player of local.players) {
-    byKey.set(playerKey(player.name, player.number), player);
-    const name = normName(player.name);
-    const list = byName.get(name) ?? [];
+    byTeamKey.set(`${player.teamId}\0${playerKey(player.name, player.number)}`, player);
+    const nameKey = `${player.teamId}\0${normName(player.name)}`;
+    const list = byTeamName.get(nameKey) ?? [];
     list.push(player);
-    byName.set(name, list);
+    byTeamName.set(nameKey, list);
   }
 
   const idMap = new Map<string, string>();
   for (const incomingPlayer of incoming.players) {
-    const key = playerKey(incomingPlayer.name, incomingPlayer.number);
-    let localPlayer = byKey.get(key);
+    const localTeam =
+      (incomingPlayer.teamId && teamIdMap.has(incomingPlayer.teamId)
+        ? knownTeams.find((t) => t.id === teamIdMap.get(incomingPlayer.teamId))
+        : undefined) ??
+      matchTeamByName(
+        knownTeams,
+        incoming.teams.find((t) => t.id === incomingPlayer.teamId)?.name ?? defaultTeam.name,
+      ) ??
+      defaultTeam;
+    if (incomingPlayer.teamId) teamIdMap.set(incomingPlayer.teamId, localTeam.id);
+
+    const key = `${localTeam.id}\0${playerKey(incomingPlayer.name, incomingPlayer.number)}`;
+    let localPlayer = byTeamKey.get(key);
     if (!localPlayer && !normNumber(incomingPlayer.number)) {
-      const sameName = byName.get(normName(incomingPlayer.name)) ?? [];
+      const sameName = byTeamName.get(`${localTeam.id}\0${normName(incomingPlayer.name)}`) ?? [];
       if (sameName.length === 1) localPlayer = sameName[0];
     }
     if (localPlayer) {
@@ -78,10 +127,10 @@ export function planMerge(local: MergeLocal, incoming: AppBackup, now = Date.now
     const added: Player = {
       ...incomingPlayer,
       id: nextId,
-      teamId: team.id,
+      teamId: localTeam.id,
     };
     playersToPut.push(added);
-    byKey.set(key, added);
+    byTeamKey.set(key, added);
     idMap.set(incomingPlayer.id, nextId);
     result.addedPlayers += 1;
   }
@@ -92,19 +141,22 @@ export function planMerge(local: MergeLocal, incoming: AppBackup, now = Date.now
       result.skippedGames += 1;
       continue;
     }
-    gamesToPut.push(remapGame(game, team, idMap));
+    const incomingTeam = incoming.teams.find((t) => t.id === game.myTeamId);
+    const localTeam = ensureLocalTeam(incomingTeam, game.myTeamName || defaultTeam.name);
+    gamesToPut.push(remapGame(game, localTeam, idMap));
     localGameIds.add(game.id);
     result.addedGames += 1;
   }
 
-  const rosterNames = new Set(local.rosters.map((r) => normName(r.name)));
+  const rosterNames = new Set(local.rosters.map((r) => normTeamName(r.name)));
   for (const roster of incoming.rosters) {
-    if (rosterNames.has(normName(roster.name))) continue;
-    const next = local.rosters.some((r) => r.id === roster.id) || rostersToPut.some((r) => r.id === roster.id)
-      ? { ...roster, id: newId() }
-      : roster;
+    if (rosterNames.has(normTeamName(roster.name))) continue;
+    const next =
+      local.rosters.some((r) => r.id === roster.id) || rostersToPut.some((r) => r.id === roster.id)
+        ? { ...roster, id: newId() }
+        : roster;
     rostersToPut.push(next);
-    rosterNames.add(normName(next.name));
+    rosterNames.add(normTeamName(next.name));
   }
 
   return { teamsToPut, playersToPut, gamesToPut, rostersToPut, result };

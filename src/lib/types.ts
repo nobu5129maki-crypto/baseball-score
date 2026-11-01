@@ -282,6 +282,8 @@ export type RosterPack = {
 export type Settings = {
   id: "app";
   leftHanded: boolean;
+  /** ホーム・新規試合・成績で使う自チーム（1部・2部など複数可） */
+  activeTeamId?: string;
 };
 
 export type RunnerOnBase = {

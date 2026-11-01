@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
@@ -24,6 +23,10 @@ export function GameSetupForm({
   backHref,
   submitLabel,
   teamName,
+  teamId,
+  teamOptions,
+  onSelectTeam,
+  teamsHrefLabel = "チーム名・選手を修正する",
   initial,
   recentOpponents,
   recentTournaments,
@@ -37,6 +40,11 @@ export function GameSetupForm({
   backHref: string;
   submitLabel: string;
   teamName: string;
+  teamId?: string;
+  /** 1部・2部など自チームが複数あるときの切替 */
+  teamOptions?: Array<{ id: string; name: string }>;
+  onSelectTeam?: (teamId: string) => void;
+  teamsHrefLabel?: string;
   initial: GameSetupValues;
   recentOpponents: string[];
   recentTournaments: string[];
@@ -88,9 +96,27 @@ export function GameSetupForm({
         }}
       >
         {note ? <p className="text-sm text-[#9aa894] leading-relaxed">{note}</p> : null}
-        <Field label="自チーム">{teamName}</Field>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-[#9aa894]">自チーム</span>
+          {teamOptions && teamOptions.length > 1 && onSelectTeam ? (
+            <div className="flex flex-wrap gap-2">
+              {teamOptions.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`tap min-h-12 px-3 text-sm ${t.id === teamId ? "tap-accent" : ""}`}
+                  onClick={() => onSelectTeam(t.id)}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="tap px-3 flex items-center">{teamName}</p>
+          )}
+        </div>
         <Link href="/teams" className="text-sm text-[#f5c518] -mt-2">
-          チーム名・選手を修正する
+          {teamsHrefLabel}
         </Link>
         <label className="flex flex-col gap-1">
           <span className="text-sm text-[#9aa894]">相手チーム</span>
@@ -283,15 +309,6 @@ function ChipRow({
           {name}
         </button>
       ))}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="text-sm text-[#9aa894]">{label}</p>
-      <p className="tap px-3 flex items-center mt-1">{children}</p>
     </div>
   );
 }

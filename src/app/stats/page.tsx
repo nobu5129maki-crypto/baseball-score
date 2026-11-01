@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
-import { db, loadAllGames } from "@/lib/db";
+import { db, getSettings, loadAllGames, setActiveTeamId } from "@/lib/db";
 import {
   comparePitchers,
   formatEra,
@@ -29,6 +29,7 @@ import {
   type SlashSortKey,
   type SortDir,
 } from "@/lib/stats";
+import { resolveActiveTeam, sortOwnTeams, teamDisplayName } from "@/lib/teams";
 
 const COLUMNS: Array<{
   key: SlashSortKey;
@@ -78,7 +79,9 @@ const PITCH_COLS_B: PitchCol[] = [
 ];
 
 export default function StatsPage() {
-  const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
+  const teams = sortOwnTeams(useLiveQuery(() => db.teams.toArray()) ?? []);
+  const settings = useLiveQuery(() => getSettings());
+  const team = resolveActiveTeam(teams, settings?.activeTeamId);
   const games =
     useLiveQuery(async () => {
       const rows = await loadAllGames();
@@ -89,7 +92,7 @@ export default function StatsPage() {
   const rows = myTeamSlashes(mine);
   const season = myTeamSeason(mine);
   const total = sumSlashes(rows);
-  const teamName = team?.name ?? "自チーム";
+  const teamName = teamDisplayName(team);
   const pitchers = myTeamPitcherStats(mine);
   const [help, setHelp] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SlashSortKey>("avg");
@@ -99,18 +102,9 @@ export default function StatsPage() {
   const [pitchSortB, setPitchSortB] = useState<PitcherSortKey>("strikeRate");
   const [pitchDirB, setPitchDirB] = useState<SortDir>("desc");
 
-  const sorted = useMemo(
-    () => [...rows].sort((a, b) => compareSlashes(a, b, sortKey, sortDir)),
-    [rows, sortKey, sortDir],
-  );
-  const sortedPitchA = useMemo(
-    () => [...pitchers].sort((a, b) => comparePitchers(a, b, pitchSortA, pitchDirA)),
-    [pitchers, pitchSortA, pitchDirA],
-  );
-  const sortedPitchB = useMemo(
-    () => [...pitchers].sort((a, b) => comparePitchers(a, b, pitchSortB, pitchDirB)),
-    [pitchers, pitchSortB, pitchDirB],
-  );
+  const sorted = [...rows].sort((a, b) => compareSlashes(a, b, sortKey, sortDir));
+  const sortedPitchA = [...pitchers].sort((a, b) => comparePitchers(a, b, pitchSortA, pitchDirA));
+  const sortedPitchB = [...pitchers].sort((a, b) => comparePitchers(a, b, pitchSortB, pitchDirB));
 
   function tapSort(key: SlashSortKey) {
     if (sortKey === key) {
@@ -146,6 +140,20 @@ export default function StatsPage() {
             {teamName}　{endedCount}試合の累積（進行中の試合も含む）
           </p>
           <h2 className="text-2xl font-bold mt-1">{teamName} の成績</h2>
+          {teams.length > 1 ? (
+            <div className="flex flex-wrap gap-2 mt-3 print:hidden">
+              {teams.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`tap min-h-11 px-3 text-sm ${team?.id === t.id ? "tap-accent" : ""}`}
+                  onClick={() => void setActiveTeamId(t.id)}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </header>
 
         <section>

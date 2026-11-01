@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameSetupForm, type GameSetupValues } from "@/components/GameSetupForm";
-import { db, saveGame } from "@/lib/db";
+import { db, getSettings, saveGame, setActiveTeamId } from "@/lib/db";
 import { newId } from "@/lib/ids";
 import { localDateKey } from "@/lib/game-time";
 import { normalizeRunChangeAt } from "@/lib/run-change";
@@ -18,13 +18,16 @@ import {
   pitchersFor,
   sidesFor,
 } from "@/lib/seed";
+import { resolveActiveTeam, sortOwnTeams, teamDisplayName } from "@/lib/teams";
 
 /** 作成〜遷移のあいだ、再マウントしてもフォームを出さない */
 let suppressForm = false;
 
 export default function NewGamePage() {
   const router = useRouter();
-  const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
+  const teams = sortOwnTeams(useLiveQuery(() => db.teams.toArray()) ?? []);
+  const settings = useLiveQuery(() => getSettings());
+  const team = resolveActiveTeam(teams, settings?.activeTeamId);
   const players =
     useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
       team?.id,
@@ -100,7 +103,11 @@ export default function NewGamePage() {
       title="新しい試合"
       backHref="/"
       submitLabel="打順へ進む"
-      teamName={team?.name ?? "…"}
+      teamName={teamDisplayName(team)}
+      teamId={team?.id}
+      teamOptions={teams}
+      onSelectTeam={(id) => void setActiveTeamId(id)}
+      teamsHrefLabel="1部・2部の追加や選手の修正"
       initial={{
         opponent: "",
         tournament: "",

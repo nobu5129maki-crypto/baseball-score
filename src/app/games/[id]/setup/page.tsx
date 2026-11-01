@@ -10,7 +10,7 @@ import { db, saveGame } from "@/lib/db";
 import { applyGameSetup } from "@/lib/game-setup";
 import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
 
-export default function GameSetupPage({ params }: PageProps<"/games/[id]/setup">) {
+export default function GameSetupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return <GameSetupScreen gameId={id} />;
 }
@@ -18,10 +18,10 @@ export default function GameSetupPage({ params }: PageProps<"/games/[id]/setup">
 function GameSetupScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
-  const team = useLiveQuery(async () => (await db.teams.toArray())[0]);
+  const teamId = game?.myTeamId;
   const players =
-    useLiveQuery(() => (team ? db.players.where("teamId").equals(team.id).toArray() : []), [
-      team?.id,
+    useLiveQuery(() => (teamId ? db.players.where("teamId").equals(teamId).toArray() : []), [
+      teamId,
     ]) ?? [];
   const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
   const [error, setError] = useState("");
