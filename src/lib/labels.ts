@@ -72,7 +72,20 @@ export function isHitResult(result: PlayResult): boolean {
   return HIT_RESULTS.includes(result);
 }
 
-export function playLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {
+export function playLabel(
+  result: PlayResult,
+  field?: Position,
+  batted?: BattedBall,
+  detail?: { deadBall?: boolean; fieldedBy?: Position },
+): string {
+  if (result === "error" && detail?.deadBall) {
+    const kind = batted ? BATTED_SHORT[batted] : "";
+    const from = detail.fieldedBy ? POSITION_SHORT[detail.fieldedBy] : "";
+    const erred = field ? POSITION_SHORT[field] : "";
+    if (from && erred && from !== erred) return `${from}${kind}失${erred}`;
+    if (from || erred) return `${from || erred}${kind}失`;
+    return kind ? `失${kind}` : "失";
+  }
   const short = PLAY_SHORT[result];
   const kind = isHitResult(result) && batted ? BATTED_SHORT[batted] : "";
   if (!field) return `${short}${kind}`;

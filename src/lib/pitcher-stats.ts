@@ -290,6 +290,16 @@ export function gamePitcherStats(game: Game): PitcherGameStats[] {
       if (runner) charges = charges.filter((c) => c.playerId !== runner.playerId);
     }
 
+    if (event.t === "bench") {
+      if (pRow) appear(pRow, before, fielding);
+      reconOuts += 1;
+      for (const move of event.moves) {
+        if (move.to === 4 || move.to === "out") {
+          charges = charges.filter((c) => c.playerId !== move.playerId);
+        }
+      }
+    }
+
     if (event.t === "pickoff" && pRow) {
       appear(pRow, before, fielding);
       pRow.outs += 1;

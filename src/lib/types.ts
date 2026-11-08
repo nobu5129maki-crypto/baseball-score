@@ -136,6 +136,10 @@ export type PlayEvent = {
   field?: Position;
   /** ヒットのゴロ／フライ／ライナー。古い試合には無い */
   batted?: BattedBall;
+  /** 送球やこぼれ球がベンチなどに入り、ボールデッドになった */
+  deadBall?: boolean;
+  /** 打球を処理した野手。失策の field と別のとき（例: 遊ゴロを一塁が後逸） */
+  fieldedBy?: Position;
 };
 
 export type StealEvent = {
@@ -149,6 +153,14 @@ export type StealEvent = {
 export type WpEvent = { id: string; seq: number; t: "wp"; holdFirst?: boolean };
 export type PbEvent = { id: string; seq: number; t: "pb"; holdFirst?: boolean };
 export type BkEvent = { id: string; seq: number; t: "bk" };
+
+/** 送球やこぼれ球がベンチなどに入り、いる走者がそれぞれ進んだ。打席は終わらない */
+export type BenchDeadEvent = {
+  id: string;
+  seq: number;
+  t: "bench";
+  moves: RunnerMove[];
+};
 
 export type PickoffEvent = {
   id: string;
@@ -189,6 +201,7 @@ export type GameEvent =
   | WpEvent
   | PbEvent
   | BkEvent
+  | BenchDeadEvent
   | PickoffEvent
   | SubEvent
   | PinchRunnerEvent

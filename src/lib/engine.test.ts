@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  commitBench,
   commitEnd,
   commitPb,
   commitPickoff,
@@ -20,6 +21,8 @@ import {
   playBlockedReason,
   nextStealBaseOpen,
   previewAfterMoves,
+  proposeBench,
+  proposeDeadBall,
   proposeMoves,
   proposeRunnerHit,
   reduceGame,
@@ -28,6 +31,7 @@ import {
   undoLast,
 } from "./engine";
 import { runChangeMessage } from "./run-change";
+import { slashFor } from "./stats";
 import { PITCHER_ORDER } from "./types";
 import type { Game, LineupSlot, Position } from "./types";
 
@@ -358,6 +362,109 @@ describe("らくスコア engine", () => {
     expect(state.hits.first).toBe(0);
     expect(state.errors.second).toBe(1);
     expect(state.bases[0]?.playerId).toBe("A1");
+  });
+
+  it("ショートゴロをファーストが後逸してボールデッドなら1塁走者は2塁へ", () => {
+    let game = commitPlay(makeGame(), "single");
+    const before = reduceGame(game);
+    expect(before.bases[0]?.playerId).toBe("A1");
+    const batter = getBatter(before);
+    const moves = proposeDeadBall(before, batter);
+    expect(moves).toEqual([
+      { playerId: batter.playerId, from: 0, to: 1 },
+      { playerId: "A1", from: 1, to: 2 },
+    ]);
+    game = commitPlay(game, "error", moves, "1B", "ground", { deadBall: true, fieldedBy: "SS" });
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A2");
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(state.bases[2]).toBeNull();
+    expect(state.hits.first).toBe(1);
+    expect(state.errors.second).toBe(1);
+    expect(state.outs).toBe(0);
+    expect(getBatter(state).playerId).toBe("A3");
+    const play = game.events.at(-1);
+    expect(play).toMatchObject({
+      t: "play",
+      result: "error",
+      field: "1B",
+      batted: "ground",
+      deadBall: true,
+      fieldedBy: "SS",
+    });
+  });
+
+  it("送球がベンチに入ったらいる走者はそれぞれ1つ進み打者はそのまま", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitSteal(game, 1, 2);
+    game = commitSteal(game, 2, 3);
+    game = commitPlay(game, "walk");
+    const before = reduceGame(game);
+    expect(before.bases[0]?.playerId).toBe("A2");
+    expect(before.bases[2]?.playerId).toBe("A1");
+    expect(proposeBench(before).map((m) => [m.playerId, m.from, m.to])).toEqual([
+      ["A1", 3, 4],
+      ["A2", 1, 2],
+    ]);
+    const strikes = before.strikes;
+    game = commitBench(game);
+    const state = reduceGame(game);
+    expect(state.bases[0]).toBeNull();
+    expect(state.bases[1]?.playerId).toBe("A2");
+    expect(state.bases[2]).toBeNull();
+    expect(state.scores.first[0]).toBe(1);
+    expect(getBatter(state).playerId).toBe("A3");
+    expect(state.errors.second).toBe(1);
+    expect(state.hits.first).toBe(1);
+    expect(state.outs).toBe(0);
+    expect(state.strikes).toBe(strikes);
+    expect(slashFor(game, "A1")?.r).toBe(1);
+    expect(slashFor(game, "A3")?.ab).toBe(0);
+  });
+
+  it("満塁のベンチ入りも走者はそれぞれ1つ進む", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitBench(game);
+    const state = reduceGame(game);
+    expect(state.bases[0]).toBeNull();
+    expect(state.bases[1]?.playerId).toBe("A3");
+    expect(state.bases[2]?.playerId).toBe("A2");
+    expect(state.scores.first[0]).toBe(1);
+    expect(getBatter(state).playerId).toBe("A4");
+    expect(state.errors.second).toBe(1);
+  });
+
+  it("走者がいないボールデッドは打者だけ1塁に出る", () => {
+    const game = commitPlay(makeGame(), "error", undefined, "1B", "ground", {
+      deadBall: true,
+      fieldedBy: "SS",
+    });
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A1");
+    expect(state.bases[1]).toBeNull();
+    expect(state.errors.second).toBe(1);
+    expect(state.hits.first).toBe(0);
+  });
+
+  it("満塁のボールデッドは3塁走者が生還し打点は付かない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    const before = reduceGame(game);
+    game = commitPlay(game, "error", proposeDeadBall(before, getBatter(before)), "1B", "ground", {
+      deadBall: true,
+      fieldedBy: "SS",
+    });
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A4");
+    expect(state.bases[1]?.playerId).toBe("A3");
+    expect(state.bases[2]?.playerId).toBe("A2");
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.errors.second).toBe(1);
+    expect(slashFor(game, "A4")?.rbi).toBe(0);
+    expect(slashFor(game, "A4")?.h).toBe(0);
   });
 
   it("守備位置の入れ替えで打順は変わらない", () => {

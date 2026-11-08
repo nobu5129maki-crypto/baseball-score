@@ -21,6 +21,12 @@ describe("playLabel", () => {
     expect(playLabel("groundout", "SS")).toBe("遊ゴ");
     expect(playLabel("homerun", "CF")).toBe("中本");
   });
+
+  it("ボールデッドは打球の場所と後逸した野手を書く", () => {
+    expect(playLabel("error", "1B", "ground", { deadBall: true, fieldedBy: "SS" })).toBe("遊ゴ失一");
+    expect(playLabel("error", "SS", "ground", { deadBall: true, fieldedBy: "SS" })).toBe("遊ゴ失");
+    expect(playLabel("error", "1B", undefined, { deadBall: true })).toBe("一失");
+  });
 });
 
 describe("jerseyLabel / orderLabel", () => {

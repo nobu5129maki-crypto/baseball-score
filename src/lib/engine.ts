@@ -264,6 +264,16 @@ export function proposeMoves(
   }
 }
 
+/** 打球がベンチに入ったボールデッド。打者は1塁、いる走者はそれぞれ1つ進む。 */
+export function proposeDeadBall(state: GameState, batter: LineupSlot): RunnerMove[] {
+  return proposeMoves("error", state, batter);
+}
+
+/** 送球がベンチに入ったボールデッド。いる走者だけがそれぞれ1つ進む。 */
+export function proposeBench(state: GameState): RunnerMove[] {
+  return plus(state.bases, 1);
+}
+
 export function proposeRunnerHit(
   state: GameState,
   batter: LineupSlot,
@@ -340,6 +350,11 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
     case "bk":
       return applyOccupancy(game, current, plus(current.bases, 1), {
         consumeAtBat: false,
+      });
+    case "bench":
+      return applyOccupancy(game, current, event.moves, {
+        consumeAtBat: false,
+        chargeError: true,
       });
     case "sub":
       return applySub(
@@ -442,7 +457,7 @@ function applyOccupancy(
   game: Game,
   state: GameState,
   moves: RunnerMove[],
-  opts: { consumeAtBat: boolean; result?: PlayResult },
+  opts: { consumeAtBat: boolean; result?: PlayResult; chargeError?: boolean },
 ): GameState {
   const side = battingSide(state.half);
   const batter = getBatter(state);
@@ -490,7 +505,7 @@ function applyOccupancy(
   ) {
     hits[side] += 1;
   }
-  if (result === "error") {
+  if (result === "error" || opts.chargeError) {
     errors[otherSide(side)] += 1;
   }
 
@@ -730,17 +745,20 @@ export function commitPlay(
   moves?: RunnerMove[],
   field?: Position,
   batted?: BattedBall,
+  detail?: { deadBall?: boolean; fieldedBy?: Position },
 ): Game {
   const state = reduceGame(game);
   if (state.ended) return game;
   const batter = getBatter(state);
-  const resolved = moves ?? proposeMoves(result, state, batter);
+  const resolved = moves ?? (detail?.deadBall ? proposeDeadBall(state, batter) : proposeMoves(result, state, batter));
   return commitEvent(game, {
     t: "play",
     result,
     moves: resolved,
     field,
     ...(batted ? { batted } : {}),
+    ...(detail?.deadBall ? { deadBall: true } : {}),
+    ...(detail?.fieldedBy ? { fieldedBy: detail.fieldedBy } : {}),
   });
 }
 
@@ -762,6 +780,14 @@ export function commitPb(game: Game, options?: { holdFirst?: boolean }): Game {
 
 export function commitBk(game: Game): Game {
   return commitEvent(game, { t: "bk" });
+}
+
+export function commitBench(game: Game, moves?: RunnerMove[]): Game {
+  const state = reduceGame(game);
+  if (state.ended || !state.bases.some(Boolean)) return game;
+  const resolved = moves ?? proposeBench(state);
+  if (resolved.length === 0) return game;
+  return commitEvent(game, { t: "bench", moves: resolved });
 }
 
 export function commitSub(

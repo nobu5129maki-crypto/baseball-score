@@ -1,6 +1,6 @@
 import { isHitResult, playLabel } from "./labels";
 import { battingSide, getBatter, reduceGame, totalRuns } from "./engine";
-import type { BattedBall, Game, GameState, LineupSlot, PlayResult, Position, Side } from "./types";
+import type { Game, GameState, LineupSlot, PlayEvent, Position, Side } from "./types";
 
 export type ScorebookMark = {
   label: string;
@@ -106,8 +106,11 @@ export function lineScoreCells(
   return Array.from({ length: cols }, (_, i) => inningScoreCell(i, scores[i] ?? 0, side, game, state));
 }
 
-function bookPlayLabel(result: PlayResult, field?: Position, batted?: BattedBall): string {
-  return playLabel(result, field, batted);
+function bookPlayLabel(event: Pick<PlayEvent, "result" | "field" | "batted" | "deadBall" | "fieldedBy">): string {
+  return playLabel(event.result, event.field, event.batted, {
+    deadBall: event.deadBall,
+    fieldedBy: event.fieldedBy,
+  });
 }
 
 function emptySide(lineup: LineupSlot[], innings: number): ScorebookSide {
@@ -191,7 +194,7 @@ export function buildScorebook(game: Game): Scorebook {
         battingBook,
         batter.order,
         before.inning,
-        bookPlayLabel(event.result, event.field, event.batted),
+        bookPlayLabel(event),
         isHitResult(event.result),
       );
       const scored = event.moves.filter((m) => m.to === 4).length;
@@ -208,6 +211,12 @@ export function buildScorebook(game: Game): Scorebook {
       const runner = before.bases[event.from - 1];
       if (runner) {
         pushMark(battingBook, runner.battingOrder, before.inning, "牽制死");
+      }
+    } else if (event.t === "bench") {
+      for (const move of event.moves) {
+        if (move.from === 0) continue;
+        const runner = before.bases[move.from - 1];
+        if (runner) pushMark(battingBook, runner.battingOrder, before.inning, "デッド");
       }
     } else if (event.t === "wp" || event.t === "pb" || event.t === "bk") {
       const label = event.t === "wp" ? "暴" : event.t === "pb" ? "捕逸" : "ボ";

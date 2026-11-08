@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commitEnd, commitPickoff, commitPinchHitter, commitPlay, commitSteal, commitSub, commitWp, reduceGame } from "./engine";
+import { commitBench, commitEnd, commitPickoff, commitPinchHitter, commitPlay, commitSteal, commitSub, commitWp, reduceGame } from "./engine";
 import { buildScorebook, displayInnings, lastPlayedInning, lineScoreCells } from "./scorebook";
 import type { Game, LineupSlot, Position } from "./types";
 
@@ -108,6 +108,26 @@ describe("buildScorebook", () => {
     expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("見三");
     game = commitPlay(makeGame(), "strikeout_swinging");
     expect(buildScorebook(game).first.orders[0].innings[0].map((m) => m.label)).toContain("空三");
+  });
+
+  it("送球のボールデッドは進んだ走者それぞれのマスにデッドと書く", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitSteal(game, 1, 2);
+    game = commitSteal(game, 2, 3);
+    game = commitPlay(game, "walk");
+    game = commitBench(game);
+    const book = buildScorebook(game);
+    expect(book.first.orders[0].innings[0].map((m) => m.label)).toContain("デッド");
+    expect(book.first.orders[1].innings[0].map((m) => m.label)).toContain("デッド");
+    expect(book.first.orders[2].innings[0].map((m) => m.label)).not.toContain("デッド");
+  });
+
+  it("ショートゴロのファースト後逸ボールデッドは遊ゴ失一と書く", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "error", undefined, "1B", "ground", { deadBall: true, fieldedBy: "SS" });
+    const book = buildScorebook(game);
+    expect(book.first.orders[1].innings[0].map((m) => m.label)).toContain("遊ゴ失一");
+    expect(book.first.orders[1].innings[0].find((m) => m.label === "遊ゴ失一")?.hit).toBeUndefined();
   });
 
   it("ヒットのゴロ・フライ・ライナーをスコアブックで書き分ける", () => {

@@ -3,7 +3,6 @@ import {
   battingSide,
   fieldingSide,
   getBatter,
-  getLineup,
   getPitcherOnSide,
   otherSide,
   playAddsPitch,
@@ -149,7 +148,10 @@ export function atBatsThisGame(
       notes.push({
         inning: before.inning,
         half: before.half,
-        label: playLabel(play.result, play.field, play.batted),
+        label: playLabel(play.result, play.field, play.batted, {
+          deadBall: play.deadBall,
+          fieldedBy: play.fieldedBy,
+        }),
         result: play.result,
         ...(play.batted ? { batted: play.batted } : {}),
       });
@@ -241,6 +243,13 @@ function applyEventToStats(
         const scorer = map.get(move.playerId);
         if (scorer) scorer.r += 1;
       }
+    }
+  }
+  if (event.t === "bench") {
+    for (const move of event.moves) {
+      if (move.to !== 4) continue;
+      const scorer = map.get(move.playerId);
+      if (scorer) scorer.r += 1;
     }
   }
   if (event.t === "steal") {

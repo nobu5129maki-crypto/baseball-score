@@ -14,6 +14,7 @@ import {
   commitPlay,
   commitSteal,
   commitWp,
+  commitBench,
   commitBk,
   battingSide,
   fieldingSide,
@@ -27,6 +28,8 @@ import {
   playBlockedReason,
   nextStealBaseOpen,
   previewAfterMoves,
+  proposeBench,
+  proposeDeadBall,
   proposeMoves,
   proposeRunnerHit,
   reduceGame,
@@ -39,7 +42,7 @@ import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { DROPPED_THIRD } from "@/lib/rules";
+import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote } from "@/lib/rules";
 import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
@@ -78,7 +81,11 @@ type SheetKind =
   | "batted"
   | "hit_runner"
   | "wp_hold"
-  | "pb_hold";
+  | "pb_hold"
+  | "dead_kind"
+  | "dead_batted"
+  | "dead_fielded"
+  | "dead_error";
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -101,7 +108,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     field?: Position;
     batted?: BattedBall;
     selectedId: string | null;
+    deadBall?: boolean;
+    fieldedBy?: Position;
   } | null>(null);
+  const [deadDraft, setDeadDraft] = useState<{ batted: BattedBall; fieldedBy?: Position } | null>(null);
+  const [bench, setBench] = useState<{ moves: RunnerMove[]; selectedId: string | null } | null>(null);
   const [startNotice, setStartNotice] = useState<string | null>(null);
   const dismissStartNotice = useCallback(() => setStartNotice(null), []);
   const state = useMemo(() => (game ? reduceGame(game) : null), [game]);
@@ -144,7 +155,21 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const people = confirmPeople(state, batter.playerId, batter.playerName, confirm?.moves ?? []);
   const preview = confirm
     ? previewAfterMoves(state, confirm.moves, batter)
-    : null;
+    : bench
+      ? previewAfterMoves(state, bench.moves, batter)
+      : null;
+  const benchPeople = state.bases.flatMap((runner, index) =>
+    runner
+      ? [
+          {
+            playerId: runner.playerId,
+            name: runner.playerName,
+            from: (index + 1) as Base,
+            label: `${index + 1}塁`,
+          },
+        ]
+      : [],
+  );
 
   function patch(mut: (g: Game) => Game) {
     return enqueueSave(async () => {
@@ -192,6 +217,42 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     void patch((g) => commitPlay(g, result, moves, field, batted));
   }
 
+  function startDeadBall() {
+    setConfirm(null);
+    setBench(null);
+    setDeadDraft(null);
+    setSheet("dead_kind");
+  }
+
+  function startBenchDead() {
+    if (!state || !state.bases.some(Boolean)) return;
+    setSheet(null);
+    setConfirm(null);
+    setBench({ moves: proposeBench(state), selectedId: null });
+  }
+
+  function finishDeadBall(errorBy: Position, fieldedBy: Position, batted: BattedBall) {
+    if (!state) return;
+    const moves = proposeDeadBall(state, batter);
+    setDeadDraft(null);
+    setSheet(null);
+    if (needsRunnerConfirm("error", state)) {
+      setConfirm({
+        result: "error",
+        moves,
+        field: errorBy,
+        batted,
+        fieldedBy,
+        deadBall: true,
+        selectedId: null,
+      });
+      return;
+    }
+    void patch((g) =>
+      commitPlay(g, "error", moves, errorBy, batted, { deadBall: true, fieldedBy }),
+    );
+  }
+
   function setMove(playerId: string, from: 0 | 1 | 2 | 3, to: Dest) {
     if (!confirm) return;
     const rest = confirm.moves.filter((m) => m.playerId !== playerId);
@@ -228,12 +289,29 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       setSheet(null);
       return;
     }
+    if (bench) {
+      setBench({ ...bench, selectedId: runner.playerId });
+      return;
+    }
     if (!confirm) return;
     setConfirm({ ...confirm, selectedId: runner.playerId });
   }
 
   function onSelectDest(to: Dest) {
-    if (!confirm || !state) return;
+    if (!state) return;
+    if (bench?.selectedId) {
+      const selected = bench.selectedId;
+      const from =
+        bench.moves.find((m) => m.playerId === selected)?.from ??
+        ((state.bases.findIndex((b) => b?.playerId === selected) + 1 || 0) as 0 | 1 | 2 | 3);
+      const rest = bench.moves.filter((m) => m.playerId !== selected);
+      setBench({
+        moves: [...rest, { playerId: selected, from, to }],
+        selectedId: null,
+      });
+      return;
+    }
+    if (!confirm) return;
     if (confirm.selectedId) {
       const selected = confirm.selectedId;
       const from =
@@ -340,15 +418,15 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         firstName={firstName}
         secondName={secondName}
         ruleLabel={runChangeRuleLabel(game.runChangeAt) ?? undefined}
-        selectedId={confirm?.selectedId ?? null}
-        edit={Boolean(confirm)}
-        showOutButton={Boolean(confirm)}
+        selectedId={confirm?.selectedId ?? bench?.selectedId ?? null}
+        edit={Boolean(confirm || bench)}
+        showOutButton={Boolean(confirm || bench)}
         pitcherName={pitcher?.playerName}
         onSelectRunner={onSelectRunner}
         onSelectDest={onSelectDest}
       />
 
-      {state.ended && !confirm ? (
+      {state.ended && !confirm && !bench ? (
         <div className="px-3 pb-4 flex flex-col gap-3">
           <p className="text-center font-bold text-[#f5c518] leading-relaxed">
             {state.bottomUnplayed
@@ -387,7 +465,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         </div>
       ) : confirm ? (
         <div className="px-3 pb-3 flex flex-col gap-2">
-          <p className="text-sm text-[#f5c518]">進塁先を直してから確定（走者をタップ→塁をタップ）</p>
+          <p className="text-sm text-[#f5c518]">
+            {confirm.deadBall
+              ? deadBallAdvanceNote(state.bases)
+              : "進塁先を直してから確定（走者をタップ→塁をタップ）"}
+          </p>
           {preview ? (
             <p className="text-xs text-[#d5dccf]">
               確定後: 1塁 {preview.bases[0]?.playerName ?? "なし"} / 2塁 {preview.bases[1]?.playerName ?? "なし"} / 3塁{" "}
@@ -421,14 +503,73 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               type="button"
               className="tap tap-accent flex-1"
               onClick={() => {
-                const { result, moves, field, batted } = confirm;
+                const { result, moves, field, batted, deadBall, fieldedBy } = confirm;
                 setConfirm(null);
-                void patch((g) => commitPlay(g, result, moves, field, batted));
+                void patch((g) =>
+                  commitPlay(
+                    g,
+                    result,
+                    moves,
+                    field,
+                    batted,
+                    deadBall || fieldedBy ? { deadBall, fieldedBy } : undefined,
+                  ),
+                );
               }}
             >
-              {PLAY_LABELS[confirm.result]}
-              {confirm.batted ? `（${BATTED_LABELS[confirm.batted]}）` : ""}
+              {confirm.deadBall ? "ボールデッド" : PLAY_LABELS[confirm.result]}
+              {!confirm.deadBall && confirm.batted ? `（${BATTED_LABELS[confirm.batted]}）` : ""}
               で確定
+            </button>
+          </div>
+        </div>
+      ) : bench ? (
+        <div className="px-3 pb-3 flex flex-col gap-2">
+          <p className="text-sm text-[#f5c518]">{benchAdvanceNote(state.bases)}</p>
+          {preview ? (
+            <p className="text-xs text-[#d5dccf]">
+              確定後: 1塁 {preview.bases[0]?.playerName ?? "なし"} / 2塁 {preview.bases[1]?.playerName ?? "なし"} / 3塁{" "}
+              {preview.bases[2]?.playerName ?? "なし"}
+              {preview.scored.length ? ` / 生還 ${preview.scored.join("・")}` : ""}
+            </p>
+          ) : null}
+          {benchPeople.map((p) => (
+            <div key={p.playerId} className="flex items-center gap-1 overflow-x-auto">
+              <span className="text-xs w-20 shrink-0 truncate">
+                {p.label} {p.name}
+              </span>
+              {([1, 2, 3, 4, "out"] as Dest[]).map((d) => (
+                <button
+                  key={String(d)}
+                  type="button"
+                  className={`tap min-h-11 px-2 text-xs ${destOf(bench.moves, p.playerId, p.from) === d ? "tap-accent" : ""}`}
+                  onClick={() => {
+                    const rest = bench.moves.filter((m) => m.playerId !== p.playerId);
+                    setBench({
+                      moves: [...rest, { playerId: p.playerId, from: p.from, to: d }],
+                      selectedId: null,
+                    });
+                  }}
+                >
+                  {d === 4 ? "本" : d === "out" ? "アウト" : `${d}塁`}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <button type="button" className="tap flex-1" onClick={() => setBench(null)}>
+              やり直す
+            </button>
+            <button
+              type="button"
+              className="tap tap-accent flex-1"
+              onClick={() => {
+                const moves = bench.moves;
+                setBench(null);
+                void patch((g) => commitBench(g, moves));
+              }}
+            >
+              ボールデッドで確定
             </button>
           </div>
         </div>
@@ -567,6 +708,23 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                     </button>
                   ) : null}
                 </div>
+                <div className="relative">
+                  <button type="button" className="tap tap-result w-full" onClick={startDeadBall}>
+                    ボールデッド
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute -top-1 -right-1 w-9 h-9 rounded-full bg-[#070a08] border border-[#2c3c30] text-sm font-bold"
+                    aria-label="ボールデッドの解説"
+                    onClick={() => {
+                      setGlossaryId("dead");
+                      setGlossaryBack(null);
+                      setSheet("glossary");
+                    }}
+                  >
+                    ?
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -662,6 +820,94 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             })}
           </div>
         </Sheet>
+      ) : null}
+      {sheet === "dead_kind" ? (
+        <Sheet
+          title="ボールデッド"
+          onClose={() => {
+            setSheet(null);
+            setDeadDraft(null);
+          }}
+        >
+          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+            ボールがベンチやスタンドに入って、プレーが止まりました。
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className="tap tap-result min-h-20"
+              onClick={() => setSheet("dead_batted")}
+            >
+              <span className="block text-xs font-normal opacity-90">打者は1塁。いる走者はそれぞれ1つ進む</span>
+              打球のあと、後逸して入った
+            </button>
+            <button
+              type="button"
+              className="tap tap-result min-h-20"
+              disabled={occupiedCount === 0}
+              onClick={startBenchDead}
+            >
+              <span className="block text-xs font-normal opacity-90">
+                {occupiedCount === 0
+                  ? "走者がいないと選べません"
+                  : "いる走者はそれぞれ1つ進む。打者はそのまま"}
+              </span>
+              送球がベンチに入った
+            </button>
+          </div>
+        </Sheet>
+      ) : null}
+      {sheet === "dead_batted" ? (
+        <Sheet
+          title="ボールデッド — どんな当たり？"
+          onClose={() => {
+            setDeadDraft(null);
+            setSheet("dead_kind");
+          }}
+        >
+          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+            ベンチやスタンドに入ってプレーが止まった打球です。ショートゴロなら「ゴロ」を選んでください。
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {BATTED_BALLS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className="tap tap-result min-h-20"
+                onClick={() => {
+                  setDeadDraft({ batted: kind });
+                  setSheet("dead_fielded");
+                }}
+              >
+                <span className="block text-xs font-normal opacity-90">{BATTED_HINTS[kind]}</span>
+                {BATTED_LABELS[kind]}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      ) : null}
+      {sheet === "dead_fielded" && deadDraft ? (
+        <PositionPicker
+          title="打球はどこへ？"
+          hint="打球が飛んだ場所です。ショートゴロならショートを選んでください。"
+          onClose={() => setSheet("dead_batted")}
+          onPick={(pos) => {
+            setDeadDraft({ ...deadDraft, fieldedBy: pos });
+            setSheet("dead_error");
+          }}
+        />
+      ) : null}
+      {sheet === "dead_error" && deadDraft?.fieldedBy ? (
+        <PositionPicker
+          title="後逸したのはだれ？"
+          hint="ボールを後ろにそらして、ベンチやスタンドに入れてしまった野手です。ショートゴロをファーストが後逸したときは、ファーストを選んでください。"
+          onClose={() => setSheet("dead_fielded")}
+          onPick={(pos) => {
+            const { batted, fieldedBy } = deadDraft;
+            if (!fieldedBy) return;
+            finishDeadBall(pos, fieldedBy, batted);
+          }}
+        />
       ) : null}
       {sheet === "field" && pendingResult ? (
         <PositionPicker

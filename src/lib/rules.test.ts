@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { GLOSSARY, glossaryById } from "./glossary";
 import { needsField } from "./labels";
 import {
+  benchAdvanceNote,
+  deadBallAdvanceNote,
   DROPPED_THIRD,
   FIELD_RESULTS,
   PLAY_RULES,
@@ -60,6 +62,28 @@ describe("PLAY_RULES", () => {
     expect(playHitValue("runner_hit")).toBe(1);
     expect(playAwardsRbi("gidp")).toBe(false);
     expect(playAwardsRbi("error")).toBe(false);
+    expect(glossaryById("dead")?.plain).toContain("それぞれ1つ進みます");
+    expect(
+      deadBallAdvanceNote([
+        { playerId: "r", playerName: "走", battingOrder: 1 },
+        null,
+        null,
+      ]),
+    ).toContain("1塁の走者は2塁へ進みます");
+    expect(
+      benchAdvanceNote([
+        { playerId: "r1", playerName: "一", battingOrder: 1 },
+        null,
+        { playerId: "r3", playerName: "三", battingOrder: 3 },
+      ]),
+    ).toContain("1塁の走者は2塁へ進みます");
+    expect(
+      benchAdvanceNote([
+        { playerId: "r1", playerName: "一", battingOrder: 1 },
+        null,
+        { playerId: "r3", playerName: "三", battingOrder: 3 },
+      ]),
+    ).toContain("3塁の走者はホームへ進みます");
     expect(playAwardsRbi("sac_fly")).toBe(true);
   });
 
@@ -73,7 +97,7 @@ describe("PLAY_RULES", () => {
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {
-    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "bk", "rbi", "slg", "ops", "ab"]) {
+    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "bk", "dead", "rbi", "slg", "ops", "ab"]) {
       expect(GLOSSARY.some((term) => term.id === id)).toBe(true);
     }
   });

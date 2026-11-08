@@ -197,7 +197,41 @@ export const SITUATION_TERMS: RuleTerm[] = [
     when: "投手がセットから変な動きをして、審判がボークを宣告したとき。",
     symbol: "BK",
   },
+  {
+    id: "dead",
+    title: "ボールデッド",
+    plain:
+      "ボールがベンチ、スタンドなどプレーできない場所に入り、審判がボールデッドにしたときです。送球がそれたときは、いる走者がそれぞれ1つ進みます。1塁は2塁、2塁は3塁、3塁はホームです。打者の打席はそのままです。打球のあと後逸して入ったときは、打者もエラーで1塁に出ます。",
+    when: "送球やこぼれ球がベンチなどに入り、プレーが止まったとき。",
+    symbol: "失",
+  },
 ];
+
+function runnerAdvanceBits(bases: GameState["bases"]): string[] {
+  const bits: string[] = [];
+  if (bases[0]) bits.push("1塁の走者は2塁へ進みます。");
+  if (bases[1]) bits.push("2塁の走者は3塁へ進みます。");
+  if (bases[2]) bits.push("3塁の走者はホームへ進みます。");
+  return bits;
+}
+
+/** 打球がベンチに入ったボールデッド。打者は1塁、いる走者はそれぞれ1つ。 */
+export function deadBallAdvanceNote(bases: GameState["bases"]): string {
+  return [
+    "ボールデッドです。打者は1塁へ出ます。いる走者はそれぞれ1つ進みます。",
+    ...runnerAdvanceBits(bases),
+    "違うときは進塁先を直してから確定してください。",
+  ].join("");
+}
+
+/** 送球がベンチに入ったボールデッド。いる走者だけがそれぞれ1つ進む。 */
+export function benchAdvanceNote(bases: GameState["bases"]): string {
+  return [
+    "ボールがベンチなどに入ってボールデッドです。いる走者はそれぞれ1つ進みます。打者はそのままです。",
+    ...runnerAdvanceBits(bases),
+    "違う走者だけ、進塁先を直してから確定してください。",
+  ].join("");
+}
 
 export function isStrikeoutResult(result: PlayResult): boolean {
   return result === "strikeout" || result === "strikeout_looking" || result === "strikeout_swinging";

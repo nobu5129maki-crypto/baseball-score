@@ -19,17 +19,20 @@ const FIELD: Array<{ pos: Position; className: string }> = [
 
 export function PositionPicker({
   title,
+  hint,
   onPick,
   onClose,
 }: {
   title: string;
+  hint?: string;
   onPick: (pos: Position) => void;
   onClose: () => void;
 }) {
   return (
     <Sheet title={title} onClose={onClose} tall>
       <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-        本塁から見て、打球が飛んだ場所をタップしてください。数字は守備番号、漢字は略称です。図の上側が外野です。
+        {hint ??
+          "本塁から見て、打球が飛んだ場所をタップしてください。数字は守備番号、漢字は略称です。図の上側が外野です。"}
       </p>
 
       <div className="relative rounded-2xl border border-[#2c3c30] bg-[#0d140f] overflow-hidden mb-2">
