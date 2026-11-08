@@ -40,7 +40,7 @@ import {
 import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
 import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
-import { HIT_RESULTS, OTHER_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
+import { HIT_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
 import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote } from "@/lib/rules";
 import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
@@ -57,18 +57,10 @@ import { InningScoreTable } from "./InningScoreTable";
 import { PositionPicker } from "./PositionPicker";
 import { Sheet } from "./Sheet";
 
-const OTHER_HELP: Partial<Record<PlayResult, string>> = {
-  fielders_choice: "fc",
-  sac_bunt: "sh",
-  sac_fly: "sf",
-  runner_hit: "rh",
-};
-
 type SheetKind =
   | null
   | "hit"
   | "out"
-  | "other"
   | "menu"
   | "sub"
   | "glossary"
@@ -144,7 +136,9 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const chooseK = needsStrikeThreeChoice(state);
   const allowDroppedThird = canDroppedThird(state);
   const gidpBlocked = playBlockedReason("gidp", state);
-  const otherResults = OTHER_RESULTS.filter((r) => !playBlockedReason(r, state));
+  const fcBlocked = playBlockedReason("fielders_choice", state);
+  const sacBuntBlocked = playBlockedReason("sac_bunt", state);
+  const sacFlyBlocked = playBlockedReason("sac_fly", state);
   const outResults = OUT_RESULTS.filter((r) => !playBlockedReason(r, state));
   const gameSlash = slashFor(game, batter.playerId);
   const slash =
@@ -702,28 +696,52 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                       併殺
                     </button>
                   ) : null}
-                  {otherResults.length > 0 ? (
-                    <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
-                      その他
-                    </button>
+                  {!fcBlocked ? (
+                    <HelpResultButton
+                      label="野選"
+                      helpLabel="野選の解説"
+                      onClick={() => startResult("fielders_choice")}
+                      onHelp={() => {
+                        setGlossaryId("fc");
+                        setGlossaryBack(null);
+                        setSheet("glossary");
+                      }}
+                    />
                   ) : null}
-                </div>
-                <div className="relative">
-                  <button type="button" className="tap tap-result w-full" onClick={startDeadBall}>
-                    ボールデッド
-                  </button>
-                  <button
-                    type="button"
-                    className="absolute -top-1 -right-1 w-9 h-9 rounded-full bg-[#070a08] border border-[#2c3c30] text-sm font-bold"
-                    aria-label="ボールデッドの解説"
-                    onClick={() => {
+                  {!sacBuntBlocked ? (
+                    <HelpResultButton
+                      label="送りバント"
+                      helpLabel="送りバントの解説"
+                      onClick={() => startResult("sac_bunt")}
+                      onHelp={() => {
+                        setGlossaryId("sh");
+                        setGlossaryBack(null);
+                        setSheet("glossary");
+                      }}
+                    />
+                  ) : null}
+                  {!sacFlyBlocked ? (
+                    <HelpResultButton
+                      label="犠牲フライ"
+                      helpLabel="犠牲フライの解説"
+                      onClick={() => startResult("sac_fly")}
+                      onHelp={() => {
+                        setGlossaryId("sf");
+                        setGlossaryBack(null);
+                        setSheet("glossary");
+                      }}
+                    />
+                  ) : null}
+                  <HelpResultButton
+                    label="ボールデッド"
+                    helpLabel="ボールデッドの解説"
+                    onClick={startDeadBall}
+                    onHelp={() => {
                       setGlossaryId("dead");
                       setGlossaryBack(null);
                       setSheet("glossary");
                     }}
-                  >
-                    ?
-                  </button>
+                  />
                 </div>
               </>
             )}
@@ -790,36 +808,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       ) : null}
       {sheet === "out" ? (
         <ResultSheet title="どんなアウト？" results={outResults} onPick={startResult} onClose={() => setSheet(null)} />
-      ) : null}
-      {sheet === "other" ? (
-        <Sheet title="その他" onClose={() => setSheet(null)}>
-          <div className="flex flex-col gap-2">
-            {otherResults.map((r) => {
-              const helpId = OTHER_HELP[r];
-              return (
-                <div key={r} className="relative">
-                  <button type="button" className="tap tap-result w-full" onClick={() => startResult(r)}>
-                    {PLAY_LABELS[r]}
-                  </button>
-                  {helpId ? (
-                    <button
-                      type="button"
-                      className="absolute -top-1 -right-1 w-9 h-9 rounded-full bg-[#070a08] border border-[#2c3c30] text-sm font-bold"
-                      aria-label={`${PLAY_LABELS[r]}の解説`}
-                      onClick={() => {
-                        setGlossaryId(helpId);
-                        setGlossaryBack("other");
-                        setSheet("glossary");
-                      }}
-                    >
-                      ?
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </Sheet>
       ) : null}
       {sheet === "dead_kind" ? (
         <Sheet
@@ -1130,6 +1118,34 @@ function confirmPeople(
   });
   void moves;
   return list;
+}
+
+function HelpResultButton({
+  label,
+  helpLabel,
+  onClick,
+  onHelp,
+}: {
+  label: string;
+  helpLabel: string;
+  onClick: () => void;
+  onHelp: () => void;
+}) {
+  return (
+    <div className="relative">
+      <button type="button" className="tap tap-result w-full px-1 leading-tight" onClick={onClick}>
+        {label}
+      </button>
+      <button
+        type="button"
+        className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-[#070a08] border border-[#2c3c30] text-xs font-bold"
+        aria-label={helpLabel}
+        onClick={onHelp}
+      >
+        ?
+      </button>
+    </div>
+  );
 }
 
 function Action({
