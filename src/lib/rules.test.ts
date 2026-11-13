@@ -55,6 +55,10 @@ describe("PLAY_RULES", () => {
 
   it("打数・安打・打点の数え方もルール表に従う", () => {
     expect(playIsAtBat("walk")).toBe(false);
+    expect(playIsAtBat("catcher_interference")).toBe(false);
+    expect(playIsAtBat("offensive_interference")).toBe(true);
+    expect(playAwardsRbi("catcher_interference")).toBe(true);
+    expect(playAwardsRbi("offensive_interference")).toBe(false);
     expect(playIsAtBat("strikeout_looking")).toBe(true);
     expect(playIsAtBat("strikeout_swinging")).toBe(true);
     expect(playIsAtBat("single")).toBe(true);
@@ -97,7 +101,7 @@ describe("PLAY_RULES", () => {
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {
-    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "bk", "dead", "rbi", "slg", "ops", "ab"]) {
+    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "ci", "oi", "bk", "dead", "rbi", "slg", "ops", "ab"]) {
       expect(GLOSSARY.some((term) => term.id === id)).toBe(true);
     }
   });

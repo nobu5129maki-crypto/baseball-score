@@ -24,6 +24,7 @@ import {
   proposeBench,
   proposeDeadBall,
   proposeMoves,
+  proposeOffensiveInterference,
   proposeRunnerHit,
   reduceGame,
   totalRuns,
@@ -503,6 +504,80 @@ describe("らくスコア engine", () => {
   it("終了時間が既にあるときは上書きしない", () => {
     const game = commitEnd({ ...makeGame(), endTime: "16:00" }, new Date(2026, 7, 23, 15, 20));
     expect(game.endTime).toBe("16:00");
+  });
+
+  it("打撃妨害は打者を1塁に出し、打数にも失策にもしない", () => {
+    const game = commitPlay(makeGame(), "catcher_interference");
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A1");
+    expect(state.outs).toBe(0);
+    expect(state.errors.second).toBe(0);
+    expect(state.hits.first).toBe(0);
+    expect(getBatter(state).playerId).toBe("A2");
+    expect(slashFor(game, "A1")).toMatchObject({ ab: 0, h: 0, bb: 0, ci: 1, rbi: 0 });
+  });
+
+  it("満塁の打撃妨害は押し出しで打点が付く", () => {
+    let game = makeGame();
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "catcher_interference");
+    const state = reduceGame(game);
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.bases[0]?.playerId).toBe("A4");
+    expect(state.bases[1]?.playerId).toBe("A3");
+    expect(state.bases[2]?.playerId).toBe("A2");
+    expect(state.errors.second).toBe(0);
+    expect(slashFor(game, "A4")).toMatchObject({ ab: 0, ci: 1, rbi: 1 });
+  });
+
+  it("打者の守備妨害は打者だけアウトで走者は残る", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "offensive_interference");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]?.playerId).toBe("A1");
+    expect(getBatter(state).playerId).toBe("A3");
+    expect(slashFor(game, "A2")).toMatchObject({ ab: 1, h: 0, ci: 0, rbi: 0 });
+  });
+
+  it("走者の守備妨害は邪魔した走者がアウト、打者は1塁、詰まっている走者だけ進む", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    const moves = proposeOffensiveInterference(before, batter, 2);
+    expect(moves).toEqual([
+      { playerId: "A1", from: 2, to: "out" },
+      { playerId: batter.playerId, from: 0, to: 1 },
+      { playerId: "A2", from: 1, to: 2 },
+    ]);
+    game = commitPlay(game, "offensive_interference", moves);
+    const state = reduceGame(game);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]?.playerId).toBe("A3");
+    expect(state.bases[1]?.playerId).toBe("A2");
+    expect(state.bases[2]).toBeNull();
+    expect(state.hits.first).toBe(2);
+  });
+
+  it("2アウトで走者が守備妨害すると、その走者でチェンジになり打者は出塁しない", () => {
+    let game = commitPlay(makeGame(), "groundout");
+    game = commitPlay(game, "groundout");
+    game = commitPlay(game, "single");
+    const before = reduceGame(game);
+    expect(before.outs).toBe(2);
+    const batter = getBatter(before);
+    const moves = proposeOffensiveInterference(before, batter, 1);
+    expect(moves).toEqual([{ playerId: "A3", from: 1, to: "out" }]);
+    game = commitPlay(game, "offensive_interference", moves);
+    const state = reduceGame(game);
+    expect(state.half).toBe("bottom");
+    expect(state.outs).toBe(0);
+    expect(state.bases.every((b) => b == null)).toBe(true);
+    expect(getBatter(state).playerId).toBe("B1");
+    expect(slashFor(game, "A4")).toMatchObject({ ab: 1, h: 0, ci: 0 });
   });
 
   it("満塁四球の提案は押し出しを含む", () => {

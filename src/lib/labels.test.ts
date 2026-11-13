@@ -9,6 +9,8 @@ describe("playLabel", () => {
     expect(playLabel("strikeout")).toBe("三振");
     expect(playLabel("strikeout_looking")).toBe("見三");
     expect(playLabel("strikeout_swinging")).toBe("空三");
+    expect(playLabel("catcher_interference")).toBe("打妨");
+    expect(playLabel("offensive_interference")).toBe("守妨");
     expect(playLabel("homerun")).toBe("本");
   });
 

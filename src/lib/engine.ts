@@ -230,6 +230,7 @@ export function proposeMoves(
     case "walk":
     case "hbp":
     case "dropped_third":
+    case "catcher_interference":
       return forceWalk(batter.playerId, state.bases);
     case "strikeout":
     case "strikeout_looking":
@@ -237,6 +238,7 @@ export function proposeMoves(
     case "groundout":
     case "flyout":
     case "lineout":
+    case "offensive_interference":
       return [batterMove("out")];
     case "gidp": {
       const force = ([1, 2, 3] as const).find((base) => state.bases[base - 1]);
@@ -272,6 +274,28 @@ export function proposeDeadBall(state: GameState, batter: LineupSlot): RunnerMov
 /** 送球がベンチに入ったボールデッド。いる走者だけがそれぞれ1つ進む。 */
 export function proposeBench(state: GameState): RunnerMove[] {
   return plus(state.bases, 1);
+}
+
+/**
+ * 守備妨害。打者なら打者アウトで走者は残す。
+ * 走者ならその走者がアウト。2アウト未満なら打者は1塁、詰まっている走者だけ進む。
+ * すでに2アウトなら、その走者で3アウトになり打者は出塁しない。
+ */
+export function proposeOffensiveInterference(
+  state: GameState,
+  batter: LineupSlot,
+  who: "batter" | Base,
+): RunnerMove[] {
+  if (who === "batter") {
+    return [{ playerId: batter.playerId, from: 0, to: "out" }];
+  }
+  const runner = state.bases[who - 1];
+  if (!runner) return [{ playerId: batter.playerId, from: 0, to: "out" }];
+  const runnerOut: RunnerMove = { playerId: runner.playerId, from: who, to: "out" };
+  if (state.outs >= 2) return [runnerOut];
+  const remaining: GameState["bases"] = [state.bases[0], state.bases[1], state.bases[2]];
+  remaining[who - 1] = null;
+  return [runnerOut, ...forceWalk(batter.playerId, remaining)];
 }
 
 export function proposeRunnerHit(

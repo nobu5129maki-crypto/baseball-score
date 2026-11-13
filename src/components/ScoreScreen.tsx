@@ -31,6 +31,7 @@ import {
   proposeBench,
   proposeDeadBall,
   proposeMoves,
+  proposeOffensiveInterference,
   proposeRunnerHit,
   reduceGame,
   totalRuns,
@@ -42,7 +43,7 @@ import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote } from "@/lib/rules";
+import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote, interferenceAdvanceNote } from "@/lib/rules";
 import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
@@ -77,7 +78,10 @@ type SheetKind =
   | "dead_kind"
   | "dead_batted"
   | "dead_fielded"
-  | "dead_error";
+  | "dead_error"
+  | "other"
+  | "offensive_interference"
+  | "offensive_runner";
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -462,7 +466,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           <p className="text-sm text-[#f5c518]">
             {confirm.deadBall
               ? deadBallAdvanceNote(state.bases)
-              : "進塁先を直してから確定（走者をタップ→塁をタップ）"}
+              : (interferenceAdvanceNote(confirm.result) ??
+                "進塁先を直してから確定（走者をタップ→塁をタップ）")}
           </p>
           {preview ? (
             <p className="text-xs text-[#d5dccf]">
@@ -742,6 +747,9 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                       setSheet("glossary");
                     }}
                   />
+                  <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
+                    その他
+                  </button>
                 </div>
               </>
             )}
@@ -1022,6 +1030,82 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           onClose={() => setSheet(null)}
         />
       ) : null}
+      {sheet === "other" ? (
+        <Sheet title="その他" onClose={() => setSheet(null)}>
+          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+            審判が妨害を宣告したときに使います。?で規則を読めます。
+          </p>
+          <div className="flex flex-col gap-2">
+            <HelpResultButton
+              label="打撃妨害"
+              hint="打者は1塁。詰まっている走者だけ進む"
+              helpLabel="打撃妨害の解説"
+              onClick={() => startResult("catcher_interference")}
+              onHelp={() => {
+                setGlossaryId("ci");
+                setGlossaryBack("other");
+                setSheet("glossary");
+              }}
+            />
+            <HelpResultButton
+              label="守備妨害"
+              hint="邪魔した打者か走者がアウト"
+              helpLabel="守備妨害の解説"
+              onClick={() => setSheet("offensive_interference")}
+              onHelp={() => {
+                setGlossaryId("oi");
+                setGlossaryBack("other");
+                setSheet("glossary");
+              }}
+            />
+          </div>
+        </Sheet>
+      ) : null}
+      {sheet === "offensive_interference" ? (
+        <Sheet title="守備妨害" onClose={() => setSheet("other")}>
+          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+            誰が野手のプレーを邪魔しましたか。ボールはデッドになります。
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className="tap tap-result min-h-20"
+              onClick={() => startResult("offensive_interference")}
+            >
+              <span className="block text-xs font-normal opacity-90">打者アウト。走者は塁に残る</span>
+              打者が邪魔した
+            </button>
+            <button
+              type="button"
+              className="tap tap-result min-h-20"
+              disabled={occupiedCount === 0}
+              onClick={() => setSheet("offensive_runner")}
+            >
+              <span className="block text-xs font-normal opacity-90">
+                {occupiedCount === 0
+                  ? "走者がいないと選べません"
+                  : "その走者がアウト。2アウト未満なら打者は1塁"}
+              </span>
+              走者が邪魔した
+            </button>
+          </div>
+        </Sheet>
+      ) : null}
+      {sheet === "offensive_runner" ? (
+        <RunnerPickSheet
+          title="守備妨害"
+          hint="野手のプレーを邪魔した走者を1人選んでください。その走者はアウトです。2アウト未満なら打者は1塁に出ます。すでに2アウトなら、その走者で3アウトになり打者は出塁しません。"
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} が邪魔した（アウト）`}
+          danger
+          onPick={(from) => {
+            const moves = proposeOffensiveInterference(state, batter, from);
+            setConfirm({ result: "offensive_interference", moves, selectedId: null });
+            setSheet(null);
+          }}
+          onClose={() => setSheet("offensive_interference")}
+        />
+      ) : null}
       {sheet === "hit_runner" ? (
         <RunnerPickSheet
           title="走者当たり"
@@ -1122,18 +1206,25 @@ function confirmPeople(
 
 function HelpResultButton({
   label,
+  hint,
   helpLabel,
   onClick,
   onHelp,
 }: {
   label: string;
+  hint?: string;
   helpLabel: string;
   onClick: () => void;
   onHelp: () => void;
 }) {
   return (
-    <div className="relative">
-      <button type="button" className="tap tap-result w-full px-1 leading-tight" onClick={onClick}>
+    <div className="relative w-full">
+      <button
+        type="button"
+        className={`tap tap-result w-full px-1 leading-tight ${hint ? "min-h-20" : ""}`}
+        onClick={onClick}
+      >
+        {hint ? <span className="block text-xs font-normal opacity-90">{hint}</span> : null}
         {label}
       </button>
       <button

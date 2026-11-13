@@ -139,6 +139,34 @@ export const PLAY_RULES: Record<PlayResult, PlayRule> = {
       symbol: "走当",
     },
   },
+  catcher_interference: {
+    needsField: false,
+    isAb: false,
+    hitValue: 0,
+    awardsRbi: true,
+    term: {
+      id: "ci",
+      title: "打撃妨害",
+      plain:
+        "捕手などが、打者のバットを振るのを邪魔したときです。ボールはデッドになり、打者は1塁へ出ます。1塁から順に走者が詰まっているときだけ、その走者は次の塁へ押されます。空いている塁の先にいる走者は進みません。打数には入りません。ヒットでも四球でも失策でもありません。出塁率には入ります。満塁で押し出された点には打点が付きます。",
+      when: "審判が「打撃妨害」と宣告したとき。空振りのバットが捕手のミットに当たったときが典型です。「その他」から記録します。",
+      symbol: "打妨",
+    },
+  },
+  offensive_interference: {
+    needsField: false,
+    isAb: true,
+    hitValue: 0,
+    awardsRbi: false,
+    term: {
+      id: "oi",
+      title: "守備妨害",
+      plain:
+        "打者や走者が、野手の捕球や送球を邪魔したときです。邪魔した人がアウトになり、ボールはデッドです。打者が邪魔したときは打者アウトで、走者は投球当時の塁に残ります。走者が邪魔したときはその走者がアウトです。2アウト未満なら打者は1塁に出ます。すでに2アウトのときは、その走者で3アウトになり打者は出塁しません。打数には入ります。ヒットや失策にはなりません。",
+      when: "審判が「守備妨害」と宣告したとき。盗塁の送球を打者が妨げた、走者がゴロを処理する野手にぶつかった、などが典型です。「その他」から、邪魔した人を選んで記録します。",
+      symbol: "守妨",
+    },
+  },
 };
 
 export const DROPPED_THIRD = {
@@ -222,6 +250,17 @@ export function deadBallAdvanceNote(bases: GameState["bases"]): string {
     ...runnerAdvanceBits(bases),
     "違うときは進塁先を直してから確定してください。",
   ].join("");
+}
+
+/** 妨害で走者がいるとき、確定前に見せる進塁の説明。 */
+export function interferenceAdvanceNote(result: PlayResult): string | null {
+  if (result === "catcher_interference") {
+    return "打撃妨害です。打者は1塁へ出ます。1塁から順に詰まっている走者だけ進みます。違うときは進塁先を直してから確定してください。";
+  }
+  if (result === "offensive_interference") {
+    return "守備妨害です。邪魔した人はアウトです。2アウト未満で走者が邪魔したときは打者は1塁に出ます。すでに2アウトなら、その走者で3アウトになり打者は出塁しません。違うときは進塁先を直してください。";
+  }
+  return null;
 }
 
 /** 送球がベンチに入ったボールデッド。いる走者だけがそれぞれ1つ進む。 */

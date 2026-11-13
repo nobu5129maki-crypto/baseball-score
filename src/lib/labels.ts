@@ -21,6 +21,8 @@ export const PLAY_LABELS: Record<PlayResult, string> = {
   sac_bunt: "送りバント",
   sac_fly: "犠牲フライ",
   runner_hit: "走者当たり",
+  catcher_interference: "打撃妨害",
+  offensive_interference: "守備妨害",
 };
 
 export const PLAY_SHORT: Record<PlayResult, string> = {
@@ -43,11 +45,13 @@ export const PLAY_SHORT: Record<PlayResult, string> = {
   sac_bunt: "犠",
   sac_fly: "犠飛",
   runner_hit: "走当",
+  catcher_interference: "打妨",
+  offensive_interference: "守妨",
 };
 
 export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun"];
 export const OUT_RESULTS: PlayResult[] = ["groundout", "flyout", "lineout", "gidp"];
-export const OTHER_RESULTS: PlayResult[] = ["fielders_choice", "sac_bunt", "sac_fly"];
+export const OTHER_RESULTS: PlayResult[] = ["catcher_interference", "offensive_interference"];
 
 export const BATTED_BALLS: BattedBall[] = ["ground", "fly", "line"];
 export const BATTED_LABELS: Record<BattedBall, string> = {

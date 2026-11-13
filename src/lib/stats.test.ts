@@ -76,6 +76,7 @@ describe("batterLine", () => {
         hbp: 0,
         sf: 0,
         sh: 0,
+        ci: 0,
         tb: 1,
         sb: 0,
         cs: 0,
@@ -96,6 +97,7 @@ describe("batterLine", () => {
         hbp: 0,
         sf: 0,
         sh: 0,
+        ci: 0,
         tb: 0,
         sb: 0,
         cs: 0,
@@ -119,7 +121,8 @@ describe("formatOps / myTeamSlashes", () => {
   }
 
   it("OPSは出塁率と長打率の合計", () => {
-    expect(formatOps({ ab: 3, h: 1, bb: 0, hbp: 0, sf: 0, tb: 1 })).toBe(".667");
+    expect(formatOps({ ab: 3, h: 1, bb: 0, hbp: 0, sf: 0, ci: 0, tb: 1 })).toBe(".667");
+    expect(formatObp({ ab: 0, h: 0, bb: 0, hbp: 0, sf: 0, ci: 1 })).toBe("1.000");
   });
 
   it("長打率は塁打÷打数で、四球や犠飛は打数に入れない", () => {

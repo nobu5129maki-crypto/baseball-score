@@ -25,14 +25,16 @@ export type PlayerSlash = {
   hbp: number;
   sf: number;
   sh: number;
+  /** 打撃妨害。打数に入らず、出塁率の分子と分母に入る */
+  ci: number;
   tb: number;
   sb: number;
   cs: number;
   r: number;
 };
 
-export function plateAppearances(p: Pick<PlayerSlash, "ab" | "bb" | "hbp" | "sf" | "sh">): number {
-  return p.ab + p.bb + p.hbp + p.sf + p.sh;
+export function plateAppearances(p: Pick<PlayerSlash, "ab" | "bb" | "hbp" | "sf" | "sh" | "ci">): number {
+  return p.ab + p.bb + p.hbp + p.sf + p.sh + p.ci;
 }
 
 export function formatAvg(h: number, ab: number): string {
@@ -42,10 +44,10 @@ export function formatAvg(h: number, ab: number): string {
   return n.toFixed(3).replace(/^0/, "");
 }
 
-export function formatObp(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf">): string {
-  const den = p.ab + p.bb + p.hbp + p.sf;
+export function formatObp(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" | "ci">): string {
+  const den = p.ab + p.bb + p.hbp + p.sf + p.ci;
   if (den === 0) return "-";
-  const n = (p.h + p.bb + p.hbp) / den;
+  const n = (p.h + p.bb + p.hbp + p.ci) / den;
   if (n >= 1) return n.toFixed(3);
   return n.toFixed(3).replace(/^0/, "");
 }
@@ -60,10 +62,10 @@ export function formatSlg(tb: number, ab: number): string {
 export type SlashSortKey = "name" | "pa" | "ab" | "h" | "bb" | "rbi" | "avg" | "obp" | "slg" | "sb" | "ops";
 export type SortDir = "asc" | "desc";
 
-function obpValue(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf">): number | null {
-  const den = p.ab + p.bb + p.hbp + p.sf;
+function obpValue(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" | "ci">): number | null {
+  const den = p.ab + p.bb + p.hbp + p.sf + p.ci;
   if (den === 0) return null;
-  return (p.h + p.bb + p.hbp) / den;
+  return (p.h + p.bb + p.hbp + p.ci) / den;
 }
 
 function slgValue(p: Pick<PlayerSlash, "tb" | "ab">): number | null {
@@ -101,10 +103,10 @@ export function compareSlashes(a: PlayerSlash, b: PlayerSlash, key: SlashSortKey
   return dir === "asc" ? cmp : -cmp;
 }
 
-export function formatOps(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" | "tb">): string {
-  const den = p.ab + p.bb + p.hbp + p.sf;
+export function formatOps(p: Pick<PlayerSlash, "h" | "bb" | "hbp" | "ab" | "sf" | "tb" | "ci">): string {
+  const den = p.ab + p.bb + p.hbp + p.sf + p.ci;
   if (den === 0) return "-";
-  const obp = (p.h + p.bb + p.hbp) / den;
+  const obp = (p.h + p.bb + p.hbp + p.ci) / den;
   const slg = p.ab === 0 ? 0 : p.tb / p.ab;
   const n = obp + slg;
   if (n >= 1) return n.toFixed(3);
@@ -175,6 +177,7 @@ function emptySlash(playerId: string, name: string, order: number, side: Side): 
     hbp: 0,
     sf: 0,
     sh: 0,
+    ci: 0,
     tb: 0,
     sb: 0,
     cs: 0,
@@ -230,6 +233,7 @@ function applyEventToStats(
     if (play.result === "hbp") row.hbp += 1;
     if (play.result === "sac_fly") row.sf += 1;
     if (play.result === "sac_bunt") row.sh += 1;
+    if (play.result === "catcher_interference") row.ci += 1;
     const hv = hitValue(play.result);
     if (hv) {
       row.h += 1;
@@ -343,6 +347,7 @@ function addSlash(map: Map<string, PlayerSlash>, row: PlayerSlash) {
   prev.hbp += row.hbp;
   prev.sf += row.sf;
   prev.sh += row.sh;
+  prev.ci += row.ci;
   prev.tb += row.tb;
   prev.sb += row.sb;
   prev.cs += row.cs;
@@ -386,6 +391,7 @@ export function sumSlashes(rows: PlayerSlash[], name = "チーム計"): PlayerSl
     acc.hbp += row.hbp;
     acc.sf += row.sf;
     acc.sh += row.sh;
+    acc.ci += row.ci;
     acc.tb += row.tb;
     acc.sb += row.sb;
     acc.cs += row.cs;

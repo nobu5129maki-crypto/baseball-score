@@ -112,7 +112,9 @@ export type PlayResult =
   | "fielders_choice"
   | "sac_bunt"
   | "sac_fly"
-  | "runner_hit";
+  | "runner_hit"
+  | "catcher_interference"
+  | "offensive_interference";
 
 export type RunnerMove = {
   playerId: string;

@@ -7,6 +7,8 @@ describe("tokensInMark", () => {
     expect(tokensInMark("中二飛")).toEqual({ positions: ["中"], plays: ["二", "飛"] });
     expect(tokensInMark("二安")).toEqual({ positions: ["二"], plays: ["安"] });
     expect(tokensInMark("死")).toEqual({ positions: [], plays: ["死"] });
+    expect(tokensInMark("打妨")).toEqual({ positions: [], plays: ["打妨"] });
+    expect(tokensInMark("守妨")).toEqual({ positions: [], plays: ["守妨"] });
     expect(tokensInMark("見三")).toEqual({ positions: [], plays: ["見三"] });
     expect(tokensInMark("牽制死")).toEqual({ positions: [], plays: ["牽制死"] });
     expect(tokensInMark("三振")).toEqual({ positions: [], plays: [] });
