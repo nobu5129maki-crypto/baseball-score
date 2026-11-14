@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import { DbBootstrap } from "@/components/DbBootstrap";
 import { PwaRegister } from "@/components/PwaRegister";
+import { TapHaptic } from "@/components/TapHaptic";
 import "./globals.css";
 
 const noto = Noto_Sans_JP({
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ja" className={`${noto.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#070a08] text-[#f4f7f0]">
         <PwaRegister />
+        <TapHaptic />
         <DbBootstrap />
         {children}
       </body>
