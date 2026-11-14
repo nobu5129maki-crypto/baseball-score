@@ -32,7 +32,6 @@ import {
   proposeDeadBall,
   proposeMoves,
   proposeOffensiveInterference,
-  proposeRunnerHit,
   reduceGame,
   totalRuns,
   undoAtBat,
@@ -72,14 +71,12 @@ type SheetKind =
   | "ph"
   | "field"
   | "batted"
-  | "hit_runner"
   | "wp_hold"
   | "pb_hold"
   | "dead_kind"
   | "dead_batted"
   | "dead_fielded"
   | "dead_error"
-  | "other"
   | "offensive_interference"
   | "offensive_runner";
 
@@ -277,13 +274,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     }
     if (sheet === "pickoff") {
       void patch((g) => commitPickoff(g, from));
-      setSheet(null);
-      return;
-    }
-    if (sheet === "hit_runner") {
-      if (!state) return;
-      const moves = proposeRunnerHit(state, batter, from);
-      setConfirm({ result: "runner_hit", moves, selectedId: null });
       setSheet(null);
       return;
     }
@@ -589,7 +579,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <Action onClick={() => setSheet("ph")} label="代打" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pr")} label="代走" />
           </div>
-          <div className="px-2 grid grid-cols-4 gap-1 pb-2">
+          <div className="px-2 grid grid-cols-3 gap-1 pb-2">
             <Action
               disabled={occupiedCount === 0}
               onClick={() => askWildPitch("wp")}
@@ -616,16 +606,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               label="ボーク"
               help={() => {
                 setGlossaryId("bk");
-                setGlossaryBack(null);
-                setSheet("glossary");
-              }}
-            />
-            <Action
-              disabled={occupiedCount === 0}
-              onClick={() => setSheet("hit_runner")}
-              label="走者当たり"
-              help={() => {
-                setGlossaryId("rh");
                 setGlossaryBack(null);
                 setSheet("glossary");
               }}
@@ -747,9 +727,32 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                       setSheet("glossary");
                     }}
                   />
-                  <button type="button" className="tap tap-result" onClick={() => setSheet("other")}>
-                    その他
-                  </button>
+                  <HelpResultButton
+                    label="打撃妨害"
+                    helpLabel="打撃妨害の解説"
+                    onClick={() => startResult("catcher_interference")}
+                    onHelp={() => {
+                      setGlossaryId("ci");
+                      setGlossaryBack(null);
+                      setSheet("glossary");
+                    }}
+                  />
+                  <HelpResultButton
+                    label="守備妨害"
+                    helpLabel="守備妨害の解説"
+                    onClick={() => {
+                      if (occupiedCount === 0) {
+                        startResult("offensive_interference");
+                        return;
+                      }
+                      setSheet("offensive_interference");
+                    }}
+                    onHelp={() => {
+                      setGlossaryId("oi");
+                      setGlossaryBack(null);
+                      setSheet("glossary");
+                    }}
+                  />
                 </div>
               </>
             )}
@@ -1030,41 +1033,10 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           onClose={() => setSheet(null)}
         />
       ) : null}
-      {sheet === "other" ? (
-        <Sheet title="その他" onClose={() => setSheet(null)}>
-          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-            審判が妨害を宣告したときに使います。?で規則を読めます。
-          </p>
-          <div className="flex flex-col gap-2">
-            <HelpResultButton
-              label="打撃妨害"
-              hint="打者は1塁。詰まっている走者だけ進む"
-              helpLabel="打撃妨害の解説"
-              onClick={() => startResult("catcher_interference")}
-              onHelp={() => {
-                setGlossaryId("ci");
-                setGlossaryBack("other");
-                setSheet("glossary");
-              }}
-            />
-            <HelpResultButton
-              label="守備妨害"
-              hint="邪魔した打者か走者がアウト"
-              helpLabel="守備妨害の解説"
-              onClick={() => setSheet("offensive_interference")}
-              onHelp={() => {
-                setGlossaryId("oi");
-                setGlossaryBack("other");
-                setSheet("glossary");
-              }}
-            />
-          </div>
-        </Sheet>
-      ) : null}
       {sheet === "offensive_interference" ? (
-        <Sheet title="守備妨害" onClose={() => setSheet("other")}>
+        <Sheet title="守備妨害" onClose={() => setSheet(null)}>
           <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-            誰が野手のプレーを邪魔しましたか。ボールはデッドになります。
+            誰が邪魔しましたか。フェアの打球が走者に当たったときも、当たった走者を選んでください。ボールはデッドです。安打にはしません。
           </p>
           <div className="flex flex-col gap-2">
             <button
@@ -1082,9 +1054,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               onClick={() => setSheet("offensive_runner")}
             >
               <span className="block text-xs font-normal opacity-90">
-                {occupiedCount === 0
-                  ? "走者がいないと選べません"
-                  : "その走者がアウト。2アウト未満なら打者は1塁"}
+                その走者がアウト。走者当たりもここ。2アウト未満なら打者は1塁
               </span>
               走者が邪魔した
             </button>
@@ -1094,7 +1064,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       {sheet === "offensive_runner" ? (
         <RunnerPickSheet
           title="守備妨害"
-          hint="野手のプレーを邪魔した走者を1人選んでください。その走者はアウトです。2アウト未満なら打者は1塁に出ます。すでに2アウトなら、その走者で3アウトになり打者は出塁しません。"
+          hint="邪魔した走者、または打球が当たった走者を1人選んでください。その走者はアウトです。2アウト未満なら打者は1塁に出ます。すでに2アウトなら、その走者で3アウトになり打者は出塁しません。安打にはしません。"
           bases={state.bases}
           action={(b, name) => `${b}塁の${name} が邪魔した（アウト）`}
           danger
@@ -1104,20 +1074,6 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             setSheet(null);
           }}
           onClose={() => setSheet("offensive_interference")}
-        />
-      ) : null}
-      {sheet === "hit_runner" ? (
-        <RunnerPickSheet
-          title="走者当たり"
-          hint="打球が当たった走者を1人選んでください。"
-          bases={state.bases}
-          action={(b, name) => `${b}塁の${name} に当たった`}
-          onPick={(from) => {
-            const moves = proposeRunnerHit(state, batter, from);
-            setConfirm({ result: "runner_hit", moves, selectedId: null });
-            setSheet(null);
-          }}
-          onClose={() => setSheet(null)}
         />
       ) : null}
       {sheet === "pr" ? (

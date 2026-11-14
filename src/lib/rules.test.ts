@@ -59,6 +59,11 @@ describe("PLAY_RULES", () => {
     expect(playIsAtBat("offensive_interference")).toBe(true);
     expect(playAwardsRbi("catcher_interference")).toBe(true);
     expect(playAwardsRbi("offensive_interference")).toBe(false);
+    expect(glossaryById("oi")?.plain).toContain("走者当たり");
+    expect(glossaryById("oi")?.plain).toContain("安打や失策にはしません");
+    expect(glossaryById("ci")?.when).toContain("打撃妨害");
+    expect(glossaryById("ci")?.when).not.toContain("その他");
+    expect(glossaryById("rh")?.plain).toContain("守備妨害");
     expect(playIsAtBat("strikeout_looking")).toBe(true);
     expect(playIsAtBat("strikeout_swinging")).toBe(true);
     expect(playIsAtBat("single")).toBe(true);

@@ -51,7 +51,6 @@ export const PLAY_SHORT: Record<PlayResult, string> = {
 
 export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun"];
 export const OUT_RESULTS: PlayResult[] = ["groundout", "flyout", "lineout", "gidp"];
-export const OTHER_RESULTS: PlayResult[] = ["catcher_interference", "offensive_interference"];
 
 export const BATTED_BALLS: BattedBall[] = ["ground", "fly", "line"];
 export const BATTED_LABELS: Record<BattedBall, string> = {
