@@ -1,5 +1,17 @@
-/** 指で押した瞬間の短い振動。アラームのような連続振動にはしない。 */
-export const TAP_VIBRATION_MS = 20;
+/**
+ * 指でボタンを離したときの短い振動。
+ * Android の Chrome は、指の pointerdown では「操作した」と認めず振動を捨てる。
+ * 指やペンは pointerup、マウスは pointerdown で頼む。
+ */
+export const TAP_VIBRATION_MS = 60;
+
+export function shouldBuzzOnPointer(
+  type: "pointerdown" | "pointerup",
+  pointerType: string,
+): boolean {
+  if (type === "pointerdown") return pointerType === "mouse";
+  return pointerType !== "mouse";
+}
 
 export function isTapControl(
   control: {

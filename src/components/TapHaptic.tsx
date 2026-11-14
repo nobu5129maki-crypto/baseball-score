@@ -1,21 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
-import { buzzTap, isTapControl } from "@/lib/tap-haptic";
+import { buzzTap, isTapControl, shouldBuzzOnPointer } from "@/lib/tap-haptic";
 
-/** ボタンやリンクを指で押した瞬間に、短く一度振動する。 */
+function controlFrom(target: EventTarget | null): Element | null {
+  const el = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+  if (!el) return null;
+  return el.closest("button, a, [role='button']");
+}
+
+/** ボタンやリンクをタップしたときに、短く一度振動する。 */
 export function TapHaptic() {
   useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.pointerType === "mouse") return;
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const control = target.closest("button, a, [role='button']");
-      if (!isTapControl(control)) return;
+    const onPointer = (event: PointerEvent) => {
+      const type = event.type === "pointerdown" ? "pointerdown" : "pointerup";
+      if (!shouldBuzzOnPointer(type, event.pointerType)) return;
+      if (!isTapControl(controlFrom(event.target))) return;
       buzzTap();
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    document.addEventListener("pointerdown", onPointer, true);
+    document.addEventListener("pointerup", onPointer, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer, true);
+      document.removeEventListener("pointerup", onPointer, true);
+    };
   }, []);
   return null;
 }
