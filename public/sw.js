@@ -8,7 +8,7 @@ function abs(path) {
   return BASE + path;
 }
 
-const CACHE = "raku-score-v4";
+const CACHE = "raku-score-v5";
 const PRECACHE = [
   abs("/"),
   abs("/icon.svg"),

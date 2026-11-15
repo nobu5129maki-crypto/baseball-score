@@ -85,18 +85,34 @@ function rs_resolve($relative)
     return $real;
 }
 
-if (!rs_logged_in()) {
-    rs_deny();
-}
-
 $relative = '';
 if (isset($_GET['rs_path']) && !is_array($_GET['rs_path'])) {
     $relative = (string) $_GET['rs_path'];
 } else {
     $relative = rs_requested_path();
 }
+$relative = rs_safe_relative($relative);
+
+function rs_is_install_asset($relative)
+{
+    $names = array(
+        'manifest.webmanifest' => true,
+        'sw.js' => true,
+        'icon-192.png' => true,
+        'icon-512.png' => true,
+        'icon-512-maskable.png' => true,
+        'apple-touch-icon.png' => true,
+        'icon.png' => true,
+        'icon.svg' => true,
+    );
+    return isset($names[$relative]);
+}
 
 $file = rs_resolve($relative);
+$publicAsset = rs_is_install_asset($relative);
+if (!$publicAsset && !rs_logged_in()) {
+    rs_deny();
+}
 if ($file === '') {
     rs_miss();
 }
@@ -108,6 +124,8 @@ $base = basename($file);
 if ($ext === 'html' || $base === 'sw.js' || $ext === 'webmanifest') {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
+} elseif ($publicAsset) {
+    header('Cache-Control: public, max-age=86400');
 } else {
     header('Cache-Control: private, max-age=86400');
 }

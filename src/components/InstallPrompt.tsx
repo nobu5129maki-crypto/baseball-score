@@ -71,8 +71,7 @@ export function InstallPrompt() {
         </p>
       ) : (
         <p className="text-sm text-[#d5dccf] mt-1 leading-relaxed">
-          ブラウザのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください。Android
-          は HTTPS で開いているときにインストールできます。
+          ブラウザのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください。
         </p>
       )}
     </div>
