@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "export:xserver": "STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/baseball-score next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

@@ -13,6 +13,7 @@ import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
 import { pickPlayerProfile } from "@/lib/player-profile";
 import { decodeRoster } from "@/lib/roster-share";
 import { nudgeLineup, swapLineupOrders } from "@/lib/lineup-edit";
+import { gameHref } from "@/lib/game-href";
 import { newId } from "@/lib/ids";
 import { createSaveQueue } from "@/lib/save-queue";
 import { PITCHER_ORDER } from "@/lib/types";
@@ -297,7 +298,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
 
   return (
     <main className="max-w-lg mx-auto w-full min-h-dvh pb-8">
-      <AppHeader title="打順・守備" backHref={game.status === "in_progress" ? `/games/${gameId}/score` : "/"} />
+      <AppHeader title="打順・守備" backHref={game.status === "in_progress" ? gameHref(gameId, "score") : "/"} />
       <div className="p-4 flex flex-col gap-3">
         <p className="text-sm text-[#9aa894]">
           {game.date}
@@ -309,7 +310,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
           {runChangeRuleSuffix(game.runChangeAt)}
         </p>
         {game.status === "lineup" ? (
-          <Link href={`/games/${gameId}/setup`} className="tap flex items-center justify-center">
+          <Link href={gameHref(gameId, "setup")} className="tap flex items-center justify-center">
             先攻・日付などを変える
           </Link>
         ) : null}
@@ -453,7 +454,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
             disabled={dup}
             onClick={() => {
               void saveGame({ ...game, status: "in_progress" }).then(() =>
-                router.push(`/games/${gameId}/score`),
+                router.push(gameHref(gameId, "score")),
               );
             }}
           >
@@ -463,7 +464,7 @@ export function LineupScreen({ gameId }: { gameId: string }) {
           <button
             type="button"
             className="tap tap-accent"
-            onClick={() => router.push(`/games/${gameId}/score`)}
+            onClick={() => router.push(gameHref(gameId, "score"))}
           >
             記録に戻る
           </button>
