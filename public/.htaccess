@@ -1,0 +1,30 @@
+# 入口は index.php のログイン画面。中身はログイン後だけ渡す。
+DirectoryIndex index.php
+Options -Indexes
+
+<FilesMatch "^(auth\.php|index\.html)$">
+  Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteRule ^index\.php$ - [L]
+RewriteRule ^gate\.php$ - [L]
+
+# フォルダの URL はログイン画面か、ログイン後の HTML を index.php が出す
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ index.php [L]
+
+# HTML の直リンクは出さない
+RewriteRule \.html$ - [F]
+
+# 実在するファイル（スクリプトや画像）はログイン後だけ渡す
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ gate.php?rs_path=$1 [B,L,QSA]
+
+# 画面のパス。未ログインはログイン画面、ログイン後は該当の HTML。
+RewriteRule ^ index.php [L]
+
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

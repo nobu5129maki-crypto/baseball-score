@@ -1,17 +1,27 @@
-const CACHE = "raku-score-v3";
+const scopePath = new URL("./", self.location).pathname;
+const BASE = scopePath === "/" ? "" : scopePath.replace(/\/$/, "");
+
+function abs(path) {
+  if (path.charAt(0) !== "/") path = "/" + path;
+  if (BASE === "") return path;
+  if (path === "/") return BASE + "/";
+  return BASE + path;
+}
+
+const CACHE = "raku-score-v4";
 const PRECACHE = [
-  "/",
-  "/icon.svg",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/icon-512-maskable.png",
-  "/apple-touch-icon.png",
-  "/manifest.webmanifest",
+  abs("/"),
+  abs("/icon.svg"),
+  abs("/icon-192.png"),
+  abs("/icon-512.png"),
+  abs("/icon-512-maskable.png"),
+  abs("/apple-touch-icon.png"),
+  abs("/manifest.webmanifest"),
 ];
 
 function isNextRouterRequest(req) {
   const url = new URL(req.url);
-  if (url.pathname.startsWith("/_next/")) return true;
+  if (url.pathname.indexOf("/_next/") !== -1) return true;
   return (
     req.headers.has("RSC") ||
     req.headers.has("Next-Url") ||
@@ -44,17 +54,19 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf(scopePath) !== 0) return;
   if (isNextRouterRequest(req)) return;
 
   if (req.mode === "navigate") {
-    event.respondWith(fetch(req).catch(() => caches.match("/")));
+    event.respondWith(fetch(req).catch(() => caches.match(abs("/"))));
     return;
   }
 
   event.respondWith(
     fetch(req)
       .then((res) => {
-        if (res.ok && (url.pathname.startsWith("/icon") || url.pathname.endsWith(".webmanifest"))) {
+        const iconish = url.pathname.indexOf("/icon") !== -1 || url.pathname.endsWith(".webmanifest");
+        if (res.ok && iconish) {
           const copy = res.clone();
           caches.open(CACHE).then((cache) => cache.put(req, copy));
         }

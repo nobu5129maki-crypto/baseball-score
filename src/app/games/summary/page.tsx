@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { GameRoute } from "@/components/GameRoute";
+import { gameHref } from "@/lib/game-href";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GlossarySheet } from "@/components/GlossarySheet";
@@ -29,9 +31,11 @@ import type { Scorebook } from "@/lib/scorebook";
 import type { Game, GameState } from "@/lib/types";
 
 export default function SummaryPage() {
-  const params = useParams<{ id: string }>();
+  return <GameRoute>{(id) => <SummaryScreen id={id} />}</GameRoute>;
+}
+
+function SummaryScreen({ id }: { id: string }) {
   const router = useRouter();
-  const id = params.id;
   const game = useLiveQuery(() => (id ? db.games.get(id) : undefined), [id]);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
@@ -175,7 +179,7 @@ export default function SummaryPage() {
             <button type="button" className="tap flex-1" onClick={() => window.print()}>
               印刷 / PDF
             </button>
-            <Link href={`/games/${id}/score`} className="tap flex-1 flex items-center justify-center">
+            <Link href={gameHref(id, "score")} className="tap flex-1 flex items-center justify-center">
               記録を見直す
             </Link>
           </div>

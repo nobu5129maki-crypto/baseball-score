@@ -10,15 +10,17 @@ const noto = Noto_Sans_JP({
   weight: ["400", "500", "700"],
 });
 
+const assetBase = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 export const metadata: Metadata = {
   title: "らくスコア",
   description: "記号いらずの野球スコア記録",
   icons: {
     icon: [
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: `${assetBase}/icon-192.png`, sizes: "192x192", type: "image/png" },
+      { url: `${assetBase}/icon-512.png`, sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: `${assetBase}/apple-touch-icon.png`, sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,

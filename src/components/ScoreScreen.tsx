@@ -38,6 +38,7 @@ import {
   undoLast,
 } from "@/lib/engine";
 import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
+import { gameHref } from "@/lib/game-href";
 import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
@@ -427,7 +428,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             type="button"
             className="tap tap-accent w-full"
             onClick={() => {
-              void patch(commitEnd).then(() => router.push(`/games/${gameId}/summary`));
+              void patch(commitEnd).then(() => router.push(gameHref(gameId, "summary")));
             }}
           >
             詳細を見る
@@ -946,14 +947,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <button type="button" className="tap w-full" onClick={() => setSheet("sub")}>
               守備位置・交代
             </button>
-            <Link href={`/games/${gameId}/lineup`} className="tap w-full flex items-center justify-center">
+            <Link href={gameHref(gameId, "lineup")} className="tap w-full flex items-center justify-center">
               メンバーを修正
             </Link>
             <button
               type="button"
               className="tap tap-accent w-full"
               onClick={() => {
-                void patch(commitEnd).then(() => router.push(`/games/${gameId}/summary`));
+                void patch(commitEnd).then(() => router.push(gameHref(gameId, "summary")));
               }}
             >
               試合を終了する

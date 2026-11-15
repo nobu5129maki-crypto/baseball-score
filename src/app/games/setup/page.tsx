@@ -1,26 +1,26 @@
 "use client";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
+import { GameRoute } from "@/components/GameRoute";
 import { GameSetupForm, type GameSetupValues } from "@/components/GameSetupForm";
 import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
+import { gameHref } from "@/lib/game-href";
 import { applyGameSetup } from "@/lib/game-setup";
 import { recentOpponentNames, recentTournamentNames, recentVenueNames } from "@/lib/opponents";
 
-export default function GameSetupPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  return <GameSetupScreen gameId={id} />;
+export default function GameSetupPage() {
+  return <GameRoute>{(id) => <GameSetupScreen gameId={id} />}</GameRoute>;
 }
 
 function GameSetupScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const teamId = game?.myTeamId;
-  const players =
-    useLiveQuery(() => (teamId ? loadPlayersOnTeam(teamId) : []), [teamId]) ?? [];
+  const players = useLiveQuery(() => (teamId ? loadPlayersOnTeam(teamId) : []), [teamId]) ?? [];
   const games = useLiveQuery(() => db.games.toArray(), []) ?? [];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,7 +41,10 @@ function GameSetupScreen({ gameId }: { gameId: string }) {
   if (game.status !== "lineup") {
     return (
       <main className="max-w-lg mx-auto w-full min-h-dvh">
-        <AppHeader title="試合の条件" backHref={game.status === "ended" ? `/games/${gameId}/summary` : `/games/${gameId}/score`} />
+        <AppHeader
+          title="試合の条件"
+          backHref={game.status === "ended" ? gameHref(gameId, "summary") : gameHref(gameId, "score")}
+        />
         <p className="p-6 text-[#9aa894] leading-relaxed">
           試合が始まっているため、先攻・後攻や日付はここでは変更できません。
         </p>
@@ -76,7 +79,7 @@ function GameSetupScreen({ gameId }: { gameId: string }) {
           players,
         ),
       );
-      router.replace(`/games/${gameId}/lineup`);
+      router.replace(gameHref(gameId, "lineup"));
     } catch (err) {
       setBusy(false);
       setError(err instanceof Error ? err.message : "保存できませんでした");
@@ -86,7 +89,7 @@ function GameSetupScreen({ gameId }: { gameId: string }) {
   return (
     <GameSetupForm
       title="試合の条件"
-      backHref={`/games/${gameId}/lineup`}
+      backHref={gameHref(gameId, "lineup")}
       submitLabel="この内容で打順へ戻る"
       teamName={game.myTeamName}
       initial={{
