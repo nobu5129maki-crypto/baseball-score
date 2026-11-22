@@ -2,6 +2,7 @@ import { newId } from "./ids";
 import type {
   Base,
   BattedBall,
+  DeliveredPitch,
   Dest,
   Game,
   GameEvent,
@@ -400,9 +401,12 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       return applySteal(game, current, event.from, "out");
     case "wp":
     case "pb":
-      return applyOccupancy(game, current, wildPitchMoves(current.bases, event.holdFirst === true), {
-        consumeAtBat: false,
-      });
+      return applyOccupancy(
+        game,
+        current,
+        event.moves ?? wildPitchMoves(current.bases, event.holdFirst === true),
+        { consumeAtBat: false },
+      );
     case "bk":
       return applyOccupancy(game, current, plus(current.bases, 1), {
         consumeAtBat: false,
@@ -744,7 +748,24 @@ function applyPinchRunner(
   return { ...next, bases };
 }
 
+function isDeliveredRunner(event: GameEvent): boolean {
+  return (event.t === "steal" || event.t === "wp" || event.t === "pb") && event.pitch != null;
+}
+
 export function undoLast(events: GameEvent[]): GameEvent[] {
+  if (events.length === 0) return events;
+  const last = events[events.length - 1];
+  if (last.t === "play" && last.fromDelivery) {
+    let i = events.length - 2;
+    if (i >= 0 && isDeliveredRunner(events[i])) i -= 1;
+    if (i >= 0 && events[i].t === "pitch") i -= 1;
+    return events.slice(0, i + 1);
+  }
+  if (isDeliveredRunner(last)) {
+    let i = events.length - 2;
+    if (i >= 0 && events[i].t === "pitch") i -= 1;
+    return events.slice(0, i + 1);
+  }
   return events.slice(0, -1);
 }
 
@@ -758,6 +779,13 @@ export function undoAtBat(events: GameEvent[]): GameEvent[] {
   }
   if (last.t === "play") {
     let i = events.length - 2;
+    if (last.fromDelivery && i >= 0 && isDeliveredRunner(events[i])) i -= 1;
+    while (i >= 0 && events[i].t === "pitch") i -= 1;
+    return events.slice(0, i + 1);
+  }
+  if (isDeliveredRunner(last)) {
+    let i = events.length - 2;
+    if (i >= 0 && events[i].t === "pitch") i -= 1;
     while (i >= 0 && events[i].t === "pitch") i -= 1;
     return events.slice(0, i + 1);
   }
@@ -786,15 +814,103 @@ function commitEvent(game: Game, event: DistributiveOmit<GameEvent, "id" | "seq"
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-export function commitPitch(game: Game, kind: PitchKind): Game {
+function appendPitchOnly(game: Game, kind: PitchKind): Game {
   const before = reduceGame(game);
   if (before.ended || before.strikes >= 3) return game;
-  const next = append(game, { t: "pitch", kind });
+  return append(game, { t: "pitch", kind });
+}
+
+export function commitPitch(game: Game, kind: PitchKind): Game {
+  const next = appendPitchOnly(game, kind);
+  if (next === game) return game;
   const state = reduceGame(next);
-  if (state.balls >= 4) {
-    return commitPlay(next, "walk");
-  }
+  if (state.balls >= 4) return commitPlay(next, "walk");
   return next;
+}
+
+export type DeliveryAction = "steal" | "cs" | "wp" | "pb";
+
+/** 四球でその走者が進む先。押されないときは null */
+function walkDestination(state: GameState, from: Base): Dest | null {
+  const move = proposeMoves("walk", state, getBatter(state)).find((item) => item.from === from);
+  return move?.to ?? null;
+}
+
+/** 四球では進まない走者だけ。暴投・捕逸の余分な進塁 */
+function wildExtras(state: GameState, holdFirst: boolean): RunnerMove[] {
+  const walkMoves = proposeMoves("walk", state, getBatter(state));
+  return wildPitchMoves(state.bases, holdFirst).filter((move) => {
+    const walked = walkMoves.find((item) => item.playerId === move.playerId);
+    return !walked || walked.to !== move.to;
+  });
+}
+
+export function deliveryNote(state: GameState, pitch: DeliveredPitch, action: DeliveryAction): string {
+  const fourth = pitch === "ball" && state.balls >= 3;
+  const third = pitch === "strike" && state.strikes >= 2;
+  if (!fourth && !third) {
+    if (pitch === "ball") {
+      return `ボールが${state.balls + 1}になります。球数が1つ増えて、打席は続きます。`;
+    }
+    return `ストライクが${state.strikes + 1}になります。球数が1つ増えて、打席は続きます。`;
+  }
+  if (fourth) {
+    if (action === "cs" && state.outs >= 2) {
+      return "4つ目のボールです。盗塁死が3アウト目になるので、打者の四球はつきません。";
+    }
+    if (action === "steal") {
+      return "4つ目のボールです。打者は四球になります。押されない走者の盗塁だけ、盗塁として残します。";
+    }
+    if (action === "cs") {
+      return "4つ目のボールです。選んだ走者は盗塁死、打者は四球になります。";
+    }
+    if (wildExtras(state, false).length === 0) {
+      return "4つ目のボールです。走者は四球で進むので、進塁は四球だけにします。";
+    }
+    return action === "wp"
+      ? "4つ目のボールです。打者は四球、押されない走者は暴投で進みます。"
+      : "4つ目のボールです。打者は四球、押されない走者は捕逸で進みます。";
+  }
+  if (action === "steal" || action === "cs") {
+    if (state.outs >= 2) return "3ストライクです。2アウトなので三振で攻守交代し、盗塁は記録しません。";
+    return action === "steal"
+      ? "3ストライクです。盗塁を記録し、打者は三振になります。"
+      : "3ストライクです。盗塁死を記録し、打者は三振になります。";
+  }
+  if (canDroppedThird(state)) {
+    return action === "wp"
+      ? "3ストライクを捕手が取れませんでした。振り逃げで、打者は1塁へ出ます。"
+      : "3ストライクを捕手がこぼしました。振り逃げで、打者は1塁へ出ます。";
+  }
+  return "3ストライクです。振り逃げはできないので打者は三振、走者は進みます。";
+}
+
+function commitPitched(
+  game: Game,
+  pitch: DeliveredPitch,
+  mode: "caught" | "wild",
+  playRunner: (game: Game) => Game,
+): Game {
+  const before = reduceGame(game);
+  if (before.ended || before.strikes >= 3) return game;
+  const pitched = appendPitchOnly(game, pitch);
+  const pitchedState = reduceGame(pitched);
+  const fourthBall = pitchedState.balls >= 4;
+  const thirdStrike = pitchedState.strikes >= 3;
+  if (thirdStrike && mode === "caught" && before.outs >= 2) {
+    return commitPlay(pitched, "strikeout", undefined, undefined, undefined, { fromDelivery: true });
+  }
+  const withRunner = playRunner(pitched);
+  const after = reduceGame(withRunner);
+  if (after.ended || after.outs >= 3) return withRunner;
+  if (fourthBall) {
+    return commitPlay(withRunner, "walk", undefined, undefined, undefined, { fromDelivery: true });
+  }
+  if (thirdStrike) {
+    const result = mode === "wild" && canDroppedThird(before) ? "dropped_third" : "strikeout";
+    return commitPlay(withRunner, result, undefined, undefined, undefined, { fromDelivery: true });
+  }
+  return withRunner;
 }
 
 export function commitPlay(
@@ -803,7 +919,7 @@ export function commitPlay(
   moves?: RunnerMove[],
   field?: Position,
   batted?: BattedBall,
-  detail?: { deadBall?: boolean; fieldedBy?: Position },
+  detail?: { deadBall?: boolean; fieldedBy?: Position; fromDelivery?: boolean },
 ): Game {
   const state = reduceGame(game);
   if (state.ended) return game;
@@ -817,23 +933,59 @@ export function commitPlay(
     ...(batted ? { batted } : {}),
     ...(detail?.deadBall ? { deadBall: true } : {}),
     ...(detail?.fieldedBy ? { fieldedBy: detail.fieldedBy } : {}),
+    ...(detail?.fromDelivery ? { fromDelivery: true } : {}),
   });
 }
 
-export function commitSteal(game: Game, from: Base, to: Dest): Game {
-  return commitEvent(game, { t: "steal", from, to });
+/** 2アウトで捕った3ストライク。盗塁は記録せず、三振で攻守交代する */
+export function commitDeliveredStrikeout(game: Game): Game {
+  return commitPitched(game, "strike", "caught", (next) => next);
+}
+
+export function commitSteal(game: Game, from: Base, to: Dest, pitch?: DeliveredPitch): Game {
+  if (!pitch) return commitEvent(game, { t: "steal", from, to });
+  const before = reduceGame(game);
+  const forcedWalk = pitch === "ball" && before.balls >= 3 && to !== "out" && walkDestination(before, from) === to;
+  const inningEndsOnStrike = pitch === "strike" && before.strikes >= 2 && before.outs >= 2;
+  return commitPitched(game, pitch, "caught", (next) =>
+    forcedWalk || inningEndsOnStrike ? next : commitEvent(next, { t: "steal", from, to, pitch }),
+  );
 }
 
 export function commitPickoff(game: Game, from: Base): Game {
   return commitEvent(game, { t: "pickoff", from });
 }
 
-export function commitWp(game: Game, options?: { holdFirst?: boolean }): Game {
-  return commitEvent(game, { t: "wp", ...(options?.holdFirst ? { holdFirst: true } : {}) });
+export function commitWp(game: Game, options?: { holdFirst?: boolean; pitch?: DeliveredPitch }): Game {
+  return commitWild(game, "wp", options);
 }
 
-export function commitPb(game: Game, options?: { holdFirst?: boolean }): Game {
-  return commitEvent(game, { t: "pb", ...(options?.holdFirst ? { holdFirst: true } : {}) });
+export function commitPb(game: Game, options?: { holdFirst?: boolean; pitch?: DeliveredPitch }): Game {
+  return commitWild(game, "pb", options);
+}
+
+function commitWild(
+  game: Game,
+  kind: "wp" | "pb",
+  options?: { holdFirst?: boolean; pitch?: DeliveredPitch },
+): Game {
+  const holdFirst = options?.holdFirst === true;
+  const pitch = options?.pitch;
+  if (!pitch) {
+    return commitEvent(game, { t: kind, ...(holdFirst ? { holdFirst: true } : {}) });
+  }
+  const before = reduceGame(game);
+  const fourth = pitch === "ball" && before.balls >= 3;
+  const extras = fourth ? wildExtras(before, holdFirst) : null;
+  return commitPitched(game, pitch, "wild", (next) => {
+    if (extras && extras.length === 0) return next;
+    return commitEvent(next, {
+      t: kind,
+      pitch,
+      ...(holdFirst ? { holdFirst: true } : {}),
+      ...(extras ? { moves: extras } : {}),
+    });
+  });
 }
 
 export function commitBk(game: Game): Game {

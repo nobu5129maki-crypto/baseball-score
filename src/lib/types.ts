@@ -143,7 +143,12 @@ export type PlayEvent = {
   deadBall?: boolean;
   /** 打球を処理した野手。失策の field と別のとき（例: 遊ゴロを一塁が後逸） */
   fieldedBy?: Position;
+  /** 盗塁・暴投・捕逸と一緒に付いた四球・三振・振り逃げ。戻すときは投球もまとめて消す */
+  fromDelivery?: boolean;
 };
+
+/** 盗塁・暴投などの前に投げていた球。古い記録には無い */
+export type DeliveredPitch = "ball" | "strike";
 
 export type StealEvent = {
   id: string;
@@ -151,10 +156,26 @@ export type StealEvent = {
   t: "steal";
   from: Base;
   to: Dest;
+  pitch?: DeliveredPitch;
 };
 
-export type WpEvent = { id: string; seq: number; t: "wp"; holdFirst?: boolean };
-export type PbEvent = { id: string; seq: number; t: "pb"; holdFirst?: boolean };
+export type WpEvent = {
+  id: string;
+  seq: number;
+  t: "wp";
+  holdFirst?: boolean;
+  pitch?: DeliveredPitch;
+  /** 四球で進まない走者だけ。無いときは従来どおり全員が進む */
+  moves?: RunnerMove[];
+};
+export type PbEvent = {
+  id: string;
+  seq: number;
+  t: "pb";
+  holdFirst?: boolean;
+  pitch?: DeliveredPitch;
+  moves?: RunnerMove[];
+};
 export type BkEvent = { id: string; seq: number; t: "bk" };
 
 /** 送球やこぼれ球がベンチなどに入り、いる走者がそれぞれ進んだ。打席は終わらない */
