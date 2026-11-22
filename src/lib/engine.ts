@@ -240,6 +240,8 @@ export function proposeMoves(
     case "lineout":
     case "offensive_interference":
       return [batterMove("out")];
+    case "preceding_out":
+      return [];
     case "gidp": {
       const force = ([1, 2, 3] as const).find((base) => state.bases[base - 1]);
       return [
@@ -296,6 +298,36 @@ export function proposeOffensiveInterference(
   const remaining: GameState["bases"] = [state.bases[0], state.bases[1], state.bases[2]];
   remaining[who - 1] = null;
   return [runnerOut, ...forceWalk(batter.playerId, remaining)];
+}
+
+/**
+ * 安打または野選のまま、指定した走者だけを挟殺でアウトにする。
+ * 打者の安打は結果のとおり残し、その走者の進塁だけをアウトに変える。
+ */
+export function proposeRundown(
+  result: "single" | "double" | "triple" | "fielders_choice",
+  state: GameState,
+  batter: LineupSlot,
+  outBase: Base,
+): RunnerMove[] {
+  const runner = state.bases[outBase - 1];
+  const moves = proposeMoves(result, state, batter);
+  if (!runner) return moves;
+  let replaced = false;
+  const next = moves.map((move) => {
+    if (move.playerId !== runner.playerId) return move;
+    replaced = true;
+    return { playerId: runner.playerId, from: outBase, to: "out" as const };
+  });
+  if (!replaced) next.push({ playerId: runner.playerId, from: outBase, to: "out" });
+  return next;
+}
+
+/** 打者が一塁に達する前の3アウト。選んだ走者だけアウトにし、打者は出塁しない。 */
+export function proposePrecedingOut(state: GameState, outBase: Base): RunnerMove[] {
+  const runner = state.bases[outBase - 1];
+  if (!runner) return [];
+  return [{ playerId: runner.playerId, from: outBase, to: "out" }];
 }
 
 export function proposeRunnerHit(
@@ -359,7 +391,7 @@ function applyEvent(game: Game, state: GameState, event: GameEvent): GameState {
       return applyPitch(current, event.kind);
     case "play":
       return applyOccupancy(game, current, event.moves, {
-        consumeAtBat: true,
+        consumeAtBat: event.result !== "preceding_out",
         result: event.result,
       });
     case "steal":
@@ -542,10 +574,12 @@ function applyOccupancy(
     lineupIndex[side] = (lineupIndex[side] + 1) % 9;
   }
 
-  const pitchCount =
-    opts.consumeAtBat && result && playAddsPitch(result, state)
-      ? countPitch(state, fieldingSide(state.half))
-      : { pitchesThrown: state.pitchesThrown, pitchesByPlayer: state.pitchesByPlayer };
+  const countThisPitch = Boolean(
+    result && playAddsPitch(result, state) && (opts.consumeAtBat || result === "preceding_out"),
+  );
+  const pitchCount = countThisPitch
+    ? countPitch(state, fieldingSide(state.half))
+    : { pitchesThrown: state.pitchesThrown, pitchesByPlayer: state.pitchesByPlayer };
 
   const next: GameState = {
     ...state,

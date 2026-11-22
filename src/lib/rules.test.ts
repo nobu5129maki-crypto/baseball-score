@@ -4,6 +4,7 @@ import { needsField } from "./labels";
 import {
   benchAdvanceNote,
   deadBallAdvanceNote,
+  hitAdvanceNote,
   DROPPED_THIRD,
   FIELD_RESULTS,
   PLAY_RULES,
@@ -69,6 +70,14 @@ describe("PLAY_RULES", () => {
     expect(playIsAtBat("strikeout_looking")).toBe(true);
     expect(playIsAtBat("strikeout_swinging")).toBe(true);
     expect(playIsAtBat("single")).toBe(true);
+    expect(playIsAtBat("preceding_out")).toBe(false);
+    expect(playHitValue("preceding_out")).toBe(0);
+    expect(playAwardsRbi("preceding_out")).toBe(false);
+    expect(glossaryById("rd")?.plain).toContain("安打は残ります");
+    expect(glossaryById("rd")?.plain).toContain("野選");
+    expect(glossaryById("rd")?.plain).toContain("次の回の先頭");
+    expect(hitAdvanceNote("single")).toContain("安打は残ります");
+    expect(hitAdvanceNote("fielders_choice")).toContain("安打にはしません");
     expect(playHitValue("homerun")).toBe(4);
     expect(playHitValue("runner_hit")).toBe(1);
     expect(playAwardsRbi("gidp")).toBe(false);
@@ -108,7 +117,7 @@ describe("PLAY_RULES", () => {
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {
-    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "ci", "oi", "bk", "dead", "rbi", "slg", "ops", "ab", "er"]) {
+    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "ci", "oi", "bk", "dead", "rbi", "slg", "ops", "ab", "er", "rd"]) {
       expect(GLOSSARY.some((term) => term.id === id)).toBe(true);
     }
   });

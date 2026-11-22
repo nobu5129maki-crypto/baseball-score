@@ -154,6 +154,17 @@ export const PLAY_RULES: Record<PlayResult, PlayRule> = {
       symbol: "打妨",
     },
   },
+  preceding_out: {
+    needsField: false,
+    isAb: false,
+    hitValue: 0,
+    awardsRbi: false,
+    blocked: (state) => {
+      if (!hasRunner(state)) return "走者がいないと挟殺になりません。";
+      if (state.outs < 2) return "2アウト未満では、安打か野選の挟殺として記録します。";
+      return null;
+    },
+  },
   offensive_interference: {
     needsField: false,
     isAb: true,
@@ -213,6 +224,14 @@ export const SITUATION_TERMS: RuleTerm[] = [
     symbol: "左本",
   },
   {
+    id: "rd",
+    title: "挟殺（きょうさつ）",
+    plain:
+      "走者が塁と塁の間で挟まれ、タッチされてアウトになるプレーです。打者がヒットで出塁したあとに起きたときは、安打は残ります。「挟殺」でシングル、ツーベース、スリーベースを選び、アウトになった走者を選びます。内野手が打者を一塁でアウトにできるのに、その走者をアウトにしにいって打者が生きたときは野選です。安打にはしません。2アウトで、打者が一塁に達する前にそのアウトで回が終わったときは、打数も安打も付きません。その打者は次の回の先頭打者です。",
+    when: "フェアの打球のあと、別の走者が挟まれてアウトになったとき。「挟殺」ボタンで記録します。",
+    symbol: "挟",
+  },
+  {
     id: "po",
     title: "牽制死",
     plain: "投手が塁へ送球して走者がアウトになったとき。スコアブックの走者のマスには牽制死と書きます。",
@@ -254,6 +273,19 @@ export function deadBallAdvanceNote(bases: GameState["bases"]): string {
 }
 
 /** 妨害で走者がいるとき、確定前に見せる進塁の説明。 */
+export function hitAdvanceNote(result: PlayResult): string | null {
+  if (result === "single" || result === "double" || result === "triple") {
+    return "進塁先を直してから確定します。別の走者が挟まれてアウトになったときは、その走者の「アウト」を押してください。安打は残ります。";
+  }
+  if (result === "fielders_choice") {
+    return "野選です。安打にはしません。アウトにした走者の「アウト」を押してから確定してください。";
+  }
+  if (result === "preceding_out") {
+    return "打者が一塁に達する前に、走者のアウトで3アウトになりました。打数も安打も付きません。次の回は同じ打者から始まります。";
+  }
+  return null;
+}
+
 export function interferenceAdvanceNote(result: PlayResult): string | null {
   if (result === "catcher_interference") {
     return "打撃妨害です。打者は1塁へ出ます。1塁から順に詰まっている走者だけ進みます。違うときは進塁先を直してから確定してください。";

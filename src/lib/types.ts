@@ -114,7 +114,8 @@ export type PlayResult =
   | "sac_fly"
   | "runner_hit"
   | "catcher_interference"
-  | "offensive_interference";
+  | "offensive_interference"
+  | "preceding_out";
 
 export type RunnerMove = {
   playerId: string;

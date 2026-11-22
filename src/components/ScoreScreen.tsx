@@ -32,6 +32,8 @@ import {
   proposeDeadBall,
   proposeMoves,
   proposeOffensiveInterference,
+  proposePrecedingOut,
+  proposeRundown,
   reduceGame,
   totalRuns,
   undoAtBat,
@@ -43,7 +45,7 @@ import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote, interferenceAdvanceNote } from "@/lib/rules";
+import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote, hitAdvanceNote, interferenceAdvanceNote } from "@/lib/rules";
 import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
@@ -79,7 +81,9 @@ type SheetKind =
   | "dead_fielded"
   | "dead_error"
   | "offensive_interference"
-  | "offensive_runner";
+  | "offensive_runner"
+  | "rundown"
+  | "rundown_runner";
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -96,6 +100,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const [glossaryBack, setGlossaryBack] = useState<SheetKind>(null);
   const [pendingResult, setPendingResult] = useState<PlayResult | null>(null);
   const [pendingBatted, setPendingBatted] = useState<BattedBall | undefined>(undefined);
+  const [pendingOutBase, setPendingOutBase] = useState<Base | null>(null);
   const [confirm, setConfirm] = useState<{
     result: PlayResult;
     moves: RunnerMove[];
@@ -186,6 +191,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
 
   function startResult(result: PlayResult) {
     setSheet(null);
+    setPendingOutBase(null);
     if (!state) return;
     if (playBlockedReason(result, state)) return;
     if (isHitResult(result)) {
@@ -203,14 +209,55 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     finishResult(result);
   }
 
-  function finishResult(result: PlayResult, field?: Position, batted?: BattedBall) {
+  function finishResult(result: PlayResult, field?: Position, batted?: BattedBall, outBase?: Base) {
     if (!state) return;
-    const moves = proposeMoves(result, state, batter);
+    const tagged = outBase ?? pendingOutBase ?? undefined;
+    const moves = tagged
+      ? result === "preceding_out"
+        ? proposePrecedingOut(state, tagged)
+        : result === "single" || result === "double" || result === "triple" || result === "fielders_choice"
+          ? proposeRundown(result, state, batter, tagged)
+          : proposeMoves(result, state, batter)
+      : proposeMoves(result, state, batter);
+    setPendingOutBase(null);
     if (needsRunnerConfirm(result, state)) {
       setConfirm({ result, moves, field, batted, selectedId: null });
       return;
     }
     void patch((g) => commitPlay(g, result, moves, field, batted));
+  }
+
+  function beginRundown(result: PlayResult) {
+    if (!state) return;
+    const occupied = ([1, 2, 3] as Base[]).filter((base) => state.bases[base - 1]);
+    if (occupied.length === 1) {
+      continueRundown(result, occupied[0]);
+      return;
+    }
+    setPendingResult(result);
+    setPendingBatted(undefined);
+    setSheet("rundown_runner");
+  }
+
+  function continueRundown(result: PlayResult, outBase: Base) {
+    setPendingOutBase(outBase);
+    setPendingResult(result);
+    setPendingBatted(undefined);
+    if (result === "preceding_out") {
+      setSheet(null);
+      finishResult(result, undefined, undefined, outBase);
+      return;
+    }
+    if (isHitResult(result)) {
+      setSheet("batted");
+      return;
+    }
+    if (needsFieldPosition(result)) {
+      setSheet("field");
+      return;
+    }
+    setSheet(null);
+    finishResult(result, undefined, undefined, outBase);
   }
 
   function startDeadBall() {
@@ -458,6 +505,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             {confirm.deadBall
               ? deadBallAdvanceNote(state.bases)
               : (interferenceAdvanceNote(confirm.result) ??
+                hitAdvanceNote(confirm.result) ??
                 "進塁先を直してから確定（走者をタップ→塁をタップ）")}
           </p>
           {preview ? (
@@ -694,6 +742,22 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                       }}
                     />
                   ) : null}
+                  {occupiedCount > 0 ? (
+                    <HelpResultButton
+                      label="挟殺"
+                      helpLabel="挟殺の解説"
+                      onClick={() => {
+                        setPendingOutBase(null);
+                        setPendingResult(null);
+                        setSheet("rundown");
+                      }}
+                      onHelp={() => {
+                        setGlossaryId("rd");
+                        setGlossaryBack(null);
+                        setSheet("glossary");
+                      }}
+                    />
+                  ) : null}
                   {!sacBuntBlocked ? (
                     <HelpResultButton
                       label="送りバント"
@@ -787,6 +851,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         <Sheet
           title={`${PLAY_LABELS[pendingResult]}はどんな当たり？`}
           onClose={() => {
+            if (pendingOutBase) {
+              setPendingOutBase(null);
+              setPendingResult(null);
+              setPendingBatted(undefined);
+              setSheet("rundown");
+              return;
+            }
             setSheet(null);
             setPendingResult(null);
             setPendingBatted(undefined);
@@ -917,6 +988,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               setSheet("batted");
               return;
             }
+            if (pendingOutBase) {
+              setPendingOutBase(null);
+              setPendingResult(null);
+              setPendingBatted(undefined);
+              setSheet("rundown");
+              return;
+            }
             setSheet(null);
             setPendingResult(null);
             setPendingBatted(undefined);
@@ -1032,6 +1110,72 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             setSheet(null);
           }}
           onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "rundown" ? (
+        <Sheet
+          title="挟殺"
+          onClose={() => {
+            setPendingOutBase(null);
+            setPendingResult(null);
+            setSheet(null);
+          }}
+        >
+          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+            打者がフェアの打球で出塁し、別の走者が塁と塁の間でタッチアウトになったときです。一塁へ投げても間に合わなかったなら安打のままです。打者を一塁でアウトにできるのに、その走者をアウトにしにいったなら野選で、安打にはしません。
+          </p>
+          <div className="flex flex-col gap-2">
+            <button type="button" className="tap tap-result min-h-16" onClick={() => beginRundown("single")}>
+              <span className="block text-xs font-normal opacity-90">安打は残る</span>
+              シングルのまま
+            </button>
+            <button type="button" className="tap tap-result min-h-16" onClick={() => beginRundown("double")}>
+              <span className="block text-xs font-normal opacity-90">安打は残る</span>
+              ツーベースのまま
+            </button>
+            <button type="button" className="tap tap-result min-h-16" onClick={() => beginRundown("triple")}>
+              <span className="block text-xs font-normal opacity-90">安打は残る</span>
+              スリーベースのまま
+            </button>
+            <button
+              type="button"
+              className="tap tap-result min-h-16"
+              onClick={() => beginRundown("fielders_choice")}
+            >
+              <span className="block text-xs font-normal opacity-90">安打にはしない</span>
+              野選
+            </button>
+            {state.outs >= 2 ? (
+              <button
+                type="button"
+                className="tap tap-result min-h-16"
+                onClick={() => beginRundown("preceding_out")}
+              >
+                <span className="block text-xs font-normal opacity-90">
+                  打数も安打も付かない。次の回の先頭
+                </span>
+                一塁に着く前に3アウト
+              </button>
+            ) : null}
+          </div>
+        </Sheet>
+      ) : null}
+      {sheet === "rundown_runner" && pendingResult ? (
+        <RunnerPickSheet
+          title="挟殺"
+          hint={
+            pendingResult === "preceding_out"
+              ? "3アウトになった走者を選んでください。打者は一塁に達していないので、打数も安打も付きません。次の回は同じ打者から始まります。"
+              : "挟まれてアウトになった走者を選んでください。選んだ安打、または野選は残ります。"
+          }
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} がアウト`}
+          danger
+          onPick={(from) => continueRundown(pendingResult, from)}
+          onClose={() => {
+            setPendingResult(null);
+            setSheet("rundown");
+          }}
         />
       ) : null}
       {sheet === "offensive_interference" ? (

@@ -25,6 +25,8 @@ import {
   proposeDeadBall,
   proposeMoves,
   proposeOffensiveInterference,
+  proposePrecedingOut,
+  proposeRundown,
   proposeRunnerHit,
   reduceGame,
   totalRuns,
@@ -176,6 +178,74 @@ describe("らくスコア engine", () => {
     expect(state.strikes).toBe(2);
     expect(state.outs).toBe(0);
     expect(state.pitchCountAtBat).toBe(3);
+  });
+
+  it("単打で走者が挟殺されても安打は残り、その走者だけアウト", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 3 }]);
+    game = commitPlay(game, "single", [{ playerId: "A2", from: 0, to: 1 }]);
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "single", proposeRundown("single", before, batter, 1));
+    const state = reduceGame(game);
+    expect(state.hits.first).toBe(3);
+    expect(state.outs).toBe(1);
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    expect(state.bases[2]).toBeNull();
+    expect(state.bases.some((runner) => runner?.playerId === "A2")).toBe(false);
+    const slash = slashFor(game, batter.playerId);
+    expect(slash?.h).toBe(1);
+    expect(slash?.ab).toBe(1);
+    expect(slash?.rbi).toBe(1);
+    expect(slash?.tb).toBe(1);
+  });
+
+  it("三塁走者が本塁で挟殺されても単打は残り、点は入らない", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 3 }]);
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "single", proposeRundown("single", before, batter, 3));
+    const state = reduceGame(game);
+    expect(state.hits.first).toBe(2);
+    expect(state.outs).toBe(1);
+    expect(state.scores.first[0]).toBe(0);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    expect(state.bases[2]).toBeNull();
+    expect(slashFor(game, batter.playerId)?.rbi).toBe(0);
+  });
+
+  it("野選の挟殺は安打にしない", () => {
+    let game = commitPlay(makeGame(), "single");
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "fielders_choice", proposeRundown("fielders_choice", before, batter, 1));
+    const state = reduceGame(game);
+    expect(state.hits.first).toBe(1);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    const slash = slashFor(game, batter.playerId);
+    expect(slash?.h).toBe(0);
+    expect(slash?.ab).toBe(1);
+  });
+
+  it("打者が一塁に達する前の挟殺は打数も安打も付かず、次の回の先頭になる", () => {
+    let game = commitPlay(makeGame(), "strikeout");
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "single", [{ playerId: "A3", from: 0, to: 1 }]);
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    expect(before.outs).toBe(2);
+    expect(batter.playerId).toBe("A4");
+    game = commitPlay(game, "preceding_out", proposePrecedingOut(before, 1));
+    const state = reduceGame(game);
+    expect(state.half).toBe("bottom");
+    expect(state.outs).toBe(0);
+    expect(state.hits.first).toBe(1);
+    expect(state.lineupIndex.first).toBe(before.lineupIndex.first);
+    expect(state.pitchesThrown.second).toBe(before.pitchesThrown.second + 1);
+    const slash = slashFor(game, batter.playerId);
+    expect(slash?.ab).toBe(0);
+    expect(slash?.h).toBe(0);
   });
 
   it("単打で打者が1塁", () => {
