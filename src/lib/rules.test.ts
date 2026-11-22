@@ -50,6 +50,8 @@ describe("PLAY_RULES", () => {
     expect(DROPPED_THIRD.allowed(manOnFirst)).toBe(false);
     expect(DROPPED_THIRD.allowed(twoOutFirst)).toBe(true);
     expect(glossaryById("ks")?.plain).toContain("1塁に走者がいないとき");
+    expect(glossaryById("er")?.plain).toContain("エラーで出た走者");
+    expect(glossaryById("er")?.title).toContain("自責点");
     expect(DROPPED_THIRD.blockedHint).toContain("振り逃げはできません");
   });
 
@@ -106,7 +108,7 @@ describe("PLAY_RULES", () => {
   });
 
   it("採点ルールの用語はこれのこと？に載る", () => {
-    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "ci", "oi", "bk", "dead", "rbi", "slg", "ops", "ab"]) {
+    for (const id of ["fc", "sh", "sf", "ks", "kl", "ksw", "rh", "ci", "oi", "bk", "dead", "rbi", "slg", "ops", "ab", "er"]) {
       expect(GLOSSARY.some((term) => term.id === id)).toBe(true);
     }
   });
