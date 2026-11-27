@@ -64,7 +64,7 @@ const PITCH_COLS_A: PitchCol[] = [
   { key: "ip", label: "回数", help: "ip" },
   { key: "bb", label: "四球" },
   { key: "so", label: "三振" },
-  { key: "er", label: "自責" },
+  { key: "er", label: "自責", help: "er" },
   { key: "era", label: "防御率", help: "era" },
 ];
 

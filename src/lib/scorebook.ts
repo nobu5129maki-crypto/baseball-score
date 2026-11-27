@@ -220,12 +220,20 @@ export function buildScorebook(game: Game): Scorebook {
       }
     } else if (event.t === "wp" || event.t === "pb" || event.t === "bk") {
       const label = event.t === "wp" ? "暴" : event.t === "pb" ? "捕逸" : "ボ";
-      const holdFirst = event.t !== "bk" && event.holdFirst === true && before.bases[0] && before.bases[2];
-      before.bases.forEach((runner, index) => {
-        if (!runner) return;
-        if (holdFirst && index === 0) return;
-        pushMark(battingBook, runner.battingOrder, before.inning, label);
-      });
+      if (event.t !== "bk" && event.moves) {
+        for (const move of event.moves) {
+          if (move.from === 0) continue;
+          const runner = before.bases[move.from - 1];
+          if (runner) pushMark(battingBook, runner.battingOrder, before.inning, label);
+        }
+      } else {
+        const holdFirst = event.t !== "bk" && event.holdFirst === true && before.bases[0] && before.bases[2];
+        before.bases.forEach((runner, index) => {
+          if (!runner) return;
+          if (holdFirst && index === 0) return;
+          pushMark(battingBook, runner.battingOrder, before.inning, label);
+        });
+      }
     } else if (event.t === "pr") {
       const runner = before.bases[event.base - 1];
       const order = runner?.battingOrder ?? event.base;

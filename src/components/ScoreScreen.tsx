@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
+  commitDeliveredStrikeout,
   commitEnd,
   commitPb,
   commitPickoff,
@@ -22,6 +23,8 @@ import {
   getLineup,
   getPitcher,
   needsFieldPosition,
+  deliveryNote,
+  latestOpenPitch,
   needsRunnerConfirm,
   needsStrikeThreeChoice,
   canDroppedThird,
@@ -32,22 +35,26 @@ import {
   proposeDeadBall,
   proposeMoves,
   proposeOffensiveInterference,
+  proposePrecedingOut,
+  proposeRundown,
   reduceGame,
   totalRuns,
   undoAtBat,
   undoLast,
 } from "@/lib/engine";
 import { db, loadPlayersOnTeam, saveGame } from "@/lib/db";
+import { gameHref } from "@/lib/game-href";
 import { createSaveQueue } from "@/lib/save-queue";
 import { applyGameTimes, normalizeTime } from "@/lib/game-time";
 import { HIT_RESULTS, OUT_RESULTS, PLAY_LABELS, BATTED_BALLS, BATTED_HINTS, BATTED_LABELS, isHitResult, jerseyLabel } from "@/lib/labels";
 import { playerProfileLabel } from "@/lib/player-profile";
-import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote, interferenceAdvanceNote } from "@/lib/rules";
+import { DROPPED_THIRD, benchAdvanceNote, deadBallAdvanceNote, hitAdvanceNote, interferenceAdvanceNote } from "@/lib/rules";
 import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
 import { POSITION_LABELS } from "@/lib/types";
-import type { Base, BattedBall, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
+import type { Base, BattedBall, DeliveredPitch, Dest, Game, GameState, LineupSlot, PitchKind, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
+import { CountDots } from "./CountDots";
 import { DefenseSheet } from "./DefenseSheet";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { DiamondMap } from "./DiamondMap";
@@ -78,7 +85,66 @@ type SheetKind =
   | "dead_fielded"
   | "dead_error"
   | "offensive_interference"
-  | "offensive_runner";
+  | "offensive_runner"
+  | "rundown"
+  | "rundown_runner"
+  | "delivery";
+
+function countedPitchName(kind: PitchKind): string {
+  if (kind === "ball") return "ボール";
+  if (kind === "strike") return "ストライク";
+  return "ファウル";
+}
+
+function DeliverySheet({
+  action,
+  state,
+  openPitch,
+  onPitch,
+  onClose,
+}: {
+  action: "steal" | "cs" | "wp" | "pb";
+  state: GameState;
+  openPitch: PitchKind | null;
+  onPitch: (pitch: DeliveredPitch | "kept") => void;
+  onClose: () => void;
+}) {
+  const title = action === "steal" ? "盗塁" : action === "cs" ? "盗塁死" : action === "wp" ? "暴投" : "捕逸";
+  const counted = openPitch ? countedPitchName(openPitch) : null;
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <CountDots balls={state.balls} strikes={state.strikes} outs={state.outs} />
+      {counted ? (
+        <>
+          <p className="text-sm text-[#9aa894] mt-3 mb-2 leading-relaxed">
+            この打席では、すでに{counted}を記録しています。その球で続けると、球数は増えません。
+          </p>
+          <button type="button" className="tap tap-accent min-h-20 w-full" onClick={() => onPitch("kept")}>
+            <span className="block text-xs font-normal opacity-90">球数はそのまま</span>
+            すでに{counted}を選んだ
+          </button>
+          <p className="text-sm text-[#9aa894] mt-3 mb-2 leading-relaxed">
+            まだ記録していない球なら、ここで数えます。球数が1つ増えます。
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-[#9aa894] mt-3 mb-2 leading-relaxed">
+          投手はすでに投げています。その球を選ぶと、球数が1つ増えます。先にボール・ストライク・ファウルを押していたときは、「すでに選んだ」がここに出ます。
+        </p>
+      )}
+      <div className="flex flex-col gap-2">
+        <button type="button" className="tap tap-ball min-h-20" onClick={() => onPitch("ball")}>
+          <span className="block text-xs font-normal opacity-90">ボール</span>
+          {deliveryNote(state, "ball", action)}
+        </button>
+        <button type="button" className="tap tap-strike min-h-20" onClick={() => onPitch("strike")}>
+          <span className="block text-xs font-normal opacity-90">ストライク</span>
+          {deliveryNote(state, "strike", action)}
+        </button>
+      </div>
+    </Sheet>
+  );
+}
 
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
@@ -95,6 +161,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const [glossaryBack, setGlossaryBack] = useState<SheetKind>(null);
   const [pendingResult, setPendingResult] = useState<PlayResult | null>(null);
   const [pendingBatted, setPendingBatted] = useState<BattedBall | undefined>(undefined);
+  const [pendingOutBase, setPendingOutBase] = useState<Base | null>(null);
   const [confirm, setConfirm] = useState<{
     result: PlayResult;
     moves: RunnerMove[];
@@ -106,6 +173,10 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   } | null>(null);
   const [deadDraft, setDeadDraft] = useState<{ batted: BattedBall; fieldedBy?: Position } | null>(null);
   const [bench, setBench] = useState<{ moves: RunnerMove[]; selectedId: string | null } | null>(null);
+  const [live, setLive] = useState<{
+    action: "steal" | "cs" | "wp" | "pb";
+    pitch: DeliveredPitch | "kept" | null;
+  } | null>(null);
   const [startNotice, setStartNotice] = useState<string | null>(null);
   const dismissStartNotice = useCallback(() => setStartNotice(null), []);
   const state = useMemo(() => (game ? reduceGame(game) : null), [game]);
@@ -174,17 +245,61 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     });
   }
 
-  function askWildPitch(kind: "wp" | "pb") {
-    if (!state) return;
-    if (state.bases[0] && state.bases[2]) {
-      setSheet(kind === "wp" ? "wp_hold" : "pb_hold");
+  function startDelivery(action: "steal" | "cs" | "wp" | "pb") {
+    setLive({ action, pitch: null });
+    setSheet("delivery");
+  }
+
+  function occupiedBases(kind: "steal" | "cs"): Base[] {
+    if (!state) return [];
+    return ([1, 2, 3] as Base[]).filter((base) => {
+      if (!state.bases[base - 1]) return false;
+      if (kind === "cs") return true;
+      return nextStealBaseOpen(state, base);
+    });
+  }
+
+  function chooseLivePitch(pitch: DeliveredPitch | "kept") {
+    if (!state || !live) return;
+    const action = live.action;
+    const recorded = pitch === "kept" ? undefined : pitch;
+    setLive({ action, pitch });
+    if (recorded === "strike" && (action === "steal" || action === "cs") && state.strikes >= 2 && state.outs >= 2) {
+      setLive(null);
+      setSheet(null);
+      void patch((g) => commitDeliveredStrikeout(g));
       return;
     }
-    void patch((g) => (kind === "wp" ? commitWp(g) : commitPb(g)));
+    if (action === "wp" || action === "pb") {
+      if (state.bases[0] && state.bases[2] && !(recorded === "ball" && state.balls >= 3)) {
+        setSheet(action === "wp" ? "wp_hold" : "pb_hold");
+        return;
+      }
+      setLive(null);
+      setSheet(null);
+      void patch((g) =>
+        action === "wp" ? commitWp(g, recorded ? { pitch: recorded } : {}) : commitPb(g, recorded ? { pitch: recorded } : {}),
+      );
+      return;
+    }
+    const choices = occupiedBases(action);
+    if (choices.length === 1) {
+      const from = choices[0];
+      setLive(null);
+      setSheet(null);
+      void patch((g) =>
+        action === "cs"
+          ? commitSteal(g, from, "out", recorded)
+          : commitSteal(g, from, from === 3 ? 4 : ((from + 1) as Dest), recorded),
+      );
+      return;
+    }
+    setSheet(action === "cs" ? "cs" : "steal");
   }
 
   function startResult(result: PlayResult) {
     setSheet(null);
+    setPendingOutBase(null);
     if (!state) return;
     if (playBlockedReason(result, state)) return;
     if (isHitResult(result)) {
@@ -202,14 +317,55 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     finishResult(result);
   }
 
-  function finishResult(result: PlayResult, field?: Position, batted?: BattedBall) {
+  function finishResult(result: PlayResult, field?: Position, batted?: BattedBall, outBase?: Base) {
     if (!state) return;
-    const moves = proposeMoves(result, state, batter);
+    const tagged = outBase ?? pendingOutBase ?? undefined;
+    const moves = tagged
+      ? result === "preceding_out"
+        ? proposePrecedingOut(state, tagged)
+        : result === "single" || result === "double" || result === "triple" || result === "fielders_choice"
+          ? proposeRundown(result, state, batter, tagged)
+          : proposeMoves(result, state, batter)
+      : proposeMoves(result, state, batter);
+    setPendingOutBase(null);
     if (needsRunnerConfirm(result, state)) {
       setConfirm({ result, moves, field, batted, selectedId: null });
       return;
     }
     void patch((g) => commitPlay(g, result, moves, field, batted));
+  }
+
+  function beginRundown(result: PlayResult) {
+    if (!state) return;
+    const occupied = ([1, 2, 3] as Base[]).filter((base) => state.bases[base - 1]);
+    if (occupied.length === 1) {
+      continueRundown(result, occupied[0]);
+      return;
+    }
+    setPendingResult(result);
+    setPendingBatted(undefined);
+    setSheet("rundown_runner");
+  }
+
+  function continueRundown(result: PlayResult, outBase: Base) {
+    setPendingOutBase(outBase);
+    setPendingResult(result);
+    setPendingBatted(undefined);
+    if (result === "preceding_out") {
+      setSheet(null);
+      finishResult(result, undefined, undefined, outBase);
+      return;
+    }
+    if (isHitResult(result)) {
+      setSheet("batted");
+      return;
+    }
+    if (needsFieldPosition(result)) {
+      setSheet("field");
+      return;
+    }
+    setSheet(null);
+    finishResult(result, undefined, undefined, outBase);
   }
 
   function startDeadBall() {
@@ -261,14 +417,19 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   function onSelectRunner(runner: RunnerOnBase, from: 0 | 1 | 2 | 3) {
     if (from === 0) return;
     if (sheet === "steal") {
-      if (!state || !nextStealBaseOpen(state, from)) return;
+      if (!state || !nextStealBaseOpen(state, from) || !live?.pitch) return;
       const to: Dest = from === 3 ? 4 : ((from + 1) as Dest);
-      void patch((g) => commitSteal(g, from, to));
+      const pitch = live.pitch === "kept" ? undefined : live.pitch;
+      setLive(null);
+      void patch((g) => commitSteal(g, from, to, pitch));
       setSheet(null);
       return;
     }
     if (sheet === "cs") {
-      void patch((g) => commitSteal(g, from, "out"));
+      if (!live?.pitch) return;
+      const pitch = live.pitch === "kept" ? undefined : live.pitch;
+      setLive(null);
+      void patch((g) => commitSteal(g, from, "out", pitch));
       setSheet(null);
       return;
     }
@@ -427,7 +588,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             type="button"
             className="tap tap-accent w-full"
             onClick={() => {
-              void patch(commitEnd).then(() => router.push(`/games/${gameId}/summary`));
+              void patch(commitEnd).then(() => router.push(gameHref(gameId, "summary")));
             }}
           >
             詳細を見る
@@ -457,6 +618,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             {confirm.deadBall
               ? deadBallAdvanceNote(state.bases)
               : (interferenceAdvanceNote(confirm.result) ??
+                hitAdvanceNote(confirm.result) ??
                 "進塁先を直してから確定（走者をタップ→塁をタップ）")}
           </p>
           {preview ? (
@@ -573,8 +735,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             ) : null}
           </div>
           <div className="px-2 grid grid-cols-5 gap-1 pb-1">
-            <Action disabled={occupiedCount === 0} onClick={() => setSheet("steal")} label="盗塁" />
-            <Action disabled={occupiedCount === 0} onClick={() => setSheet("cs")} label="盗塁死" />
+            <Action disabled={occupiedCount === 0} onClick={() => startDelivery("steal")} label="盗塁" />
+            <Action disabled={occupiedCount === 0} onClick={() => startDelivery("cs")} label="盗塁死" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pickoff")} label="牽制" />
             <Action onClick={() => setSheet("ph")} label="代打" />
             <Action disabled={occupiedCount === 0} onClick={() => setSheet("pr")} label="代走" />
@@ -582,7 +744,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           <div className="px-2 grid grid-cols-3 gap-1 pb-2">
             <Action
               disabled={occupiedCount === 0}
-              onClick={() => askWildPitch("wp")}
+              onClick={() => startDelivery("wp")}
               label="暴投"
               help={() => {
                 setGlossaryId("wp");
@@ -592,7 +754,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             />
             <Action
               disabled={occupiedCount === 0}
-              onClick={() => askWildPitch("pb")}
+              onClick={() => startDelivery("pb")}
               label="捕逸"
               help={() => {
                 setGlossaryId("pb");
@@ -693,6 +855,22 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
                       }}
                     />
                   ) : null}
+                  {occupiedCount > 0 ? (
+                    <HelpResultButton
+                      label="挟殺"
+                      helpLabel="挟殺の解説"
+                      onClick={() => {
+                        setPendingOutBase(null);
+                        setPendingResult(null);
+                        setSheet("rundown");
+                      }}
+                      onHelp={() => {
+                        setGlossaryId("rd");
+                        setGlossaryBack(null);
+                        setSheet("glossary");
+                      }}
+                    />
+                  ) : null}
                   {!sacBuntBlocked ? (
                     <HelpResultButton
                       label="送りバント"
@@ -786,6 +964,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         <Sheet
           title={`${PLAY_LABELS[pendingResult]}はどんな当たり？`}
           onClose={() => {
+            if (pendingOutBase) {
+              setPendingOutBase(null);
+              setPendingResult(null);
+              setPendingBatted(undefined);
+              setSheet("rundown");
+              return;
+            }
             setSheet(null);
             setPendingResult(null);
             setPendingBatted(undefined);
@@ -916,6 +1101,13 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
               setSheet("batted");
               return;
             }
+            if (pendingOutBase) {
+              setPendingOutBase(null);
+              setPendingResult(null);
+              setPendingBatted(undefined);
+              setSheet("rundown");
+              return;
+            }
             setSheet(null);
             setPendingResult(null);
             setPendingBatted(undefined);
@@ -946,14 +1138,14 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             <button type="button" className="tap w-full" onClick={() => setSheet("sub")}>
               守備位置・交代
             </button>
-            <Link href={`/games/${gameId}/lineup`} className="tap w-full flex items-center justify-center">
+            <Link href={gameHref(gameId, "lineup")} className="tap w-full flex items-center justify-center">
               メンバーを修正
             </Link>
             <button
               type="button"
               className="tap tap-accent w-full"
               onClick={() => {
-                void patch(commitEnd).then(() => router.push(`/games/${gameId}/summary`));
+                void patch(commitEnd).then(() => router.push(gameHref(gameId, "summary")));
               }}
             >
               試合を終了する
@@ -978,45 +1170,84 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
           onClose={() => setSheet(null)}
         />
       ) : null}
+      {sheet === "delivery" && live ? (
+        <DeliverySheet
+          action={live.action}
+          state={state}
+          openPitch={latestOpenPitch(game.events)}
+          onPitch={chooseLivePitch}
+          onClose={() => {
+            setLive(null);
+            setSheet(null);
+          }}
+        />
+      ) : null}
       {sheet === "wp_hold" || sheet === "pb_hold" ? (
         <WildAdvanceSheet
           kind={sheet === "wp_hold" ? "wp" : "pb"}
           bases={state.bases}
           onChoose={(holdFirst) => {
             const kind = sheet === "wp_hold" ? "wp" : "pb";
-            void patch((g) => (kind === "wp" ? commitWp(g, { holdFirst }) : commitPb(g, { holdFirst })));
+            const pitch = live?.pitch;
+            setLive(null);
             setSheet(null);
+            if (!pitch) return;
+            const options = pitch === "kept" ? { holdFirst } : { holdFirst, pitch };
+            void patch((g) => (kind === "wp" ? commitWp(g, options) : commitPb(g, options)));
           }}
-          onClose={() => setSheet(null)}
+          onClose={() => {
+            if (live) setLive({ ...live, pitch: null });
+            setSheet("delivery");
+          }}
         />
       ) : null}
       {sheet === "steal" ? (
         <RunnerPickSheet
           title="盗塁"
-          hint="進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。先にその走者を動かしてください。"
+          hint={
+            live?.pitch === "kept"
+              ? "進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。球数はすでに数えてあるので、増えません。"
+              : "進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。先にその走者を動かしてください。選んだ球の球数は、走者を選んだときに増えます。"
+          }
           bases={state.bases}
           action={(b, name) => `${b}塁の${name} を ${b === 3 ? "本塁" : `${b + 1}塁`}へ`}
           canPick={(b) => nextStealBaseOpen(state, b)}
           onPick={(from) => {
+            const pitch = live?.pitch;
             const to: Dest = from === 3 ? 4 : ((from + 1) as Dest);
-            void patch((g) => commitSteal(g, from, to));
+            setLive(null);
             setSheet(null);
+            if (!pitch) return;
+            void patch((g) => commitSteal(g, from, to, pitch === "kept" ? undefined : pitch));
           }}
-          onClose={() => setSheet(null)}
+          onClose={() => {
+            if (live) setLive({ ...live, pitch: null });
+            setSheet("delivery");
+          }}
         />
       ) : null}
       {sheet === "cs" ? (
         <RunnerPickSheet
           title="盗塁死"
-          hint="アウトになった走者を1人選んでください。"
+          hint={
+            live?.pitch === "kept"
+              ? "アウトになった走者を1人選んでください。球数はすでに数えてあるので、増えません。"
+              : "アウトになった走者を1人選んでください。選んだ球の球数は、走者を選んだときに増えます。"
+          }
           bases={state.bases}
           action={(b, name) => `${b}塁の${name} を盗塁死（アウト）`}
           danger
           onPick={(from) => {
-            void patch((g) => commitSteal(g, from, "out"));
+            const pitch = live?.pitch;
+            setLive(null);
             setSheet(null);
+            if (!pitch) return;
+            void patch((g) => commitSteal(g, from, "out", pitch === "kept" ? undefined : pitch));
           }}
-          onClose={() => setSheet(null)}
+          onClose={() => {
+            if (live) setLive({ ...live, pitch: null });
+            setSheet("delivery");
+          }}
         />
       ) : null}
       {sheet === "pickoff" ? (
@@ -1031,6 +1262,72 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             setSheet(null);
           }}
           onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "rundown" ? (
+        <Sheet
+          title="挟殺"
+          onClose={() => {
+            setPendingOutBase(null);
+            setPendingResult(null);
+            setSheet(null);
+          }}
+        >
+          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
+            打者がフェアの打球で出塁し、別の走者が塁と塁の間でタッチアウトになったときです。一塁へ投げても間に合わなかったなら安打のままです。打者を一塁でアウトにできるのに、その走者をアウトにしにいったなら野選で、安打にはしません。
+          </p>
+          <div className="flex flex-col gap-2">
+            <button type="button" className="tap tap-result min-h-16" onClick={() => beginRundown("single")}>
+              <span className="block text-xs font-normal opacity-90">安打は残る</span>
+              シングルのまま
+            </button>
+            <button type="button" className="tap tap-result min-h-16" onClick={() => beginRundown("double")}>
+              <span className="block text-xs font-normal opacity-90">安打は残る</span>
+              ツーベースのまま
+            </button>
+            <button type="button" className="tap tap-result min-h-16" onClick={() => beginRundown("triple")}>
+              <span className="block text-xs font-normal opacity-90">安打は残る</span>
+              スリーベースのまま
+            </button>
+            <button
+              type="button"
+              className="tap tap-result min-h-16"
+              onClick={() => beginRundown("fielders_choice")}
+            >
+              <span className="block text-xs font-normal opacity-90">安打にはしない</span>
+              野選
+            </button>
+            {state.outs >= 2 ? (
+              <button
+                type="button"
+                className="tap tap-result min-h-16"
+                onClick={() => beginRundown("preceding_out")}
+              >
+                <span className="block text-xs font-normal opacity-90">
+                  打数も安打も付かない。次の回の先頭
+                </span>
+                一塁に着く前に3アウト
+              </button>
+            ) : null}
+          </div>
+        </Sheet>
+      ) : null}
+      {sheet === "rundown_runner" && pendingResult ? (
+        <RunnerPickSheet
+          title="挟殺"
+          hint={
+            pendingResult === "preceding_out"
+              ? "3アウトになった走者を選んでください。打者は一塁に達していないので、打数も安打も付きません。次の回は同じ打者から始まります。"
+              : "挟まれてアウトになった走者を選んでください。選んだ安打、または野選は残ります。"
+          }
+          bases={state.bases}
+          action={(b, name) => `${b}塁の${name} がアウト`}
+          danger
+          onPick={(from) => continueRundown(pendingResult, from)}
+          onClose={() => {
+            setPendingResult(null);
+            setSheet("rundown");
+          }}
         />
       ) : null}
       {sheet === "offensive_interference" ? (

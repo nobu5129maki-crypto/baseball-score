@@ -9,6 +9,7 @@ import { inningLabel, reduceGame, totalRuns } from "@/lib/engine";
 import { splitGamesByStatus } from "@/lib/game-list";
 import { gameTimeLabel } from "@/lib/game-time";
 import { runChangeRuleSuffix } from "@/lib/run-change";
+import { gameHref } from "@/lib/game-href";
 import { resolveActiveTeam, teamDisplayName } from "@/lib/teams";
 import type { Game } from "@/lib/types";
 
@@ -63,12 +64,12 @@ export default function HomePage() {
       <section className="px-4 pb-4 flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">
         <InstallPrompt />
         {active.map((g) => (
-          <GameCard key={g.id} game={g} cta="試合を続ける" href={`/games/${g.id}/score`} highlight />
+          <GameCard key={g.id} game={g} cta="試合を続ける" href={gameHref(g.id, "score")} highlight />
         ))}
         {setup.map((g) => (
           <div key={g.id} className="flex flex-col gap-2">
-            <GameCard game={g} cta="打順を決める" href={`/games/${g.id}/lineup`} />
-            <Link href={`/games/${g.id}/setup`} className="text-sm text-center text-[#f5c518] underline">
+            <GameCard game={g} cta="打順を決める" href={gameHref(g.id, "lineup")} />
+            <Link href={gameHref(g.id, "setup")} className="text-sm text-center text-[#f5c518] underline">
               先攻・日付などを変える
             </Link>
           </div>
@@ -185,7 +186,7 @@ function EndedGameCard({
         {first} {totalRuns(state.scores.first)} — {totalRuns(state.scores.second)} {second}
       </p>
       <Link
-        href={`/games/${game.id}/summary`}
+        href={gameHref(game.id, "summary")}
         className="tap tap-sm mt-3 w-full flex items-center justify-center"
       >
         詳細を見る

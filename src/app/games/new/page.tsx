@@ -6,6 +6,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppHeader } from "@/components/AppHeader";
 import { GameSetupForm, type GameSetupValues } from "@/components/GameSetupForm";
 import { db, getSettings, loadPlayersOnTeam, saveGame, setActiveTeamId } from "@/lib/db";
+import { gameHref } from "@/lib/game-href";
 import { newId } from "@/lib/ids";
 import { localDateKey } from "@/lib/game-time";
 import { normalizeRunChangeAt } from "@/lib/run-change";
@@ -78,7 +79,7 @@ export default function NewGamePage() {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
-      router.replace(`/games/${id}/lineup`);
+      router.replace(gameHref(id, "lineup"));
     } catch (err) {
       creating.current = false;
       suppressForm = false;

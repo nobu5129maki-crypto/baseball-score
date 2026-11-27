@@ -23,6 +23,7 @@ export const PLAY_LABELS: Record<PlayResult, string> = {
   runner_hit: "走者当たり",
   catcher_interference: "打撃妨害",
   offensive_interference: "守備妨害",
+  preceding_out: "一塁前に3アウト",
 };
 
 export const PLAY_SHORT: Record<PlayResult, string> = {
@@ -47,6 +48,7 @@ export const PLAY_SHORT: Record<PlayResult, string> = {
   runner_hit: "走当",
   catcher_interference: "打妨",
   offensive_interference: "守妨",
+  preceding_out: "挟",
 };
 
 export const HIT_RESULTS: PlayResult[] = ["single", "double", "triple", "homerun"];

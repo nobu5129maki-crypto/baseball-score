@@ -9,6 +9,8 @@ import {
   commitPitch,
   commitPlay,
   commitPositionSwap,
+  deliveryNote,
+  latestOpenPitch,
   commitSteal,
   commitSub,
   commitWp,
@@ -25,6 +27,8 @@ import {
   proposeDeadBall,
   proposeMoves,
   proposeOffensiveInterference,
+  proposePrecedingOut,
+  proposeRundown,
   proposeRunnerHit,
   reduceGame,
   totalRuns,
@@ -178,6 +182,74 @@ describe("らくスコア engine", () => {
     expect(state.pitchCountAtBat).toBe(3);
   });
 
+  it("単打で走者が挟殺されても安打は残り、その走者だけアウト", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 3 }]);
+    game = commitPlay(game, "single", [{ playerId: "A2", from: 0, to: 1 }]);
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "single", proposeRundown("single", before, batter, 1));
+    const state = reduceGame(game);
+    expect(state.hits.first).toBe(3);
+    expect(state.outs).toBe(1);
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    expect(state.bases[2]).toBeNull();
+    expect(state.bases.some((runner) => runner?.playerId === "A2")).toBe(false);
+    const slash = slashFor(game, batter.playerId);
+    expect(slash?.h).toBe(1);
+    expect(slash?.ab).toBe(1);
+    expect(slash?.rbi).toBe(1);
+    expect(slash?.tb).toBe(1);
+  });
+
+  it("三塁走者が本塁で挟殺されても単打は残り、点は入らない", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 3 }]);
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "single", proposeRundown("single", before, batter, 3));
+    const state = reduceGame(game);
+    expect(state.hits.first).toBe(2);
+    expect(state.outs).toBe(1);
+    expect(state.scores.first[0]).toBe(0);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    expect(state.bases[2]).toBeNull();
+    expect(slashFor(game, batter.playerId)?.rbi).toBe(0);
+  });
+
+  it("野選の挟殺は安打にしない", () => {
+    let game = commitPlay(makeGame(), "single");
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    game = commitPlay(game, "fielders_choice", proposeRundown("fielders_choice", before, batter, 1));
+    const state = reduceGame(game);
+    expect(state.hits.first).toBe(1);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]?.playerId).toBe(batter.playerId);
+    const slash = slashFor(game, batter.playerId);
+    expect(slash?.h).toBe(0);
+    expect(slash?.ab).toBe(1);
+  });
+
+  it("打者が一塁に達する前の挟殺は打数も安打も付かず、次の回の先頭になる", () => {
+    let game = commitPlay(makeGame(), "strikeout");
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "single", [{ playerId: "A3", from: 0, to: 1 }]);
+    const before = reduceGame(game);
+    const batter = getBatter(before);
+    expect(before.outs).toBe(2);
+    expect(batter.playerId).toBe("A4");
+    game = commitPlay(game, "preceding_out", proposePrecedingOut(before, 1));
+    const state = reduceGame(game);
+    expect(state.half).toBe("bottom");
+    expect(state.outs).toBe(0);
+    expect(state.hits.first).toBe(1);
+    expect(state.lineupIndex.first).toBe(before.lineupIndex.first);
+    expect(state.pitchesThrown.second).toBe(before.pitchesThrown.second + 1);
+    const slash = slashFor(game, batter.playerId);
+    expect(slash?.ab).toBe(0);
+    expect(slash?.h).toBe(0);
+  });
+
   it("単打で打者が1塁", () => {
     const game = commitPlay(makeGame(), "single");
     const state = reduceGame(game);
@@ -314,6 +386,188 @@ describe("らくスコア engine", () => {
     let game = commitPlay(makeGame(), "single");
     game = commitPb(game);
     expect(reduceGame(game).bases[1]?.playerId).toBe("A1");
+  });
+
+  it("盗塁の球はストライクとして球数が増える", () => {
+    let game = commitPlay(makeGame(), "single");
+    const before = reduceGame(game);
+    game = commitSteal(game, 1, 2, "strike");
+    const state = reduceGame(game);
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(state.strikes).toBe(1);
+    expect(state.balls).toBe(0);
+    expect(state.pitchesThrown.second).toBe(before.pitchesThrown.second + 1);
+    expect(getBatter(state).playerId).toBe("A2");
+    expect(slashFor(game, "A1")?.sb).toBe(1);
+  });
+
+  it("先に数えたボールの盗塁は、球数もカウントも増やさない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "ball");
+    const pitched = reduceGame(game);
+    expect(latestOpenPitch(game.events)).toBe("ball");
+    game = commitSteal(game, 1, 2);
+    const state = reduceGame(game);
+    expect(state.balls).toBe(pitched.balls);
+    expect(state.strikes).toBe(0);
+    expect(state.pitchesThrown.second).toBe(pitched.pitchesThrown.second);
+    expect(state.pitchCountAtBat).toBe(pitched.pitchCountAtBat);
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(slashFor(game, "A1")?.sb).toBe(1);
+    game = { ...game, events: undoLast(game.events) };
+    const undone = reduceGame(game);
+    expect(undone.balls).toBe(1);
+    expect(undone.bases[0]?.playerId).toBe("A1");
+    expect(latestOpenPitch(game.events)).toBe("ball");
+  });
+
+  it("打席が終わると、すでに数えた球は引き継がない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "strike");
+    expect(latestOpenPitch(game.events)).toBe("strike");
+    game = commitPlay(game, "groundout");
+    expect(latestOpenPitch(game.events)).toBeNull();
+  });
+
+  it("盗塁の球はボールとしても数え、戻すと投球ごと消える", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "ball");
+    game = commitSteal(game, 1, 2, "ball");
+    const pitched = reduceGame(game);
+    expect(pitched.balls).toBe(2);
+    expect(pitched.bases[1]?.playerId).toBe("A1");
+    game = { ...game, events: undoLast(game.events) };
+    const undone = reduceGame(game);
+    expect(undone.balls).toBe(1);
+    expect(undone.bases[0]?.playerId).toBe("A1");
+    expect(undone.pitchesThrown.second).toBe(pitched.pitchesThrown.second - 1);
+  });
+
+  it("4つ目のボールで一塁走者を盗塁にしても、押されるだけなので四球", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitSteal(game, 1, 2, "ball");
+    const state = reduceGame(game);
+    expect(state.balls).toBe(0);
+    expect(state.bases[0]?.playerId).toBe("A2");
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(slashFor(game, "A1")?.sb).toBe(0);
+    expect(slashFor(game, "A2")?.bb).toBe(1);
+  });
+
+  it("4つ目のボールでも、押されない二塁走者の盗塁は残る", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 2 }]);
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitSteal(game, 2, 3, "ball");
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A2");
+    expect(state.bases[2]?.playerId).toBe("A1");
+    expect(slashFor(game, "A1")?.sb).toBe(1);
+    expect(slashFor(game, "A2")?.bb).toBe(1);
+  });
+
+  it("2アウトからの3ストライクは三振だけで、盗塁はつかない", () => {
+    let game = commitPlay(makeGame(), "strikeout");
+    game = commitPlay(game, "strikeout");
+    game = commitPlay(game, "single");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    const batter = getBatter(reduceGame(game)).playerId;
+    game = commitSteal(game, 1, 2, "strike");
+    const state = reduceGame(game);
+    expect(state.half).toBe("bottom");
+    expect(slashFor(game, "A1")?.sb).toBe(0);
+    expect(slashFor(game, batter)?.ab).toBe(1);
+  });
+
+  it("3ストライクの盗塁は盗塁と三振の両方", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitSteal(game, 1, 2, "strike");
+    const state = reduceGame(game);
+    expect(state.outs).toBe(1);
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(getBatter(state).playerId).toBe("A3");
+    expect(slashFor(game, "A1")?.sb).toBe(1);
+  });
+
+  it("暴投の球はボールとして数え、打者は残る", () => {
+    let game = commitPlay(makeGame(), "single");
+    const before = reduceGame(game);
+    game = commitWp(game, { pitch: "ball" });
+    const state = reduceGame(game);
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(state.balls).toBe(1);
+    expect(state.pitchesThrown.second).toBe(before.pitchesThrown.second + 1);
+    expect(getBatter(state).playerId).toBe("A2");
+  });
+
+  it("4つ目のボールの暴投は、押されない走者だけ暴投で進む", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 2 }]);
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitWp(game, { pitch: "ball" });
+    const state = reduceGame(game);
+    expect(state.bases[0]?.playerId).toBe("A2");
+    expect(state.bases[2]?.playerId).toBe("A1");
+    expect(slashFor(game, "A2")?.bb).toBe(1);
+    expect(slashFor(game, "A2")?.rbi).toBe(0);
+  });
+
+  it("満塁の4つ目のボールは四球の打点になり、暴投では重ねない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPlay(game, "single");
+    game = commitPlay(game, "single");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    game = commitPitch(game, "ball");
+    const batter = getBatter(reduceGame(game)).playerId;
+    game = commitWp(game, { pitch: "ball" });
+    const state = reduceGame(game);
+    expect(state.scores.first[0]).toBe(1);
+    expect(state.bases[0]?.playerId).toBe(batter);
+    expect(state.bases[1]?.playerId).toBe("A3");
+    expect(state.bases[2]?.playerId).toBe("A2");
+    expect(slashFor(game, batter)?.rbi).toBe(1);
+    expect(slashFor(game, batter)?.bb).toBe(1);
+  });
+
+  it("振り逃げできる3ストライクの暴投は、打者を1塁に出す", () => {
+    let game = commitPlay(makeGame(), "single", [{ playerId: "A1", from: 0, to: 2 }]);
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitWp(game, { pitch: "strike" });
+    const state = reduceGame(game);
+    expect(state.outs).toBe(0);
+    expect(state.bases[0]?.playerId).toBe("A2");
+    expect(state.bases[2]?.playerId).toBe("A1");
+    expect(slashFor(game, "A2")?.ab).toBe(1);
+  });
+
+  it("1塁に走者がいる3ストライクの暴投は三振で、走者は進む", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "strike");
+    game = commitPitch(game, "strike");
+    game = commitWp(game, { pitch: "strike" });
+    const state = reduceGame(game);
+    expect(state.outs).toBe(1);
+    expect(state.bases[0]).toBeNull();
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(getBatter(state).playerId).toBe("A3");
+  });
+
+  it("投球の説明はボールとストライクの結果を先に言う", () => {
+    const empty = reduceGame(makeGame());
+    expect(deliveryNote(empty, "ball", "steal")).toContain("球数が1つ増えて");
+    expect(deliveryNote({ ...empty, balls: 3 }, "ball", "wp")).toContain("四球");
+    expect(deliveryNote({ ...empty, strikes: 2, outs: 2 }, "strike", "cs")).toContain("盗塁は記録しません");
+    expect(deliveryNote({ ...empty, strikes: 2 }, "strike", "pb")).toContain("振り逃げ");
   });
 
   it("一塁と三塁の暴投で一塁を残すと三塁だけホームに入る", () => {

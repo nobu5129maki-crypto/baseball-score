@@ -154,6 +154,17 @@ export const PLAY_RULES: Record<PlayResult, PlayRule> = {
       symbol: "打妨",
     },
   },
+  preceding_out: {
+    needsField: false,
+    isAb: false,
+    hitValue: 0,
+    awardsRbi: false,
+    blocked: (state) => {
+      if (!hasRunner(state)) return "走者がいないと挟殺になりません。";
+      if (state.outs < 2) return "2アウト未満では、安打か野選の挟殺として記録します。";
+      return null;
+    },
+  },
   offensive_interference: {
     needsField: false,
     isAb: true,
@@ -192,7 +203,7 @@ export const SITUATION_TERMS: RuleTerm[] = [
     id: "pb",
     title: "捕逸（PB）",
     plain:
-      "捕手が普通に取れそうな球を後ろにそらして、走者が進塁したとき。投手の暴投ではない。一塁と三塁に走者がいるときは、三塁はホームへ進み、一塁が進むか残るかを選べます。",
+      "捕手が普通に取れそうな球を後ろにそらして、走者が進塁したとき。投手の暴投ではない。投げた球はボールかストライクで、まだ数えていなければ球数が1つ増えます。先にボール・ストライク・ファウルを押していたときは、その球のまま記録して球数は増やしません。一塁と三塁に走者がいるときは、三塁はホームへ進み、一塁が進むか残るかを選べます。",
     when: "キャッチャーが捕球をこぼして走者が動いたとき。",
     symbol: "PB",
   },
@@ -200,7 +211,7 @@ export const SITUATION_TERMS: RuleTerm[] = [
     id: "wp",
     title: "暴投（WP）",
     plain:
-      "投手が捕手の取れないところに投げ、走者が進塁したとき。一塁と三塁に走者がいるときは、三塁はホームへ進み、一塁が進むか残るかを選べます。",
+      "投手が捕手の取れないところに投げ、走者が進塁したとき。投げた球はボールかストライクで、まだ数えていなければ球数が1つ増えます。先にボール・ストライク・ファウルを押していたときは、その球のまま記録して球数は増やしません。一塁と三塁に走者がいるときは、三塁はホームへ進み、一塁が進むか残るかを選べます。",
     when: "ワンバウンドや大きく外れた球で走者が動いたとき。",
     symbol: "WP",
   },
@@ -211,6 +222,14 @@ export const SITUATION_TERMS: RuleTerm[] = [
       "スコアブックでは飛んだ方向を付けて、左本・中本・右本と書きます。本塁打そのものが得点になるので、マスに「点」は重ねません。",
     when: "ホームランを記録するとき。方向を選んでください。",
     symbol: "左本",
+  },
+  {
+    id: "rd",
+    title: "挟殺（きょうさつ）",
+    plain:
+      "走者が塁と塁の間で挟まれ、タッチされてアウトになるプレーです。打者がヒットで出塁したあとに起きたときは、安打は残ります。「挟殺」でシングル、ツーベース、スリーベースを選び、アウトになった走者を選びます。内野手が打者を一塁でアウトにできるのに、その走者をアウトにしにいって打者が生きたときは野選です。安打にはしません。2アウトで、打者が一塁に達する前にそのアウトで回が終わったときは、打数も安打も付きません。その打者は次の回の先頭打者です。",
+    when: "フェアの打球のあと、別の走者が挟まれてアウトになったとき。「挟殺」ボタンで記録します。",
+    symbol: "挟",
   },
   {
     id: "po",
@@ -254,6 +273,19 @@ export function deadBallAdvanceNote(bases: GameState["bases"]): string {
 }
 
 /** 妨害で走者がいるとき、確定前に見せる進塁の説明。 */
+export function hitAdvanceNote(result: PlayResult): string | null {
+  if (result === "single" || result === "double" || result === "triple") {
+    return "進塁先を直してから確定します。別の走者が挟まれてアウトになったときは、その走者の「アウト」を押してください。安打は残ります。";
+  }
+  if (result === "fielders_choice") {
+    return "野選です。安打にはしません。アウトにした走者の「アウト」を押してから確定してください。";
+  }
+  if (result === "preceding_out") {
+    return "打者が一塁に達する前に、走者のアウトで3アウトになりました。打数も安打も付きません。次の回は同じ打者から始まります。";
+  }
+  return null;
+}
+
 export function interferenceAdvanceNote(result: PlayResult): string | null {
   if (result === "catcher_interference") {
     return "打撃妨害です。打者は1塁へ出ます。1塁から順に詰まっている走者だけ進みます。違うときは進塁先を直してから確定してください。";
