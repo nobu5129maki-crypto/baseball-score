@@ -10,6 +10,7 @@ import {
   commitPlay,
   commitPositionSwap,
   deliveryNote,
+  latestOpenPitch,
   commitSteal,
   commitSub,
   commitWp,
@@ -398,6 +399,34 @@ describe("らくスコア engine", () => {
     expect(state.pitchesThrown.second).toBe(before.pitchesThrown.second + 1);
     expect(getBatter(state).playerId).toBe("A2");
     expect(slashFor(game, "A1")?.sb).toBe(1);
+  });
+
+  it("先に数えたボールの盗塁は、球数もカウントも増やさない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "ball");
+    const pitched = reduceGame(game);
+    expect(latestOpenPitch(game.events)).toBe("ball");
+    game = commitSteal(game, 1, 2);
+    const state = reduceGame(game);
+    expect(state.balls).toBe(pitched.balls);
+    expect(state.strikes).toBe(0);
+    expect(state.pitchesThrown.second).toBe(pitched.pitchesThrown.second);
+    expect(state.pitchCountAtBat).toBe(pitched.pitchCountAtBat);
+    expect(state.bases[1]?.playerId).toBe("A1");
+    expect(slashFor(game, "A1")?.sb).toBe(1);
+    game = { ...game, events: undoLast(game.events) };
+    const undone = reduceGame(game);
+    expect(undone.balls).toBe(1);
+    expect(undone.bases[0]?.playerId).toBe("A1");
+    expect(latestOpenPitch(game.events)).toBe("ball");
+  });
+
+  it("打席が終わると、すでに数えた球は引き継がない", () => {
+    let game = commitPlay(makeGame(), "single");
+    game = commitPitch(game, "strike");
+    expect(latestOpenPitch(game.events)).toBe("strike");
+    game = commitPlay(game, "groundout");
+    expect(latestOpenPitch(game.events)).toBeNull();
   });
 
   it("盗塁の球はボールとしても数え、戻すと投球ごと消える", () => {

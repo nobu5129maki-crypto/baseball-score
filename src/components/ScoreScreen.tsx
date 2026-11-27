@@ -24,6 +24,7 @@ import {
   getPitcher,
   needsFieldPosition,
   deliveryNote,
+  latestOpenPitch,
   needsRunnerConfirm,
   needsStrikeThreeChoice,
   canDroppedThird,
@@ -52,7 +53,7 @@ import { runChangeMessage, runChangeRuleLabel } from "@/lib/run-change";
 import { atBatsThisGame, batterAtBatLine, batterLine, careerGames, slashAcrossGames, slashFor } from "@/lib/stats";
 import { opponentBenchPlayers, rememberOpponentBench } from "@/lib/opponent-bench";
 import { POSITION_LABELS } from "@/lib/types";
-import type { Base, BattedBall, DeliveredPitch, Dest, Game, LineupSlot, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
+import type { Base, BattedBall, DeliveredPitch, Dest, Game, GameState, LineupSlot, PitchKind, PlayResult, Position, RunnerMove, RunnerOnBase } from "@/lib/types";
 import { CountDots } from "./CountDots";
 import { DefenseSheet } from "./DefenseSheet";
 import { PlayerIdentity } from "./PlayerIdentity";
@@ -89,6 +90,62 @@ type SheetKind =
   | "rundown_runner"
   | "delivery";
 
+function countedPitchName(kind: PitchKind): string {
+  if (kind === "ball") return "ボール";
+  if (kind === "strike") return "ストライク";
+  return "ファウル";
+}
+
+function DeliverySheet({
+  action,
+  state,
+  openPitch,
+  onPitch,
+  onClose,
+}: {
+  action: "steal" | "cs" | "wp" | "pb";
+  state: GameState;
+  openPitch: PitchKind | null;
+  onPitch: (pitch: DeliveredPitch | "kept") => void;
+  onClose: () => void;
+}) {
+  const title = action === "steal" ? "盗塁" : action === "cs" ? "盗塁死" : action === "wp" ? "暴投" : "捕逸";
+  const counted = openPitch ? countedPitchName(openPitch) : null;
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <CountDots balls={state.balls} strikes={state.strikes} outs={state.outs} />
+      {counted ? (
+        <>
+          <p className="text-sm text-[#9aa894] mt-3 mb-2 leading-relaxed">
+            この打席では、すでに{counted}を記録しています。その球で続けると、球数は増えません。
+          </p>
+          <button type="button" className="tap tap-accent min-h-20 w-full" onClick={() => onPitch("kept")}>
+            <span className="block text-xs font-normal opacity-90">球数はそのまま</span>
+            すでに{counted}を選んだ
+          </button>
+          <p className="text-sm text-[#9aa894] mt-3 mb-2 leading-relaxed">
+            まだ記録していない球なら、ここで数えます。球数が1つ増えます。
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-[#9aa894] mt-3 mb-2 leading-relaxed">
+          投手はすでに投げています。その球を選ぶと、球数が1つ増えます。先にボール・ストライク・ファウルを押していたときは、「すでに選んだ」がここに出ます。
+        </p>
+      )}
+      <div className="flex flex-col gap-2">
+        <button type="button" className="tap tap-ball min-h-20" onClick={() => onPitch("ball")}>
+          <span className="block text-xs font-normal opacity-90">ボール</span>
+          {deliveryNote(state, "ball", action)}
+        </button>
+        <button type="button" className="tap tap-strike min-h-20" onClick={() => onPitch("strike")}>
+          <span className="block text-xs font-normal opacity-90">ストライク</span>
+          {deliveryNote(state, "strike", action)}
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
 export function ScoreScreen({ gameId }: { gameId: string }) {
   const router = useRouter();
   const enqueueSave = useRef(createSaveQueue()).current;
@@ -118,7 +175,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
   const [bench, setBench] = useState<{ moves: RunnerMove[]; selectedId: string | null } | null>(null);
   const [live, setLive] = useState<{
     action: "steal" | "cs" | "wp" | "pb";
-    pitch: DeliveredPitch | null;
+    pitch: DeliveredPitch | "kept" | null;
   } | null>(null);
   const [startNotice, setStartNotice] = useState<string | null>(null);
   const dismissStartNotice = useCallback(() => setStartNotice(null), []);
@@ -202,24 +259,27 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     });
   }
 
-  function chooseLivePitch(pitch: DeliveredPitch) {
+  function chooseLivePitch(pitch: DeliveredPitch | "kept") {
     if (!state || !live) return;
     const action = live.action;
+    const recorded = pitch === "kept" ? undefined : pitch;
     setLive({ action, pitch });
-    if ((action === "steal" || action === "cs") && pitch === "strike" && state.strikes >= 2 && state.outs >= 2) {
+    if (recorded === "strike" && (action === "steal" || action === "cs") && state.strikes >= 2 && state.outs >= 2) {
       setLive(null);
       setSheet(null);
       void patch((g) => commitDeliveredStrikeout(g));
       return;
     }
     if (action === "wp" || action === "pb") {
-      if (state.bases[0] && state.bases[2] && !(pitch === "ball" && state.balls >= 3)) {
+      if (state.bases[0] && state.bases[2] && !(recorded === "ball" && state.balls >= 3)) {
         setSheet(action === "wp" ? "wp_hold" : "pb_hold");
         return;
       }
       setLive(null);
       setSheet(null);
-      void patch((g) => (action === "wp" ? commitWp(g, { pitch }) : commitPb(g, { pitch })));
+      void patch((g) =>
+        action === "wp" ? commitWp(g, recorded ? { pitch: recorded } : {}) : commitPb(g, recorded ? { pitch: recorded } : {}),
+      );
       return;
     }
     const choices = occupiedBases(action);
@@ -229,8 +289,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       setSheet(null);
       void patch((g) =>
         action === "cs"
-          ? commitSteal(g, from, "out", pitch)
-          : commitSteal(g, from, from === 3 ? 4 : ((from + 1) as Dest), pitch),
+          ? commitSteal(g, from, "out", recorded)
+          : commitSteal(g, from, from === 3 ? 4 : ((from + 1) as Dest), recorded),
       );
       return;
     }
@@ -359,7 +419,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     if (sheet === "steal") {
       if (!state || !nextStealBaseOpen(state, from) || !live?.pitch) return;
       const to: Dest = from === 3 ? 4 : ((from + 1) as Dest);
-      const pitch = live.pitch;
+      const pitch = live.pitch === "kept" ? undefined : live.pitch;
       setLive(null);
       void patch((g) => commitSteal(g, from, to, pitch));
       setSheet(null);
@@ -367,7 +427,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
     }
     if (sheet === "cs") {
       if (!live?.pitch) return;
-      const pitch = live.pitch;
+      const pitch = live.pitch === "kept" ? undefined : live.pitch;
       setLive(null);
       void patch((g) => commitSteal(g, from, "out", pitch));
       setSheet(null);
@@ -1111,28 +1171,16 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
         />
       ) : null}
       {sheet === "delivery" && live ? (
-        <Sheet
-          title={live.action === "steal" ? "盗塁" : live.action === "cs" ? "盗塁死" : live.action === "wp" ? "暴投" : "捕逸"}
+        <DeliverySheet
+          action={live.action}
+          state={state}
+          openPitch={latestOpenPitch(game.events)}
+          onPitch={chooseLivePitch}
           onClose={() => {
             setLive(null);
             setSheet(null);
           }}
-        >
-          <p className="text-sm text-[#9aa894] mb-3 leading-relaxed">
-            投手はすでに投げています。その球を選ぶと、球数が1つ増えます。
-          </p>
-          <CountDots balls={state.balls} strikes={state.strikes} outs={state.outs} />
-          <div className="flex flex-col gap-2 mt-3">
-            <button type="button" className="tap tap-ball min-h-20" onClick={() => chooseLivePitch("ball")}>
-              <span className="block text-xs font-normal opacity-90">ボール</span>
-              {deliveryNote(state, "ball", live.action)}
-            </button>
-            <button type="button" className="tap tap-strike min-h-20" onClick={() => chooseLivePitch("strike")}>
-              <span className="block text-xs font-normal opacity-90">ストライク</span>
-              {deliveryNote(state, "strike", live.action)}
-            </button>
-          </div>
-        </Sheet>
+        />
       ) : null}
       {sheet === "wp_hold" || sheet === "pb_hold" ? (
         <WildAdvanceSheet
@@ -1144,9 +1192,8 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             setLive(null);
             setSheet(null);
             if (!pitch) return;
-            void patch((g) =>
-              kind === "wp" ? commitWp(g, { holdFirst, pitch }) : commitPb(g, { holdFirst, pitch }),
-            );
+            const options = pitch === "kept" ? { holdFirst } : { holdFirst, pitch };
+            void patch((g) => (kind === "wp" ? commitWp(g, options) : commitPb(g, options)));
           }}
           onClose={() => {
             if (live) setLive({ ...live, pitch: null });
@@ -1157,7 +1204,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       {sheet === "steal" ? (
         <RunnerPickSheet
           title="盗塁"
-          hint="進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。先にその走者を動かしてください。選んだ球の球数は、走者を選んだときに増えます。"
+          hint={
+            live?.pitch === "kept"
+              ? "進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。球数はすでに数えてあるので、増えません。"
+              : "進塁させる走者を1人選んでください。次の塁に走者がいるときは盗塁できません。先にその走者を動かしてください。選んだ球の球数は、走者を選んだときに増えます。"
+          }
           bases={state.bases}
           action={(b, name) => `${b}塁の${name} を ${b === 3 ? "本塁" : `${b + 1}塁`}へ`}
           canPick={(b) => nextStealBaseOpen(state, b)}
@@ -1167,7 +1218,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             setLive(null);
             setSheet(null);
             if (!pitch) return;
-            void patch((g) => commitSteal(g, from, to, pitch));
+            void patch((g) => commitSteal(g, from, to, pitch === "kept" ? undefined : pitch));
           }}
           onClose={() => {
             if (live) setLive({ ...live, pitch: null });
@@ -1178,7 +1229,11 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
       {sheet === "cs" ? (
         <RunnerPickSheet
           title="盗塁死"
-          hint="アウトになった走者を1人選んでください。選んだ球の球数は、走者を選んだときに増えます。"
+          hint={
+            live?.pitch === "kept"
+              ? "アウトになった走者を1人選んでください。球数はすでに数えてあるので、増えません。"
+              : "アウトになった走者を1人選んでください。選んだ球の球数は、走者を選んだときに増えます。"
+          }
           bases={state.bases}
           action={(b, name) => `${b}塁の${name} を盗塁死（アウト）`}
           danger
@@ -1187,7 +1242,7 @@ export function ScoreScreen({ gameId }: { gameId: string }) {
             setLive(null);
             setSheet(null);
             if (!pitch) return;
-            void patch((g) => commitSteal(g, from, "out", pitch));
+            void patch((g) => commitSteal(g, from, "out", pitch === "kept" ? undefined : pitch));
           }}
           onClose={() => {
             if (live) setLive({ ...live, pitch: null });

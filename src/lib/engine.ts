@@ -845,6 +845,17 @@ function wildExtras(state: GameState, holdFirst: boolean): RunnerMove[] {
   });
 }
 
+/** この打席ですでに数えた、いちばん新しい球。打席が終わっていれば null */
+export function latestOpenPitch(events: GameEvent[]): PitchKind | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    if (event.t === "pitch") return event.kind;
+    if (event.t === "end_game") return null;
+    if (event.t === "play" && event.result !== "preceding_out") return null;
+  }
+  return null;
+}
+
 export function deliveryNote(state: GameState, pitch: DeliveredPitch, action: DeliveryAction): string {
   const fourth = pitch === "ball" && state.balls >= 3;
   const third = pitch === "strike" && state.strikes >= 2;
